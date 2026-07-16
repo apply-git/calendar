@@ -1,0 +1,176 @@
+# 桌面行程表交接檔
+
+## 專案位置
+
+`d:\計畫表`
+
+## 專案類型
+
+純前端本機 App：Vanilla HTML / CSS / JavaScript。
+
+不需要 npm、不需要 build、不需要伺服器。
+
+使用方式：直接雙擊 `index.html`。
+
+## 主要檔案
+
+| 檔案 | 用途 |
+|---|---|
+| `index.html` | 主畫面與 dialog 結構 |
+| `styles.css` | 版面、主題、手機響應式、小工具模式樣式 |
+| `app.js` | 全部資料狀態、渲染、互動邏輯 |
+| `sync.js` | 雲端同步 scaffold（Supabase REST/Auth，純 fetch，未設定時整個 no-op） |
+| `config.js` | 雲端同步實際設定檔（`window.CALENDAR_SYNC_CONFIG`，預設空值） |
+| `config.example.js` | 雲端同步設定範例／備份，不會被 index.html 載入 |
+| `schema.sql` | Supabase `sync_state` 表 + RLS 規則，供 CLOUD_SETUP.md 步驟貼到 SQL Editor 執行 |
+| `CLOUD_SETUP.md` | 雲端同步設定教學（建 Supabase 專案、跑 schema、設定 Google 登入） |
+| `manifest.json` / `service-worker.js` / `icons/` / `start-pwa-local.bat` | PWA 安裝與離線快取（需本機伺服器）。`icons/` 內含正式圖示（icon-192/icon-512/icon-maskable-512/apple-touch-icon/favicon-64，皆圓角）與 `icon-master-1024.png` 母檔備用；`service-worker.js` 快取版本 v3。 |
+| `README.md` | 使用說明 |
+| `HANDOFF.md` | 本交接檔 |
+| `ROADMAP.md` | 功能規劃、分工與進度（2026-07 大幅擴充的依據） |
+| `CLAUDE.md` | Claude Code 入口說明 |
+| `AGENTS.md` | Codex / 通用 agent 入口說明 |
+
+## 執行 / 驗證
+
+1. 開啟：`index.html`
+2. 瀏覽器網址類似：`file:///D:/%E8%A8%88%E7%95%AB%E8%A1%A8/index.html`
+3. 修改後重新整理頁面即可。
+4. 無自動測試；以瀏覽器手動測功能。
+
+## 資料儲存
+
+全部存在瀏覽器 `localStorage`。
+
+目前使用 key：
+
+- `desktop-schedule-v1`：行程
+- `desktop-schedule-habits-v1`：習慣
+- `desktop-schedule-theme-v1`：深色 / 淺色
+- `desktop-schedule-categories-v1`：分類
+- `desktop-schedule-text-settings-v1`：自訂文字
+- `desktop-schedule-app-settings-v1`：工作時間等設定
+- `desktop-schedule-daily-memos-v1`：每日備忘錄
+- `desktop-schedule-templates-v1`：快速範本
+- `desktop-schedule-weekly-goals-v1`：每週目標
+- `desktop-schedule-widget-mode-v1`：小工具模式
+- `desktop-schedule-sync-auth-v1`：雲端同步登入權杖（access/refresh token、使用者 id/email）。**不**納入「備份」匯出/還原，避免帳號憑證被包進分享出去的 JSON 檔。
+- `desktop-schedule-sync-meta-v1`：雲端同步狀態（最後一次成功同步的時間戳）。同樣**不**納入備份。
+
+`appSettings`（`desktop-schedule-app-settings-v1`）新增欄位 `autoSync`（布林，預設 `false`）：是否開啟「存檔時自動同步到雲端」。這個欄位**有**跟著 `appSettings` 整包走 `normalizeStoredData()` / `exportBackup()` / `importBackup()`。
+
+task 物件新增欄位 `excludedDates`（字串陣列，預設 `[]`）：儲存「這筆（通常是重複）行程被排除、不顯示」的日期字串清單，供「🗑 清空當日」功能使用。`occursOnDate(task, dateKey)` 一開始就會檢查 `excludedDates` 是否包含 `dateKey`，包含就直接回傳 `false`（蓋掉所有重複規則判斷）。`normalizeStoredData()` 會幫舊資料補上空陣列；`buildBackupPayload()` / `applyBackupObject()` 是整包序列化/還原 `tasks` 陣列，`excludedDates` 會自動跟著 task 物件走，不需要額外程式碼。
+
+## 已完成功能
+
+- 新增 / 編輯 / 刪除行程
+- 日 / 週 / 月檢視
+- 完成勾選
+- 重複行程：每天 / 每週 / 每月
+- 重複行程每日獨立完成
+- 分類與顏色
+- 自訂分類
+- 自訂畫面文字
+- 自訂日檢視顯示時間範圍
+- 子任務清單
+- 行程複製到明天
+- 行程置頂
+- 逾時標紅
+- 每日備忘錄
+- 快速範本
+- 本週 / 本月完成統計
+- 清理已完成舊行程
+- 提醒時間：不提醒 / 準時 / 5 / 10 / 30 分鐘前
+- 重要度篩選
+- 今日待辦模式
+- 桌面小工具模式
+- 拖曳調整日期；同日拖曳可調整排序
+- 關鍵字標籤
+- 完成音效
+- 每週目標
+- CSV 匯出
+- PDF / 列印
+- JSON 備份 / 還原
+- 國定假日標示（2025–2027，`TAIWAN_HOLIDAYS`）
+- 近 7 天完成統計長條圖
+- 番茄鐘 / 專注計時
+- .ics 匯出 / 匯入（含 RRULE 轉換）
+- 彈性重複規則：每隔 N 天、只工作日、每月第 N 個週幾
+- 農曆顯示（1900–2100，純前端換算）
+- 日檢視時間軸模式（可拖曳調整結束時間）
+- PWA（`manifest.json` / `service-worker.js`，需透過 `start-pwa-local.bat` 本機伺服器才能安裝/離線）
+- 系統推播通知
+- 雲端同步 scaffold（`sync.js`）：預設未設定 = 純本機、不發網路請求；設定 `config.js` 後可 Google 登入、手動/自動同步備份 JSON 到 Supabase，last-write-wins，詳見 `CLOUD_SETUP.md`
+- 日／週／月檢視一鍵清除：「🗑 清空當日」（`clearDayBtn`，只在日檢視顯示，函式 `clearDayTasks()`）、「🗑 清空本週」（`clearWeekBtn`，只在週檢視顯示，函式 `clearWeekTasks()`）、「🗑 清空本月」（`clearMonthBtn`，只在月檢視顯示，函式 `clearMonthTasks()`）。三者邏輯一致：非重複行程整筆刪除；重複行程改記到 `task.excludedDates`（牽涉到的日期不再出現，其他天不受影響），`occursOnDate()` 最前面會先檢查 `excludedDates` 是否包含目標日期並直接回傳 `false`。點擊後用 `confirm()` 跳出確認，確認才會清除並顯示 toast。週／月版本共用 `clearTasksForDateKeys(dateKeys, label)` 這個輔助函式：先掃描整個日期範圍，把「要刪除的非重複行程 id」與「重複行程要新增的 excludedDates」蒐集完才一次套用，避免逐天處理時 tasks 陣列被提前修改而找不到物件；月範圍只算當月 1 號到月底（`daysInMonth()`），不含 `renderMonth()` 網格補齊的跨月天數。三顆按鈕的顯示/隱藏邏輯都整合在 `updateDayModeSwitch()`（今日待辦模式、小工具模式時全部隱藏）。
+
+## 重要實作規則
+
+1. 盡量維持純前端，不引入框架。
+2. 不要破壞現有 `localStorage` 相容性。
+3. 新增資料欄位時，必須更新：
+   - `normalizeStoredData()`
+   - `exportBackup()`
+   - `importBackup()`
+   - `README.md`
+4. UI 文字若屬常用顯示文字，盡量納入文字設定。
+5. 行程完成狀態使用 `completedDates`，不要改回單一 `done`。
+6. 重複行程要透過 `occursOnDate(task, dateKey)` 判斷。
+7. 修改後至少手動測：新增行程、完成勾選、切換檢視、備份還原。
+
+## app.js 核心區塊
+
+- 常數與預設值：檔案開頭
+- DOM refs：`els`
+- 初始化：`init()`
+- 事件綁定：`bindEvents()`
+- 主渲染：`render()`
+- 日 / 週 / 月渲染：`renderDay()`、`renderWeek()`、`renderMonth()`
+- 行程卡片：`taskCard()`
+- 新增 / 編輯行程：`openTaskDialog()`、`saveTaskFromForm()`
+- 篩選：`getFilteredTasks()`
+- 提醒：`checkReminders()`
+- 備份 / 還原：`exportBackup()`、`importBackup()`（內部呼叫 `buildBackupPayload()` / `applyBackupObject()`，這兩個是備份資料格式的單一真相，`sync.js` 也透過 `window.CalendarApp` 呼叫它們，避免資料格式各自漂移）
+- 資料相容：`normalizeStoredData()`
+- 提供給 `sync.js` 的介面：檔案最底部的 `window.CalendarApp`（`buildBackupPayload`、`applyBackupObject`、`isAutoSyncEnabled`/`setAutoSyncEnabled`、`showToast`、可被 `sync.js` 掛上的 `onDataChanged` 鉤子；`render()` 存檔後會呼叫它，外層包 try/catch，沒有載入 sync.js 或呼叫失敗都不影響本機功能）
+- 日期工具：檔案底部
+
+## 後續可製作方向
+
+### PWA 版（已完成，待實測）
+
+`manifest.json` / `service-worker.js` / `icons/` / 離線快取 / README 教學皆已完成。
+仍待做：透過 `start-pwa-local.bat` 本機伺服器實際安裝到手機/電腦跑一輪確認。
+
+### 雲端同步實際上線（scaffold 已完成，尚未實測）
+
+程式骨架（`sync.js` + `config.js` + `schema.sql` + `CLOUD_SETUP.md`）已就緒，但**尚未拿真實 Supabase 金鑰驗證過**。下一步：
+- 依 `CLOUD_SETUP.md` 建 Supabase 專案、跑 `schema.sql`、啟用 Google 登入、填 `config.js`。
+- 兩台裝置實測 last-write-wins 同步是否如預期。
+
+### Android 安裝檔
+
+若要真正 `.apk`：建議使用 Capacitor，需新增 Node 專案、Android Studio / Gradle 環境；目前程式可作為 Web assets 放入 Capacitor。
+
+### iOS 安裝檔
+
+需 macOS + Xcode + Apple Developer Program。
+
+## 已知注意事項
+
+- 桌面通知在 `file://` 不同瀏覽器限制不同，正式 PWA 用 HTTPS 較穩。
+- iPhone PWA 的通知支援受系統版本影響。
+- 已有雲端同步 scaffold（`sync.js` + `config.js` + `schema.sql` + `CLOUD_SETUP.md`）：預設未設定時仍是純 localStorage、無帳號系統、不跨裝置同步；填好 `config.js` 的 Supabase 專案資訊並登入 Google 後，才會有帳號與跨裝置同步（last-write-wins，非即時多人協作）。目前沒有真的部署 Supabase 專案驗證過（沒有金鑰），架構與程式碼已完成但屬「尚未實測」狀態，之後拿到金鑰要照 `CLOUD_SETUP.md` 走一次完整流程驗證。
+- 登入用的 access/refresh token 存在 `desktop-schedule-sync-auth-v1`，刻意不放進備份 JSON；換瀏覽器/清資料需要重新走一次 Google 登入。
+- 測試過程曾建立測試行程與每週目標，已手動刪除。
+
+## 存檔規則
+
+當使用者說「存檔」時，除了保存專案變更，必須同步更新這三個交接檔案：
+
+- `HANDOFF.md`
+- `CLAUDE.md`
+- `AGENTS.md`
+
+## 交接給新 agent 的第一句建議
+
+請先讀 `HANDOFF.md`、`README.md`，再讀 `index.html` / `app.js` / `styles.css`。這是純前端本機行程表，請保持無框架、免安裝、localStorage 相容。
