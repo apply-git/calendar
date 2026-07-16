@@ -304,7 +304,9 @@
     const userId = authState.user?.id;
     if (!userId) throw new Error('cloudPull：找不到使用者 id，無法連線雲端（不是雲端沒有資料）');
     const url = `${SUPABASE_URL}/rest/v1/sync_state?user_id=eq.${encodeURIComponent(userId)}&select=payload,updated_at`;
-    const res = await fetch(url, { headers: authHeaders() });
+    // cache: 'no-store'：同步判斷必須讀到雲端「當下」的資料，任何一層快取（瀏覽器 HTTP 快取）
+    // 都可能造成用舊資料比較而誤判方向。Service Worker 端也已改為不攔截跨網域請求。
+    const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
     if (!res.ok) throw new Error('cloudPull failed: ' + res.status);
     const rows = await res.json();
     // 這裡回傳 null 才是真的「雲端還沒有這個帳號的資料列」（例如第一次同步），是合理、安全的 null。

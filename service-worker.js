@@ -1,4 +1,4 @@
-const CACHE_NAME = 'desktop-schedule-pwa-v9';
+const CACHE_NAME = 'desktop-schedule-pwa-v10';
 const APP_SHELL = [
   './',
   './index.html',
@@ -38,6 +38,14 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  // 【重要】只攔截「自己網站」的檔案請求（HTML/JS/CSS/圖示等 app shell）。
+  // 跨網域請求（尤其 Supabase API 的 GET，例如 cloudPull 讀 sync_state）一律
+  // 直接走網路、絕對不要快取：曾經因為這裡把 API 回應也 cache-first，
+  // 導致每台裝置永遠讀到第一次快取的舊雲端資料，同步判斷全面失準，
+  // 裝置間互相用舊資料覆蓋。API 的即時性比離線可用重要。
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
