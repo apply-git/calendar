@@ -290,7 +290,27 @@ function init() {
   updatePomodoroDisplay();
   requestNotificationPermission();
   registerServiceWorker();
+  handleUrlShortcutAction();
   setInterval(checkReminders, 30 * 1000);
+}
+
+// Android PWA「長按主畫面圖示」快捷選單（manifest.json 的 shortcuts）會導向
+// ./index.html?action=xxx，這裡讀取 query param 觸發對應既有邏輯，
+// 處理完立刻把網址上的 ?action=... 清掉，避免重新整理時重複觸發。
+function handleUrlShortcutAction() {
+  const params = new URLSearchParams(window.location.search);
+  const action = params.get('action');
+  if (!action) return;
+
+  if (action === 'quickadd') {
+    openTaskDialog({ date: toDateInput(currentDate) });
+  } else if (action === 'todaytodo') {
+    if (!todayTodoMode) toggleTodayTodoMode();
+  } else if (action === 'pomodoro') {
+    openPomodoroDialog();
+  }
+
+  history.replaceState(null, '', window.location.pathname);
 }
 
 function registerServiceWorker() {

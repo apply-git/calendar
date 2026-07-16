@@ -24,7 +24,7 @@
 | `config.example.js` | 雲端同步設定範例／備份，不會被 index.html 載入 |
 | `schema.sql` | Supabase `sync_state` 表 + RLS 規則，供 CLOUD_SETUP.md 步驟貼到 SQL Editor 執行 |
 | `CLOUD_SETUP.md` | 雲端同步設定教學（建 Supabase 專案、跑 schema、設定 Google 登入） |
-| `manifest.json` / `service-worker.js` / `icons/` / `start-pwa-local.bat` | PWA 安裝與離線快取（需本機伺服器）。`icons/` 內含正式圖示（icon-192/icon-512/icon-maskable-512/apple-touch-icon/favicon-64，皆圓角）與 `icon-master-1024.png` 母檔備用；`service-worker.js` 快取版本 v3。 |
+| `manifest.json` / `service-worker.js` / `icons/` / `start-pwa-local.bat` | PWA 安裝與離線快取（需本機伺服器）。`icons/` 內含正式圖示（icon-192/icon-512/icon-maskable-512/apple-touch-icon/favicon-64，皆圓角）與 `icon-master-1024.png` 母檔備用；`service-worker.js` 快取版本 v4。 |
 | `README.md` | 使用說明 |
 | `HANDOFF.md` | 本交接檔 |
 | `ROADMAP.md` | 功能規劃、分工與進度（2026-07 大幅擴充的依據） |
@@ -101,6 +101,7 @@ task 物件新增欄位 `excludedDates`（字串陣列，預設 `[]`）：儲存
 - PWA（`manifest.json` / `service-worker.js`，需透過 `start-pwa-local.bat` 本機伺服器才能安裝/離線）
 - 系統推播通知
 - 雲端同步 scaffold（`sync.js`）：預設未設定 = 純本機、不發網路請求；設定 `config.js` 後可 Google 登入、手動/自動同步備份 JSON 到 Supabase，last-write-wins，詳見 `CLOUD_SETUP.md`
+- Android PWA「長按主畫面圖示」快捷選單（App Shortcuts）：`manifest.json` 的 `shortcuts` 陣列定義三個項目（新增行程／今日待辦／番茄鐘），`url` 分別指向 `./index.html?action=quickadd`、`?action=todaytodo`、`?action=pomodoro`。`app.js` 的 `init()` 在 `render()` 之後呼叫 `handleUrlShortcutAction()`：讀 `new URLSearchParams(window.location.search).get('action')`，依值呼叫既有的 `openTaskDialog({ date: toDateInput(currentDate) })` / `toggleTodayTodoMode()`（先檢查 `todayTodoMode` 避免重複觸發）/ `openPomodoroDialog()`，處理完用 `history.replaceState(null, '', window.location.pathname)` 清掉網址上的 `?action=...`。`service-worker.js` 的 fetch handler 對帶 query string 的請求會 cache miss、直接打網路拿到同一份 `index.html`（Cloudflare Pages 靜態站標準行為），只有離線 fallback 到快取版 `index.html` 時網址上的 query 仍在、`app.js` 一樣讀得到，不需要額外改 SW 邏輯；這次順手把 `CACHE_NAME` 從 v3 升到 v4 讓已安裝的舊版本更快抓到新 `manifest.json`。iPhone（Safari）PWA 不支援長按快捷選單。
 - 日／週／月檢視一鍵清除：「🗑 清空當日」（`clearDayBtn`，只在日檢視顯示，函式 `clearDayTasks()`）、「🗑 清空本週」（`clearWeekBtn`，只在週檢視顯示，函式 `clearWeekTasks()`）、「🗑 清空本月」（`clearMonthBtn`，只在月檢視顯示，函式 `clearMonthTasks()`）。三者邏輯一致：非重複行程整筆刪除；重複行程改記到 `task.excludedDates`（牽涉到的日期不再出現，其他天不受影響），`occursOnDate()` 最前面會先檢查 `excludedDates` 是否包含目標日期並直接回傳 `false`。點擊後用 `confirm()` 跳出確認，確認才會清除並顯示 toast。週／月版本共用 `clearTasksForDateKeys(dateKeys, label)` 這個輔助函式：先掃描整個日期範圍，把「要刪除的非重複行程 id」與「重複行程要新增的 excludedDates」蒐集完才一次套用，避免逐天處理時 tasks 陣列被提前修改而找不到物件；月範圍只算當月 1 號到月底（`daysInMonth()`），不含 `renderMonth()` 網格補齊的跨月天數。三顆按鈕的顯示/隱藏邏輯都整合在 `updateDayModeSwitch()`（今日待辦模式、小工具模式時全部隱藏）。
 
 ## 重要實作規則
@@ -155,12 +156,22 @@ task 物件新增欄位 `excludedDates`（字串陣列，預設 `[]`）：儲存
 
 需 macOS + Xcode + Apple Developer Program。
 
+## 正式上線網址
+
+已部署到 Cloudflare Pages，供手機/其他電腦跨網路存取：
+
+- 網址：https://calendar88.pages.dev/
+- 原始碼倉庫：https://github.com/apply-git/calendar.git（Git 整合部署，`git push` 到 `main` 分支會自動觸發重新部署，Framework preset：None，無 build step，輸出目錄 `/`）
+- 手機加入主畫面：直接用瀏覽器開這個網址，比照 README「PWA 安裝與離線使用」步驟加入主畫面即可，**不需要**再透過 `start-pwa-local.bat` 區網方式（那個仍保留給沒有網路、只想純區網用的情境）。
+- Supabase 的 Google 登入 Redirect URL 要設定為這個網址（見下方雲端同步段落）。
+
 ## 已知注意事項
 
 - 桌面通知在 `file://` 不同瀏覽器限制不同，正式 PWA 用 HTTPS 較穩。
 - iPhone PWA 的通知支援受系統版本影響。
 - 已有雲端同步 scaffold（`sync.js` + `config.js` + `schema.sql` + `CLOUD_SETUP.md`）：預設未設定時仍是純 localStorage、無帳號系統、不跨裝置同步；填好 `config.js` 的 Supabase 專案資訊並登入 Google 後，才會有帳號與跨裝置同步（last-write-wins，非即時多人協作）。目前沒有真的部署 Supabase 專案驗證過（沒有金鑰），架構與程式碼已完成但屬「尚未實測」狀態，之後拿到金鑰要照 `CLOUD_SETUP.md` 走一次完整流程驗證。
 - 登入用的 access/refresh token 存在 `desktop-schedule-sync-auth-v1`，刻意不放進備份 JSON；換瀏覽器/清資料需要重新走一次 Google 登入。
+- **PWA Service Worker 快取陷阱**：`config.js`/`sync.js` 更新後（例如剛設定好 Supabase 金鑰）部署上線，若某個瀏覽器/裝置之前已經開過這個網址一次，Service Worker 會把「當時那份舊版」`config.js` 存進離線快取，之後不管怎麼重新整理都會被 SW 攔截優先給舊版，導致畫面一直顯示「雲端同步未設定」。驗證方式：`navigator.serviceWorker.getRegistrations()` 逐一 `unregister()` 再 `caches.keys()` 逐一 `caches.delete()`，然後重新整理。一般使用者可以用瀏覽器「清除瀏覽資料/快取」或把 PWA 從主畫面移除重新加入解決。這不是部署失敗，純粹是 SW 離線快取的預期行為。
 - 測試過程曾建立測試行程與每週目標，已手動刪除。
 
 ## 存檔規則

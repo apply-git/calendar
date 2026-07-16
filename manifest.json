@@ -35,5 +35,43 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "新增行程",
+      "short_name": "新增行程",
+      "description": "快速開啟新增行程視窗",
+      "url": "./index.html?action=quickadd",
+      "icons": [
+        {
+          "src": "./icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "今日待辦",
+      "short_name": "今日待辦",
+      "description": "切換到今日待辦模式",
+      "url": "./index.html?action=todaytodo",
+      "icons": [
+        {
+          "src": "./icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "番茄鐘",
+      "short_name": "番茄鐘",
+      "description": "開啟番茄鐘專注計時",
+      "url": "./index.html?action=pomodoro",
+      "icons": [
+        {
+          "src": "./icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }
