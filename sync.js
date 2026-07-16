@@ -38,6 +38,7 @@
   let authState = loadAuthState();
   let autoSyncTimer = null;
   let syncing = false;
+  let lastHistoryList = []; // 快取 listHistory() 最近一次結果（含 payload），restoreHistory(id) 依此找快照內容，避免再打一次 API
 
   const syncEls = {};
 
@@ -77,6 +78,10 @@
     syncEls.debugBtn = document.getElementById('cloudSyncDebugBtn');
     syncEls.forcePullBtn = document.getElementById('cloudSyncForcePullBtn');
     syncEls.forcePushBtn = document.getElementById('cloudSyncForcePushBtn');
+    syncEls.historyBtn = document.getElementById('cloudHistoryBtn');
+    syncEls.historyDialog = document.getElementById('cloudHistoryDialog');
+    syncEls.historyCloseBtn = document.getElementById('closeCloudHistoryBtn');
+    syncEls.historyList = document.getElementById('cloudHistoryList');
   }
 
   function bindEvents() {
@@ -92,6 +97,13 @@
     syncEls.debugBtn?.addEventListener('click', showDebugStatus);
     syncEls.forcePullBtn?.addEventListener('click', forcePullFromCloud);
     syncEls.forcePushBtn?.addEventListener('click', forcePushToCloud);
+    syncEls.historyBtn?.addEventListener('click', openCloudHistoryDialog);
+    syncEls.historyCloseBtn?.addEventListener('click', () => syncEls.historyDialog.close());
+    syncEls.historyList?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-restore-id]');
+      if (!btn) return;
+      restoreHistory(btn.getAttribute('data-restore-id'));
+    });
     syncEls.autoToggle?.addEventListener('change', () => {
       if (!window.CalendarApp) return;
       window.CalendarApp.setAutoSyncEnabled(syncEls.autoToggle.checked);
@@ -447,9 +459,155 @@
       const payload = window.CalendarApp.buildBackupPayload();
       const serverUpdatedAt = await cloudPush(payload);
       saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
+      saveHistorySnapshot(payload).catch(() => {});
       alert('已把這台的資料強制推送到雲端。接下來到另一台裝置按「⬇️ 強制拉取雲端資料覆蓋本機」即可。');
     } catch (err) {
       alert('強制推送失敗：' + (err?.message || String(err)));
+    }
+  }
+
+  // ---- 雲端備份版本（sync_history）：每次推送自動留存快照、可一鍵回復 ----
+  // 這整段是「誤覆蓋救援」的加強版：last-write-wins 同步策略下，較新的一份會整包覆蓋
+  // 另一份，一旦覆蓋方向錯了（例如某台裝置誤推了不完整資料）原本沒有辦法復原。
+  // 這裡在每次成功推送到 sync_state 時，「順便」多存一份快照到 sync_history，
+  // 最多保留每位使用者最新 10 份，UI 提供清單與「還原」。
+  //
+  // 設計原則：fire-and-forget，絕對不能影響主同步流程。
+  //   - sync_history 表可能還沒建立（使用者沒有執行 schema-history.sql），
+  //     這種情況下所有請求都會失敗（404 / PGRST205），必須優雅降級成 console.warn，
+  //     不能 throw、不能擋住 syncNow() / forcePushToCloud() 的主要行為。
+
+  // 儲存一份快照並修剪超過 10 份的舊版本。整個函式保證不 throw。
+  async function saveHistorySnapshot(backupObject) {
+    try {
+      if (!SYNC_ENABLED || !isLoggedIn()) return;
+      const ok = await ensureFreshToken();
+      if (!ok) return;
+      const userId = authState.user?.id;
+      if (!userId) return;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/sync_history`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders(),
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ user_id: userId, payload: backupObject }),
+      });
+      if (!res.ok) {
+        // 最常見原因：sync_history 表尚未建立（使用者還沒跑 schema-history.sql）。
+        console.warn('[sync] saveHistorySnapshot 寫入快照失敗（sync_history 表可能尚未建立），略過本次快照：', res.status);
+        return;
+      }
+      await pruneHistorySnapshots(userId);
+    } catch (err) {
+      console.warn('[sync] saveHistorySnapshot 發生錯誤，不影響主同步流程', err);
+    }
+  }
+
+  // 只保留最新 10 份快照，第 11 筆以後刪除。同樣保證不 throw。
+  async function pruneHistorySnapshots(userId) {
+    try {
+      const listUrl = `${SUPABASE_URL}/rest/v1/sync_history?user_id=eq.${encodeURIComponent(userId)}&select=id&order=created_at.desc`;
+      const res = await fetch(listUrl, { headers: authHeaders(), cache: 'no-store' });
+      if (!res.ok) return;
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length <= 10) return;
+      const idsToDelete = rows.slice(10).map((r) => r.id);
+      if (!idsToDelete.length) return;
+      const deleteUrl = `${SUPABASE_URL}/rest/v1/sync_history?id=in.(${idsToDelete.join(',')})`;
+      await fetch(deleteUrl, { method: 'DELETE', headers: authHeaders() });
+    } catch (err) {
+      console.warn('[sync] 修剪雲端備份版本失敗，不影響主同步流程', err);
+    }
+  }
+
+  // 列出最新 10 份快照（含 payload，供還原時直接使用不用再打一次 API）。
+  // 回傳 null 代表「連線失敗或 sync_history 表尚未建立」，回傳 [] 代表「表存在但還沒有任何快照」，
+  // UI 需要區分這兩種情況顯示不同提示文字。
+  async function listHistory() {
+    if (!SYNC_ENABLED || !isLoggedIn()) return null;
+    try {
+      const ok = await ensureFreshToken();
+      if (!ok) return null;
+      const userId = authState.user?.id;
+      if (!userId) return null;
+      const url = `${SUPABASE_URL}/rest/v1/sync_history?user_id=eq.${encodeURIComponent(userId)}&select=id,created_at,payload&order=created_at.desc&limit=10`;
+      const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+      if (!res.ok) {
+        console.warn('[sync] listHistory 讀取失敗（sync_history 表可能尚未建立）：', res.status);
+        return null;
+      }
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows : null;
+    } catch (err) {
+      console.warn('[sync] listHistory 發生錯誤', err);
+      return null;
+    }
+  }
+
+  // 開啟「雲端備份版本」對話框並載入清單。
+  async function openCloudHistoryDialog() {
+    if (!syncEls.historyDialog) return;
+    if (typeof syncEls.historyDialog.showModal === 'function') syncEls.historyDialog.showModal();
+    if (syncEls.historyList) syncEls.historyList.innerHTML = '<p class="muted">載入中…</p>';
+    const list = await listHistory();
+    lastHistoryList = Array.isArray(list) ? list : [];
+    renderHistoryList(list);
+  }
+
+  function pad2(n) {
+    return String(n).padStart(2, '0');
+  }
+
+  function renderHistoryList(list) {
+    if (!syncEls.historyList) return;
+    if (list === null) {
+      syncEls.historyList.innerHTML = '<p class="muted">尚未建立 sync_history 資料表，請依 CLOUD_SETUP.md 的「版本備份」段落執行 schema-history.sql</p>';
+      return;
+    }
+    if (!list.length) {
+      syncEls.historyList.innerHTML = '<p class="muted">還沒有任何快照，先按一次立即同步就會有第一份</p>';
+      return;
+    }
+    syncEls.historyList.innerHTML = list
+      .map((item) => {
+        const d = new Date(item.created_at);
+        const label = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+        const count = item.payload && Array.isArray(item.payload.tasks) ? item.payload.tasks.length : 0;
+        return (
+          `<div class="cloud-history-row">` +
+          `<span class="cloud-history-info">${label}｜${count} 筆行程</span>` +
+          `<button type="button" class="ghost-btn" data-restore-id="${item.id}">還原</button>` +
+          `</div>`
+        );
+      })
+      .join('');
+  }
+
+  // 還原：把選定快照套用到本機，再推送成雲端最新一份（讓其他裝置下次同步拿到這一份），
+  // 並把還原本身也留一份新快照（讓「還原這個動作」自己也可以被追溯／再還原）。
+  async function restoreHistory(id) {
+    const entry = lastHistoryList.find((item) => String(item.id) === String(id));
+    if (!entry) {
+      toast('找不到這份快照，請重新開啟雲端備份版本清單');
+      return;
+    }
+    if (!window.CalendarApp) {
+      toast('還原失敗：找不到本機資料介面');
+      return;
+    }
+    if (!confirm('會用這份快照覆蓋目前本機與雲端資料，確定？')) return;
+    try {
+      window.CalendarApp.applyBackupObject(entry.payload || {});
+      const serverUpdatedAt = await cloudPush(entry.payload);
+      saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
+      toast('已還原並同步該版本');
+      syncEls.historyDialog?.close();
+      saveHistorySnapshot(entry.payload).catch(() => {});
+    } catch (err) {
+      console.warn('[sync] restoreHistory 失敗', err);
+      toast('還原失敗：' + (err?.message || String(err)));
     }
   }
 
@@ -491,6 +649,7 @@
         const payload = window.CalendarApp.buildBackupPayload();
         const serverUpdatedAt = await cloudPush(payload);
         saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
+        saveHistorySnapshot(payload).catch(() => {});
         if (!silent) toast('已同步到雲端');
       }
       return true;
@@ -559,5 +718,8 @@
     showDebugStatus,
     forcePullFromCloud,
     forcePushToCloud,
+    // 供 push.js（背景推播 scaffold）讀取目前登入狀態用，回傳淺拷貝避免外部程式改到內部狀態。
+    // 不做 token 刷新；push.js 只在使用者於對話框內操作時呼叫，沿用當下已知的登入狀態即可。
+    getAuthState: () => (authState ? { ...authState, user: authState.user ? { ...authState.user } : null } : null),
   };
 })();

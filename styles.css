@@ -213,6 +213,20 @@ button:active { transform: translateY(0); }
   gap: 7px;
 }
 .field.full { grid-column: 1 / -1; }
+/* 事項名稱欄位：輸入框＋語音輸入鈕同列（voiceInputBtn 不支援的瀏覽器會被 JS 整顆 remove，
+   這裡的 flex 版型在按鈕不存在時 input 自然佔滿整列，不會跑版）。 */
+.title-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.title-input-row input { flex: 1; min-width: 0; }
+.title-input-row .icon-btn {
+  flex-shrink: 0;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+}
+.nl-hint { margin: 2px 0 0; font-size: 12px; }
 .checkbox-field { justify-content: end; }
 .checkbox-field label {
   display: flex;
@@ -348,6 +362,14 @@ textarea { resize: vertical; }
   border-color: var(--primary);
   box-shadow: inset 0 0 0 1px var(--primary);
 }
+/* 月檢視熱力圖：依當天行程數疊一層淡淡的主色底色，疊在最底層——宣告在這裡（比
+   .month-day.holiday 早），同一權重（兩個 class）下 CSS 來源順序讓後面的假日紅底
+   規則自然覆蓋掉熱力底色，今天的外框高亮（上面這條規則只動 border/box-shadow，
+   不動 background）也不受影響。color-mix 沒有 --primary 的固定 RGB 分量，跟著淺色/
+   深色主題自動變色，深色模式也看得清。 */
+.month-day.mh-1 { background: color-mix(in srgb, var(--primary) 8%, var(--surface-strong)); }
+.month-day.mh-2 { background: color-mix(in srgb, var(--primary) 16%, var(--surface-strong)); }
+.month-day.mh-3 { background: color-mix(in srgb, var(--primary) 26%, var(--surface-strong)); }
 .day-head {
   display: flex;
   align-items: center;
@@ -388,6 +410,32 @@ textarea { resize: vertical; }
   color: var(--danger);
   font-weight: 700;
   font-size: 13px;
+}
+
+/* Agenda 列表檢視：未來 30 天依日期分組，每組一個日期標題列，底下是當天的行程卡片。 */
+.agenda-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.agenda-group.today .agenda-date-main { color: var(--primary-strong); }
+.agenda-date-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.agenda-date-main {
+  font-size: 16px;
+  font-weight: 800;
+}
+.agenda-lunar, .agenda-holiday { margin: 0; }
+.agenda-holiday { color: var(--danger); font-weight: 700; font-size: 12px; }
+.agenda-day-tasks {
+  display: grid;
+  gap: 8px;
 }
 
 .task-card {
@@ -550,6 +598,37 @@ textarea { resize: vertical; }
 .empty-list:empty::after {
   content: "尚無重點事項";
   color: var(--muted);
+}
+
+.countdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.countdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 14px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.countdown-days {
+  flex: 0 0 auto;
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--primary-strong);
+  white-space: nowrap;
+}
+.countdown-days.countdown-today { color: var(--danger); }
+.countdown-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .habit-list {
@@ -715,6 +794,73 @@ textarea { resize: vertical; }
   border: 1px solid var(--border);
 }
 
+.cloud-history-dialog { width: min(440px, calc(100vw - 28px)); }
+.cloud-history-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 16px 0 4px;
+}
+.cloud-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.cloud-history-row + .cloud-history-row { margin-top: 8px; }
+.cloud-history-info { font-size: 13px; color: var(--muted); }
+.cloud-history-row .ghost-btn { flex-shrink: 0; padding: 6px 12px; }
+
+.weekly-review-dialog { width: min(480px, calc(100vw - 28px)); }
+.weekly-review-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 16px 0 4px;
+}
+.weekly-review-section h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.weekly-review-rate {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.weekly-review-rate-value {
+  font-size: 34px;
+  font-weight: 900;
+  color: var(--primary);
+}
+.weekly-review-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.weekly-review-category-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.weekly-review-category-name { flex: 1; }
+.weekly-review-next-list {
+  margin: 6px 0 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /* 手機版「⋯ 更多」工具視窗：桌面版永遠不會開啟（moreToolsBtn 預設 hidden，
    只有手機 matchMedia 才會被 JS 移除 hidden），這裡的樣式對桌面版沒有任何影響。 */
 .more-tools-dialog { width: min(360px, calc(100vw - 28px)); }
@@ -787,6 +933,9 @@ body.widget-mode .task-card { font-size: 14px; }
   .toolbar-actions, .calendar-nav { flex-wrap: wrap; }
   .calendar-nav h2 { width: 100%; margin: 6px 0 0; }
 
+  /* 檢視切換多了第四顆「列表」鈕，手機寬度縮小 padding/字級才放得下四顆不擠壓換行。 */
+  .view-switch .view-btn { padding: 7px 10px; font-size: 13px; }
+
   /* 行事曆優先：.main 排到最前面，.sidebar（今日重點/完成率/每週目標/習慣追蹤/
      自訂分類/快速範本）排到後面，使用者一開頁面先看到行事曆本體。 */
   .main { order: 1; }
@@ -853,7 +1002,8 @@ body.widget-mode .task-card { font-size: 14px; }
   #exportCsvBtn,
   #printBtn,
   #exportIcsBtn,
-  #importIcsBtn {
+  #importIcsBtn,
+  #weeklyReviewBtn {
     display: none !important;
   }
 

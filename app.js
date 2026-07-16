@@ -156,6 +156,10 @@ let pomodoroState = { mode: 'focus', remainingSeconds: 25 * 60, running: false, 
 let swRegistration = null;
 let timelineResizeState = null;
 let timelineDragMoved = false;
+// 自然語言快速新增：openTaskDialog() 開窗當下記錄日期/開始/結束欄位的「預設值」快照，
+// saveTaskFromForm() 送出前的保險解析只在欄位仍等於這份快照（=使用者沒手動改過）時才套用，
+// 避免蓋掉使用者手動調整過的日期/時間。
+let taskDialogDefaults = { date: '', start: '', end: '' };
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -166,6 +170,7 @@ const els = {
   calendarView: $('calendarView'),
   quickAddBtn: $('quickAddBtn'),
   topThreeHeading: $('topThreeHeading'),
+  countdownList: $('countdownList'),
   completionHeading: $('completionHeading'),
   habitHeading: $('habitHeading'),
   categoryHeading: $('categoryHeading'),
@@ -217,6 +222,7 @@ const els = {
   taskId: $('taskId'),
   taskNameLabel: $('taskNameLabel'),
   taskTitle: $('taskTitle'),
+  voiceInputBtn: $('voiceInputBtn'),
   taskDate: $('taskDate'),
   taskStart: $('taskStart'),
   taskEnd: $('taskEnd'),
@@ -231,6 +237,7 @@ const els = {
   taskRepeatWeekday: $('taskRepeatWeekday'),
   taskReminder: $('taskReminder'),
   taskPinned: $('taskPinned'),
+  taskCountdown: $('taskCountdown'),
   taskTags: $('taskTags'),
   taskSubtasks: $('taskSubtasks'),
   taskNote: $('taskNote'),
@@ -278,14 +285,25 @@ const els = {
   moreToolsBtn: $('moreToolsBtn'),
   moreToolsDialog: $('moreToolsDialog'),
   closeMoreToolsBtn: $('closeMoreToolsBtn'),
+  moreToolsWeeklyReviewBtn: $('moreToolsWeeklyReviewBtn'),
+  weeklyReviewBtn: $('weeklyReviewBtn'),
+  weeklyReviewDialog: $('weeklyReviewDialog'),
+  closeWeeklyReviewBtn: $('closeWeeklyReviewBtn'),
+  weeklyReviewRateValue: $('weeklyReviewRateValue'),
+  weeklyReviewCountsLabel: $('weeklyReviewCountsLabel'),
+  weeklyReviewCompare: $('weeklyReviewCompare'),
+  weeklyReviewCategories: $('weeklyReviewCategories'),
+  weeklyReviewNextWeekSummary: $('weeklyReviewNextWeekSummary'),
+  weeklyReviewNextWeekList: $('weeklyReviewNextWeekList'),
+  weeklyReviewGoals: $('weeklyReviewGoals'),
 };
 
 init();
 
 function init() {
-  document.body.classList.toggle('dark', localStorage.getItem(THEME_KEY) === 'dark');
   document.body.classList.toggle('widget-mode', widgetMode);
-  els.themeBtn.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+  applyTheme();
+  bindSystemThemeListener();
   els.todayLabel.textContent = formatLongDate(new Date());
   applyTextSettings();
 
@@ -294,12 +312,45 @@ function init() {
   normalizeStoredData();
   bindEvents();
   setupMobilePanels();
+  setupVoiceInput();
   render();
   updatePomodoroDisplay();
   requestNotificationPermission();
   registerServiceWorker();
   handleUrlShortcutAction();
   setInterval(checkReminders, 30 * 1000);
+}
+
+// 深色模式三段循環（淺色 → 深色 → 自動(跟隨系統) → 淺色）：THEME_KEY 存 'light'|'dark'|'auto'。
+// 'auto' 時實際深淺由 matchMedia('(prefers-color-scheme: dark)') 決定，並即時跟隨系統切換。
+// applyTheme() 是唯一「由存值算出實際深淺並套用 body.dark + 更新按鈕圖示/title」的地方，
+// init()、toggleTheme()、applyBackupObject()、系統主題變更監聽都呼叫它，避免各處各自判斷漂移。
+function getStoredThemeMode() {
+  const stored = localStorage.getItem(THEME_KEY);
+  return stored === 'dark' || stored === 'auto' ? stored : 'light';
+}
+
+function systemPrefersDark() {
+  return Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
+function applyTheme() {
+  const mode = getStoredThemeMode();
+  const isDark = mode === 'dark' || (mode === 'auto' && systemPrefersDark());
+  document.body.classList.toggle('dark', isDark);
+  if (els.themeBtn) {
+    els.themeBtn.textContent = mode === 'auto' ? '🌗' : (mode === 'dark' ? '☀️' : '🌙');
+    const modeLabel = mode === 'auto' ? '自動（跟隨系統）' : (mode === 'dark' ? '深色' : '淺色');
+    els.themeBtn.title = `目前主題：${modeLabel}，點擊切換`;
+  }
+}
+
+function bindSystemThemeListener() {
+  if (!window.matchMedia) return;
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  const handler = () => { if (getStoredThemeMode() === 'auto') applyTheme(); };
+  if (typeof media.addEventListener === 'function') media.addEventListener('change', handler);
+  else if (typeof media.addListener === 'function') media.addListener(handler); // 舊瀏覽器相容
 }
 
 // 手機版排版大改（只在 max-width:760px 生效，桌面版完全不受影響）：
@@ -502,6 +553,17 @@ function bindEvents() {
   els.taskForm.addEventListener('submit', saveTaskFromForm);
   [els.taskDate, els.taskStart, els.taskEnd].forEach((el) => el.addEventListener('input', updateConflictWarning));
   els.taskRepeat.addEventListener('change', updateRepeatFieldsVisibility);
+  // 自然語言快速新增：標題欄位失焦時嘗試解析中文日期/時間語彙，見 parseNaturalDateTime()。
+  els.taskTitle.addEventListener('blur', applyNaturalLanguageParse);
+
+  // 每週回顧：桌面工具列鈕與「⋯ 更多」視窗內的按鈕都直接開啟 weeklyReviewDialog
+  // （更多視窗這顆不是 proxy click，是自己的 click handler）。
+  els.weeklyReviewBtn?.addEventListener('click', openWeeklyReviewDialog);
+  els.closeWeeklyReviewBtn?.addEventListener('click', closeWeeklyReviewDialog);
+  els.moreToolsWeeklyReviewBtn?.addEventListener('click', () => {
+    els.moreToolsDialog?.close();
+    openWeeklyReviewDialog();
+  });
 
   els.addHabitBtn.addEventListener('click', addHabit);
   els.habitInput.addEventListener('keydown', (event) => {
@@ -528,6 +590,7 @@ function render() {
   renderDailyMemo();
   renderCalendar(visibleTasks);
   renderTodayPanel();
+  renderCountdownPanel();
   renderWeeklyGoals();
   renderHabits();
   renderCategories();
@@ -561,6 +624,7 @@ function renderTitle() {
     els.currentTitle.textContent = `${formatMonthDay(start)} – ${formatMonthDay(end)}`;
   }
   if (currentView === 'month') els.currentTitle.textContent = `${currentDate.getFullYear()} 年 ${currentDate.getMonth() + 1} 月`;
+  if (currentView === 'agenda') els.currentTitle.textContent = '未來 30 天';
   els.lunarDayLabel.textContent = (currentView === 'day' && appSettings.showLunar) ? `🌙 農曆 ${lunarFullLabel(currentDate)}` : '';
   if (els.jumpDateInput) els.jumpDateInput.value = toDateInput(currentDate);
 }
@@ -582,6 +646,7 @@ function renderCalendar(visibleTasks) {
   if (currentView === 'day') renderDay(visibleTasks);
   if (currentView === 'week') renderWeek(visibleTasks);
   if (currentView === 'month') renderMonth(visibleTasks);
+  if (currentView === 'agenda') renderAgenda(visibleTasks);
 }
 
 function renderTodoList(visibleTasks) {
@@ -759,14 +824,65 @@ function renderMonth(visibleTasks) {
       ${days.map((day) => {
         const key = toDateInput(day);
         const holidayName = getHoliday(key);
-        const dayTasks = visibleTasks.filter((task) => occursOnDate(task, key)).sort(compareTasks).slice(0, 4);
+        const allDayTasks = visibleTasks.filter((task) => occursOnDate(task, key));
+        const dayTasks = allDayTasks.slice().sort(compareTasks).slice(0, 4);
         return `
-          <div class="month-day ${isToday(day) ? 'today' : ''} ${day.getMonth() !== currentDate.getMonth() ? 'outside' : ''} ${holidayName ? 'holiday' : ''}" data-drop-date="${key}">
+          <div class="month-day ${heatClass(allDayTasks.length)} ${isToday(day) ? 'today' : ''} ${day.getMonth() !== currentDate.getMonth() ? 'outside' : ''} ${holidayName ? 'holiday' : ''}" data-drop-date="${key}" title="${allDayTasks.length} 筆行程">
             <div class="day-head"><span>${day.getDate()}</span><button class="small-btn" data-new-date="${key}">＋</button></div>
             ${appSettings.showLunar ? `<div class="lunar-mini">${escapeHtml(lunarCellLabel(day))}</div>` : ''}
             ${holidayName ? `<div class="holiday-label">${escapeHtml(holidayName)}</div>` : ''}
             ${dayTasks.map((task) => taskCard(task, key)).join('')}
-            ${visibleTasks.filter((task) => occursOnDate(task, key)).length > 4 ? '<span class="badge">更多...</span>' : ''}
+            ${allDayTasks.length > 4 ? '<span class="badge">更多...</span>' : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// 月檢視熱力圖：依「當天行程數」加淡淡的主色底色，疊在最底層（class 加在最前面，
+// 讓後面宣告的 .month-day.today／.month-day.holiday 這些既有規則在 CSS 來源順序上
+// 仍然覆蓋得到，不會被熱力底色蓋掉）。0 筆不加 class；1–2 筆 mh-1；3–4 筆 mh-2；5 筆以上 mh-3。
+function heatClass(count) {
+  if (count >= 5) return 'mh-3';
+  if (count >= 3) return 'mh-2';
+  if (count >= 1) return 'mh-1';
+  return '';
+}
+
+// Agenda 列表檢視（第四種檢視）：從 currentDate 起算 30 天，依日期分組，
+// 完全沒行程的日期跳過不顯示；30 天內都沒行程時顯示空狀態。
+function renderAgenda(visibleTasks) {
+  const days = Array.from({ length: 30 }, (_, i) => addDays(currentDate, i));
+  const todayKey = toDateInput(new Date());
+  const tomorrowKey = toDateInput(addDays(new Date(), 1));
+
+  const groups = days
+    .map((day) => {
+      const key = toDateInput(day);
+      const dayTasks = visibleTasks.filter((task) => occursOnDate(task, key)).sort(compareTasks);
+      return { day, key, dayTasks };
+    })
+    .filter((group) => group.dayTasks.length);
+
+  if (!groups.length) {
+    els.calendarView.innerHTML = '<div class="empty-state"><div><strong>未來 30 天沒有行程</strong><p>按「新增行程」開始安排。</p></div></div>';
+    return;
+  }
+
+  els.calendarView.innerHTML = `
+    <div class="agenda-list">
+      ${groups.map(({ day, key, dayTasks }) => {
+        const holidayName = getHoliday(key);
+        const dayLabel = key === todayKey ? '今天　' : (key === tomorrowKey ? '明天　' : '');
+        return `
+          <div class="agenda-group ${isToday(day) ? 'today' : ''}">
+            <div class="agenda-date-head">
+              <span class="agenda-date-main">${dayLabel}${weekdayName(day)}　${formatMonthDay(day)}</span>
+              ${appSettings.showLunar ? `<span class="lunar-mini agenda-lunar">${escapeHtml(lunarCellLabel(day))}</span>` : ''}
+              ${holidayName ? `<span class="holiday-label agenda-holiday">${escapeHtml(holidayName)}</span>` : ''}
+            </div>
+            <div class="agenda-day-tasks">${dayTasks.map((task) => taskCard(task, key)).join('')}</div>
           </div>
         `;
       }).join('')}
@@ -829,6 +945,55 @@ function renderTodayPanel() {
   renderWeeklyChart();
 }
 
+// 倒數日側欄面板：列出所有 countdown=true 的行程，依「下一次出現日期」（重複行程用
+// nextCountdownOccurrence() 往前掃描找最近一次 >= 今天的出現日）由近到遠排序。
+function renderCountdownPanel() {
+  if (!els.countdownList) return;
+  const todayKey = toDateInput(new Date());
+  const items = tasks
+    .filter((task) => task.countdown)
+    .map((task) => {
+      const dateKey = nextCountdownOccurrence(task, todayKey);
+      return dateKey ? { task, dateKey } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+
+  els.countdownList.innerHTML = items.length
+    ? items.map(({ task, dateKey }) => {
+        const days = diffDaysBetween(todayKey, dateKey);
+        const daysLabel = days <= 0 ? '就是今天！' : `還有 ${days} 天`;
+        const md = formatMonthDay(new Date(`${dateKey}T00:00:00`));
+        return `
+          <div class="countdown-item" data-countdown-edit="${task.id}">
+            <span class="countdown-days ${days <= 0 ? 'countdown-today' : ''}">${daysLabel}</span>
+            <span class="countdown-title">${escapeHtml(task.title)}</span>
+            <span class="muted">${md}</span>
+          </div>
+        `;
+      }).join('')
+    : '<p class="muted">尚無倒數事項</p>';
+}
+
+// 找出 task 從 fromDateKey（含）起算最近一次出現的日期。不重複行程直接比較 task.date；
+// 重複行程逐日往後掃描（最多兩年），避免每天重算太久。
+function nextCountdownOccurrence(task, fromDateKey) {
+  if (task.repeat === 'none') {
+    return task.date >= fromDateKey && occursOnDate(task, task.date) ? task.date : null;
+  }
+  let cursor = new Date(`${fromDateKey}T00:00:00`);
+  for (let i = 0; i < 730; i++) {
+    const key = toDateInput(cursor);
+    if (occursOnDate(task, key)) return key;
+    cursor = addDays(cursor, 1);
+  }
+  return null;
+}
+
+function diffDaysBetween(fromDateKey, toDateKey) {
+  return Math.round((new Date(`${toDateKey}T00:00:00`) - new Date(`${fromDateKey}T00:00:00`)) / 86400000);
+}
+
 function renderWeeklyChart() {
   const days = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i - 6));
   const counts = days.map((day) => countDoneOnDate(day));
@@ -888,6 +1053,7 @@ function applyTemplate(id) {
     repeat: 'none',
     reminder: 10,
     pinned: false,
+    countdown: false,
     tags: [],
     subtasks: [],
     note: '',
@@ -1182,6 +1348,121 @@ function addWeeklyGoal() {
   showToast('每週目標已新增');
 }
 
+// ----------------------------------------------------------------------------
+// 每週回顧：computeWeeklyReview() 是不碰 DOM 的純函式（只讀全域 tasks / weeklyGoals /
+// categories），回傳本週/上週完成率、分類統計、下週預覽、每週目標完成情況；渲染邏輯
+// 另外寫在 renderWeeklyReview()。重複行程沿用 occursOnDate() 判斷「每天算一次出現」，
+// 完成判定沿用既有 isTaskDone()。
+// ----------------------------------------------------------------------------
+function computeWeeklyReview(baseDate) {
+  const base = startOfDay(baseDate instanceof Date && !Number.isNaN(baseDate.getTime()) ? baseDate : new Date());
+  const thisMonday = startOfWeek(base);
+  const prevMonday = addDays(thisMonday, -7);
+  const nextMonday = addDays(thisMonday, 7);
+
+  const scanWeek = (monday) => {
+    const dayKeys = Array.from({ length: 7 }, (_, i) => toDateInput(addDays(monday, i)));
+    let total = 0;
+    let done = 0;
+    const categoryStats = new Map();
+    dayKeys.forEach((dateKey) => {
+      tasks.forEach((task) => {
+        if (!occursOnDate(task, dateKey)) return;
+        total += 1;
+        const isDone = isTaskDone(task, dateKey);
+        if (isDone) done += 1;
+        const stat = categoryStats.get(task.category) || { total: 0, done: 0 };
+        stat.total += 1;
+        if (isDone) stat.done += 1;
+        categoryStats.set(task.category, stat);
+      });
+    });
+    return {
+      start: dayKeys[0],
+      end: dayKeys[6],
+      total,
+      done,
+      rate: total ? Math.round((done / total) * 100) : 0,
+      categoryStats,
+    };
+  };
+
+  const currentWeek = scanWeek(thisMonday);
+  const previousWeek = scanWeek(prevMonday);
+
+  let trend = 'same';
+  if (currentWeek.rate > previousWeek.rate) trend = 'up';
+  else if (currentWeek.rate < previousWeek.rate) trend = 'down';
+
+  const categoryList = categories
+    .map((category) => {
+      const stat = currentWeek.categoryStats.get(category.name);
+      return stat ? { name: category.name, color: category.color, done: stat.done, total: stat.total } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+
+  const nextWeekDayKeys = Array.from({ length: 7 }, (_, i) => toDateInput(addDays(nextMonday, i)));
+  const nextWeekItems = [];
+  nextWeekDayKeys.forEach((dateKey) => {
+    tasks
+      .filter((task) => occursOnDate(task, dateKey))
+      .sort((a, b) => a.start.localeCompare(b.start))
+      .forEach((task) => nextWeekItems.push({ date: dateKey, title: task.title }));
+  });
+
+  const weekKey = toDateInput(thisMonday);
+  const goalsThisWeek = weeklyGoals.filter((goal) => goal.week === weekKey);
+
+  return {
+    currentWeek: { start: currentWeek.start, end: currentWeek.end, total: currentWeek.total, done: currentWeek.done, rate: currentWeek.rate },
+    previousWeek: { start: previousWeek.start, end: previousWeek.end, total: previousWeek.total, done: previousWeek.done, rate: previousWeek.rate },
+    trend,
+    categories: categoryList,
+    nextWeek: { total: nextWeekItems.length, items: nextWeekItems.slice(0, 3) },
+    goals: { total: goalsThisWeek.length, done: goalsThisWeek.filter((goal) => Boolean(goal.done)).length },
+  };
+}
+
+function renderWeeklyReview() {
+  const data = computeWeeklyReview(new Date());
+
+  els.weeklyReviewRateValue.textContent = `${data.currentWeek.rate}%`;
+  els.weeklyReviewCountsLabel.textContent = `總行程 ${data.currentWeek.total} 件｜已完成 ${data.currentWeek.done} 件`;
+
+  const trendIcon = data.trend === 'up' ? '↑' : (data.trend === 'down' ? '↓' : '→');
+  els.weeklyReviewCompare.textContent = `上週完成率 ${data.previousWeek.rate}%　${trendIcon}　本週完成率 ${data.currentWeek.rate}%`;
+
+  els.weeklyReviewCategories.innerHTML = data.categories.length
+    ? data.categories.map((cat) => `
+        <div class="weekly-review-category-row">
+          <span class="color-dot" style="--dot-color:${cat.color}"></span>
+          <span class="weekly-review-category-name">${escapeHtml(cat.name)}</span>
+          <span class="muted">${cat.done} / ${cat.total}</span>
+        </div>
+      `).join('')
+    : '<p class="muted">本週尚無分類資料</p>';
+
+  els.weeklyReviewNextWeekSummary.textContent = `下週已排定 ${data.nextWeek.total} 件行程`;
+  els.weeklyReviewNextWeekList.innerHTML = data.nextWeek.items.length
+    ? data.nextWeek.items.map((item) => `<li>${formatMonthDay(new Date(`${item.date}T00:00:00`))}　${escapeHtml(item.title)}</li>`).join('')
+    : '<li class="muted">下週尚無排定行程</li>';
+
+  els.weeklyReviewGoals.textContent = data.goals.total
+    ? `本週目標：已完成 ${data.goals.done} / ${data.goals.total} 項`
+    : '本週尚未設定每週目標';
+}
+
+function openWeeklyReviewDialog() {
+  renderWeeklyReview();
+  els.weeklyReviewDialog.showModal();
+}
+
+function closeWeeklyReviewDialog() {
+  els.weeklyReviewDialog.close();
+}
+
 function openTaskDialog(defaults = {}) {
   renderCategoryOptions();
   const isEdit = Boolean(defaults.id);
@@ -1201,11 +1482,15 @@ function openTaskDialog(defaults = {}) {
   updateRepeatFieldsVisibility();
   els.taskReminder.value = String(defaults.reminder ?? 10);
   els.taskPinned.checked = Boolean(defaults.pinned);
+  els.taskCountdown.checked = Boolean(defaults.countdown);
   els.taskTags.value = (defaults.tags || []).map((tag) => `#${tag}`).join(', ');
   els.taskSubtasks.value = (defaults.subtasks || []).join('\n');
   els.taskNote.value = defaults.note || '';
   els.deleteTaskBtn.hidden = !isEdit;
   updateConflictWarning();
+  // 自然語言快速新增：記錄這次開窗當下日期/開始/結束的預設值，saveTaskFromForm() 送出前
+  // 的保險解析只在欄位仍等於這份快照時才套用，避免蓋掉使用者手動改過的欄位。
+  taskDialogDefaults = { date: els.taskDate.value, start: els.taskStart.value, end: els.taskEnd.value };
   els.taskDialog.showModal();
   els.taskTitle.focus();
 }
@@ -1226,6 +1511,9 @@ function updateRepeatFieldsVisibility() {
 
 function saveTaskFromForm(event) {
   event.preventDefault();
+  // 保險再解析一次：正常流程 blur 已經處理過，這裡是給「Enter 直接送出、taskTitle
+  // 沒機會 blur」的情況兜底，且只在日期/時間欄位仍是開窗當下的預設值時才套用。
+  applyNaturalLanguageParseOnSubmit();
   const existingTask = tasks.find((item) => item.id === els.taskId.value);
   const task = {
     id: els.taskId.value || crypto.randomUUID(),
@@ -1241,6 +1529,7 @@ function saveTaskFromForm(event) {
     repeatNth: [1, 2, 3, 4, -1].includes(Number(els.taskRepeatNth.value)) ? Number(els.taskRepeatNth.value) : 1,
     reminder: Number(els.taskReminder.value),
     pinned: els.taskPinned.checked,
+    countdown: els.taskCountdown.checked,
     tags: parseTags(els.taskTags.value),
     subtasks: linesFromTextarea(els.taskSubtasks.value),
     note: els.taskNote.value.trim(),
@@ -1261,6 +1550,96 @@ function saveTaskFromForm(event) {
   closeTaskDialog();
   render();
   showToast('行程已儲存');
+}
+
+// ----------------------------------------------------------------------------
+// 自然語言快速新增：DOM 掛接層。實際解析邏輯是不依賴 DOM 的純函式 parseNaturalDateTime()
+// （定義在檔案底部日期工具區），這裡只負責讀 #taskTitle、套用解析結果到表單欄位、
+// 顯示 toast。解析不到任何日期/時間語彙時完全不動作。
+// ----------------------------------------------------------------------------
+function applyNaturalLanguageParse() {
+  const parsed = parseNaturalDateTime(els.taskTitle.value, new Date());
+  if (!parsed.date && !parsed.start) return;
+
+  if (parsed.date) els.taskDate.value = parsed.date;
+  if (parsed.start) els.taskStart.value = parsed.start;
+  if (parsed.end) els.taskEnd.value = parsed.end;
+  els.taskTitle.value = parsed.title;
+  updateConflictWarning();
+
+  const toastParts = [];
+  if (parsed.date) toastParts.push(formatMonthDay(new Date(`${parsed.date}T00:00:00`)));
+  if (parsed.start) toastParts.push(parsed.start);
+  if (toastParts.length) showToast(`已解析：${toastParts.join(' ')}`);
+}
+
+// saveTaskFromForm() 送出前的保險呼叫：只在標題仍含可解析語彙、且日期/開始/結束欄位
+// 都還是開窗當下的預設值（taskDialogDefaults，代表使用者沒手動改過）時才個別套用，
+// 避免蓋掉使用者手動調整過的欄位。正常情況下 blur 已經處理過，這裡多半是 no-op。
+function applyNaturalLanguageParseOnSubmit() {
+  const parsed = parseNaturalDateTime(els.taskTitle.value, new Date());
+  if (!parsed.date && !parsed.start) return;
+
+  if (parsed.date && els.taskDate.value === taskDialogDefaults.date) els.taskDate.value = parsed.date;
+  if (parsed.start && els.taskStart.value === taskDialogDefaults.start) els.taskStart.value = parsed.start;
+  if (parsed.end && els.taskEnd.value === taskDialogDefaults.end) els.taskEnd.value = parsed.end;
+  els.taskTitle.value = parsed.title;
+}
+
+// ----------------------------------------------------------------------------
+// 語音輸入：偵測不到 SpeechRecognition API 的瀏覽器直接把按鈕整顆移除（降級）。
+// 支援的瀏覽器：點擊開始聆聽（🎤→🔴），辨識結果 append 到 #taskTitle 現有文字後，
+// 再主動觸發一次自然語言解析；再點一次可停止；錯誤（如使用者拒絕權限）toast 提示並還原按鈕。
+// ----------------------------------------------------------------------------
+function setupVoiceInput() {
+  const btn = els.voiceInputBtn;
+  if (!btn) return;
+  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionCtor) {
+    btn.remove();
+    return;
+  }
+
+  const recognition = new SpeechRecognitionCtor();
+  recognition.lang = 'zh-TW';
+  recognition.interimResults = false;
+  let listening = false;
+
+  const resetButton = () => {
+    listening = false;
+    btn.textContent = '🎤';
+    btn.title = '語音輸入';
+  };
+
+  recognition.addEventListener('result', (event) => {
+    const transcript = event.results?.[0]?.[0]?.transcript?.trim() || '';
+    if (transcript) {
+      const existing = els.taskTitle.value.trim();
+      els.taskTitle.value = existing ? `${existing} ${transcript}` : transcript;
+      applyNaturalLanguageParse();
+    }
+  });
+  recognition.addEventListener('error', () => {
+    showToast('無法使用麥克風');
+    resetButton();
+  });
+  recognition.addEventListener('end', resetButton);
+
+  btn.addEventListener('click', () => {
+    if (listening) {
+      recognition.stop();
+      return;
+    }
+    try {
+      recognition.start();
+      listening = true;
+      btn.textContent = '🔴';
+      btn.title = '聆聽中…再按一次停止';
+    } catch {
+      showToast('無法使用麥克風');
+      resetButton();
+    }
+  });
 }
 
 function deleteCurrentTask() {
@@ -1312,7 +1691,12 @@ function handleCalendarClick(event) {
   const categoryDeleteName = event.target.dataset.deleteCategory;
   const applyTemplateId = event.target.closest('[data-apply-template]')?.dataset.applyTemplate;
   const deleteTemplateId = event.target.dataset.deleteTemplate;
+  const countdownEditId = event.target.closest('[data-countdown-edit]')?.dataset.countdownEdit;
 
+  if (countdownEditId) {
+    const task = tasks.find((item) => item.id === countdownEditId);
+    if (task) openTaskDialog(task);
+  }
   if (applyTemplateId) applyTemplate(applyTemplateId);
   if (deleteTemplateId) deleteTemplate(deleteTemplateId);
   if (pinId) toggleTaskPinned(pinId);
@@ -1470,6 +1854,7 @@ function navigate(direction) {
   if (currentView === 'day') currentDate = addDays(currentDate, direction);
   if (currentView === 'week') currentDate = addDays(currentDate, direction * 7);
   if (currentView === 'month') currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + direction, 1);
+  if (currentView === 'agenda') currentDate = addDays(currentDate, direction * 30);
   render();
 }
 
@@ -1642,7 +2027,9 @@ function applyBackupObject(data) {
   templates = Array.isArray(data.templates) && data.templates.length ? data.templates : defaultTemplates;
   weeklyGoals = Array.isArray(data.weeklyGoals) ? data.weeklyGoals : [];
   widgetMode = Boolean(data.widgetMode);
-  if (data.theme) localStorage.setItem(THEME_KEY, data.theme);
+  // 'auto' 是新增的存值，舊備份沒有這個值也沒關係：不合法值一律不覆寫，交給 applyTheme() 內的
+  // getStoredThemeMode() 用既有值或預設 'light' 處理。
+  if (data.theme === 'light' || data.theme === 'dark' || data.theme === 'auto') localStorage.setItem(THEME_KEY, data.theme);
   normalizeStoredData();
   saveJson(STORAGE_KEY, tasks);
   saveJson(HABIT_KEY, habits);
@@ -1653,9 +2040,8 @@ function applyBackupObject(data) {
   saveJson(TEMPLATE_KEY, templates);
   saveJson(WEEKLY_GOAL_KEY, weeklyGoals);
   localStorage.setItem(WIDGET_KEY, widgetMode ? '1' : '0');
-  document.body.classList.toggle('dark', localStorage.getItem(THEME_KEY) === 'dark');
   document.body.classList.toggle('widget-mode', widgetMode);
-  els.themeBtn.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+  applyTheme();
   applyTextSettings();
   render();
 }
@@ -1810,6 +2196,7 @@ function parseIcsEvent(block) {
     repeatNth: 1,
     reminder: 10,
     pinned: false,
+    countdown: false,
     tags: [],
     subtasks: [],
     note: props.DESCRIPTION ? icsUnescape(props.DESCRIPTION.value) : '',
@@ -2018,10 +2405,12 @@ function setTaskDone(task, dateKey, done) {
 }
 
 function toggleTheme() {
-  document.body.classList.toggle('dark');
-  const isDark = document.body.classList.contains('dark');
-  localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
-  els.themeBtn.textContent = isDark ? '☀️' : '🌙';
+  const order = ['light', 'dark', 'auto'];
+  const next = order[(order.indexOf(getStoredThemeMode()) + 1) % order.length];
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme();
+  const labelMap = { light: '淺色', dark: '深色', auto: '自動(跟隨系統)' };
+  showToast(`主題：${labelMap[next]}`);
 }
 
 function normalizeStoredData() {
@@ -2034,6 +2423,7 @@ function normalizeStoredData() {
       category: categoryExists ? task.category : categories[0].name,
       completedDates,
       pinned: Boolean(task.pinned),
+      countdown: Boolean(task.countdown),
       tags: Array.isArray(task.tags) ? task.tags.filter(Boolean) : [],
       subtasks: Array.isArray(task.subtasks) ? task.subtasks.filter(Boolean) : [],
       excludedDates: Array.isArray(task.excludedDates) ? task.excludedDates.filter(Boolean) : [],
@@ -2214,6 +2604,258 @@ function toDateInput(date) {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+// ============================================================================
+// 自然語言快速新增：中文日期/時間語彙解析。parseNaturalDateTime(text, baseDate) 是
+// 完全不依賴 DOM 的純函式，回傳 { title, date, start, end }（抓不到的欄位為 null，
+// title 是剝離掉已解析語彙後、trim 過的文字）。DOM 掛接（讀寫 #taskTitle 等表單欄位）
+// 另外寫在 applyNaturalLanguageParse() / applyNaturalLanguageParseOnSubmit()（在
+// saveTaskFromForm() 附近）。
+//
+// 設計保守：只有「時間語彙前後是斷詞邊界或字串端點」時才承認是時間（擋掉像「3點檔」
+// 「第3點」這種數字+點不是真的時間的情況），拿捏不準就放棄解析該段、完全不動作。
+// ============================================================================
+const NL_CN_DIGIT_MAP = { 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+const NL_CN_WEEKDAY_MAP = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
+
+// 全形轉半形（含數字、冒號、斜線等），用 code point 位移一次處理整個全形符號區塊
+// （U+FF01–FF5E → U+0021–007E），逐字元替換不改變字串長度，方便後面用 index 對應回原字串。
+function nlToHalfWidth(str) {
+  return str.replace(/[！-～]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+}
+
+// 中文數字轉阿拉伯數字，支援一~十二（時間欄位夠用：小時最大到 12）。
+function nlChineseNumberToInt(str) {
+  if (!str) return null;
+  if (str.length === 1) return NL_CN_DIGIT_MAP[str] ?? null;
+  if (str.length === 2 && str[0] === '十') {
+    const tail = NL_CN_DIGIT_MAP[str[1]];
+    return tail ? 10 + tail : 10;
+  }
+  return null;
+}
+
+function nlHourToken(str) {
+  if (/^[0-9]{1,2}$/.test(str)) return parseInt(str, 10);
+  return nlChineseNumberToInt(str);
+}
+
+// 判斷字元是否為「斷詞邊界」：字串端點、空白、常見標點都算邊界；中日文字元／數字不算
+// （用來擋掉「3點檔」的「檔」、「第3點」的「第」這種黏在數字旁邊的情況）。
+function nlIsWordBoundaryChar(ch) {
+  if (ch === undefined) return true;
+  if (/[\s,，、。.!！?？:：\-~—()（）[\]「」『』]/.test(ch)) return true;
+  return !/[一-鿿\d]/.test(ch);
+}
+
+function nlHasValidBoundary(text, startIndex, endIndex) {
+  const before = startIndex > 0 ? text[startIndex - 1] : undefined;
+  const after = endIndex < text.length ? text[endIndex] : undefined;
+  return nlIsWordBoundaryChar(before) && nlIsWordBoundaryChar(after);
+}
+
+function nlSpliceOut(str, start, end) {
+  return str.slice(0, start) + str.slice(end);
+}
+
+function nlMinutesToTime(totalMinutes) {
+  const wrapped = ((totalMinutes % 1440) + 1440) % 1440;
+  const hh = Math.floor(wrapped / 60);
+  const mm = wrapped % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+function nlTimeToMinutes(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// 上午/早上：12 點視為 0 點（午夜），其餘照原值。下午/晚上：12 點維持 12 點（中午），
+// 其餘 +12。
+function nlApplyPeriod(period, hour) {
+  if (period === '上午' || period === '早上') return hour === 12 ? 0 : hour;
+  if (period === '下午' || period === '晚上') return hour === 12 ? 12 : hour + 12;
+  return hour;
+}
+
+// 沒有上午/下午詞的裸數字＋點（例如「3點」）：12 以下時，<8 視為下午/晚上（+12），
+// 否則照原值（8~12 當作已經是白天的整點）；>12 已經是明確的 24 小時制數字，照原值。
+function nlBareHourAdjust(hour) {
+  if (hour <= 12) return hour < 8 ? hour + 12 : hour;
+  return hour;
+}
+
+function nlExtractDate(work, base) {
+  const relDayPatterns = [
+    { re: /大後天/, offset: 3 },
+    { re: /後天/, offset: 2 },
+    { re: /明天/, offset: 1 },
+    { re: /今天/, offset: 0 },
+  ];
+  for (const { re, offset } of relDayPatterns) {
+    const m = re.exec(work);
+    if (m) {
+      const target = addDays(base, offset);
+      return { start: m.index, end: m.index + m[0].length, dateKey: toDateInput(target) };
+    }
+  }
+
+  // 下週X / 下周X（不論本週有沒有過，一律算下一週的那一天）
+  const nextWeekMatch = /下(?:週|周)([一二三四五六日天])/.exec(work);
+  if (nextWeekMatch) {
+    const weekday = NL_CN_WEEKDAY_MAP[nextWeekMatch[1]];
+    if (weekday !== undefined) {
+      const thisMonday = startOfWeek(base);
+      const nextMonday = addDays(thisMonday, 7);
+      const daysFromMonday = (weekday - 1 + 7) % 7;
+      const target = addDays(nextMonday, daysFromMonday);
+      return { start: nextWeekMatch.index, end: nextWeekMatch.index + nextWeekMatch[0].length, dateKey: toDateInput(target) };
+    }
+  }
+
+  // 週X / 周X / 星期X / 禮拜X（本週該日，已過則下週；「下週X」已在上面優先攔截）
+  const thisWeekMatch = /(?:週|周|星期|禮拜)([一二三四五六日天])/.exec(work);
+  if (thisWeekMatch) {
+    const weekday = NL_CN_WEEKDAY_MAP[thisWeekMatch[1]];
+    if (weekday !== undefined) {
+      const thisMonday = startOfWeek(base);
+      const daysFromMonday = (weekday - 1 + 7) % 7;
+      let target = addDays(thisMonday, daysFromMonday);
+      if (target < base) target = addDays(target, 7);
+      return { start: thisWeekMatch.index, end: thisWeekMatch.index + thisWeekMatch[0].length, dateKey: toDateInput(target) };
+    }
+  }
+
+  // N月N日 / N月N號（今年；数字前後加 lookaround 避免咬到更長數字的一部分）
+  const mdMatch = /(?<!\d)(\d{1,2})月(\d{1,2})[日號](?!\d)/.exec(work);
+  if (mdMatch) {
+    const month = parseInt(mdMatch[1], 10);
+    const day = parseInt(mdMatch[2], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const year = base.getFullYear();
+      let target = new Date(year, month - 1, day);
+      if (target < base) target = new Date(year + 1, month - 1, day);
+      return { start: mdMatch.index, end: mdMatch.index + mdMatch[0].length, dateKey: toDateInput(target) };
+    }
+  }
+
+  // N/N（月/日，今年，已過則明年）
+  const slashMatch = /(?<!\d)(\d{1,2})\/(\d{1,2})(?!\d)/.exec(work);
+  if (slashMatch) {
+    const month = parseInt(slashMatch[1], 10);
+    const day = parseInt(slashMatch[2], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const year = base.getFullYear();
+      let target = new Date(year, month - 1, day);
+      if (target < base) target = new Date(year + 1, month - 1, day);
+      return { start: slashMatch.index, end: slashMatch.index + slashMatch[0].length, dateKey: toDateInput(target) };
+    }
+  }
+
+  return null;
+}
+
+function nlExtractTime(work) {
+  const numToken = '(?:[0-9]{1,2}|[一二三四五六七八九十]{1,2})';
+
+  // 上午/早上/下午/晚上 + 區間（例如「下午3點到5點」）
+  const periodRangeRe = new RegExp(`(上午|早上|下午|晚上)(${numToken})[點点](半)?(?:到|至|-|~)(${numToken})[點点](半)?`);
+  let m = periodRangeRe.exec(work);
+  if (m) {
+    const h1 = nlHourToken(m[2]);
+    const h2 = nlHourToken(m[4]);
+    if (h1 !== null && h2 !== null) {
+      const startMin = nlApplyPeriod(m[1], h1) * 60 + (m[3] ? 30 : 0);
+      const endMin = nlApplyPeriod(m[1], h2) * 60 + (m[5] ? 30 : 0);
+      return { start: m.index, end: m.index + m[0].length, startTime: nlMinutesToTime(startMin), endTime: nlMinutesToTime(endMin) };
+    }
+  }
+
+  // 上午/早上/下午/晚上 + 單一時間（可帶「半」或「:MM」分鐘）
+  const periodSingleRe = new RegExp(`(上午|早上|下午|晚上)(${numToken})[點点](?:(半)|[:：]([0-5][0-9]))?`);
+  m = periodSingleRe.exec(work);
+  if (m) {
+    const h = nlHourToken(m[2]);
+    if (h !== null) {
+      const minute = m[3] ? 30 : (m[4] ? parseInt(m[4], 10) : 0);
+      const startMin = nlApplyPeriod(m[1], h) * 60 + minute;
+      return { start: m.index, end: m.index + m[0].length, startTime: nlMinutesToTime(startMin), endTime: null };
+    }
+  }
+
+  // 24 小時制區間，例如「15:30-17:00」「3:30-5:00」
+  const colonRangeRe = /([01]?[0-9]|2[0-3]):([0-5][0-9])\s*(?:[-~到至])\s*([01]?[0-9]|2[0-3]):([0-5][0-9])/;
+  m = colonRangeRe.exec(work);
+  if (m) {
+    return { start: m.index, end: m.index + m[0].length, startTime: `${m[1].padStart(2, '0')}:${m[2]}`, endTime: `${m[3].padStart(2, '0')}:${m[4]}` };
+  }
+
+  // 24 小時制單一時間，例如「15:30」
+  const colonSingleRe = /([01]?[0-9]|2[0-3]):([0-5][0-9])/;
+  m = colonSingleRe.exec(work);
+  if (m) {
+    return { start: m.index, end: m.index + m[0].length, startTime: `${m[1].padStart(2, '0')}:${m[2]}`, endTime: null };
+  }
+
+  // 不帶上午/下午詞的區間，例如「3點到5點」（需通過斷詞邊界檢查）
+  const bareRangeRe = new RegExp(`(${numToken})[點点](半)?(?:到|至|-|~)(${numToken})[點点](半)?`);
+  m = bareRangeRe.exec(work);
+  if (m && nlHasValidBoundary(work, m.index, m.index + m[0].length)) {
+    const h1 = nlHourToken(m[1]);
+    const h2 = nlHourToken(m[3]);
+    if (h1 !== null && h2 !== null) {
+      const startMin = nlBareHourAdjust(h1) * 60 + (m[2] ? 30 : 0);
+      const endMin = nlBareHourAdjust(h2) * 60 + (m[4] ? 30 : 0);
+      return { start: m.index, end: m.index + m[0].length, startTime: nlMinutesToTime(startMin), endTime: nlMinutesToTime(endMin) };
+    }
+  }
+
+  // 不帶上午/下午詞的單一時間，例如「3點」（<8 視為下午/晚上；需通過斷詞邊界檢查，
+  // 避免「3點檔」「第3點」被誤判為時間）
+  const bareSingleRe = new RegExp(`(${numToken})[點点](半)?`);
+  m = bareSingleRe.exec(work);
+  if (m && nlHasValidBoundary(work, m.index, m.index + m[0].length)) {
+    const h = nlHourToken(m[1]);
+    if (h !== null) {
+      const minute = m[2] ? 30 : 0;
+      const startMin = nlBareHourAdjust(h) * 60 + minute;
+      return { start: m.index, end: m.index + m[0].length, startTime: nlMinutesToTime(startMin), endTime: null };
+    }
+  }
+
+  return null;
+}
+
+function parseNaturalDateTime(text, baseDate) {
+  const raw = String(text == null ? '' : text);
+  const base = startOfDay(baseDate instanceof Date && !Number.isNaN(baseDate.getTime()) ? baseDate : new Date());
+
+  let work = nlToHalfWidth(raw);
+  let title = raw; // 保留原始字元（含使用者輸入的全形），只移除掉解析到的區段
+
+  let resultDate = null;
+  let resultStart = null;
+  let resultEnd = null;
+
+  const dateMatch = nlExtractDate(work, base);
+  if (dateMatch) {
+    resultDate = dateMatch.dateKey;
+    work = nlSpliceOut(work, dateMatch.start, dateMatch.end);
+    title = nlSpliceOut(title, dateMatch.start, dateMatch.end);
+  }
+
+  const timeMatch = nlExtractTime(work);
+  if (timeMatch) {
+    resultStart = timeMatch.startTime;
+    resultEnd = timeMatch.endTime || nlMinutesToTime(nlTimeToMinutes(timeMatch.startTime) + 60);
+    work = nlSpliceOut(work, timeMatch.start, timeMatch.end);
+    title = nlSpliceOut(title, timeMatch.start, timeMatch.end);
+  }
+
+  title = title.replace(/\s+/g, ' ').trim();
+
+  return { title, date: resultDate, start: resultStart, end: resultEnd };
 }
 
 function formatLongDate(date) {

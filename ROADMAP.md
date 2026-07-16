@@ -64,3 +64,22 @@
 ## 六、存檔規則
 
 依 HANDOFF.md，完成後同步更新 `HANDOFF.md`、`CLAUDE.md`、`AGENTS.md`（及本 `ROADMAP.md`、`README.md`）。
+
+## 七、第二波功能批次（2026-07-16 晚間，總指揮 Fable 5 派工，全部完工）
+
+- [x] Worker A（Sonnet）：⏳ 倒數日（task.countdown 欄位＋側欄面板）、Agenda 列表檢視（第四種檢視，未來 30 天）、主題三段循環（淺/深/自動跟隨系統，存值 'auto'）、月檢視熱力圖（color-mix 依行程數深淺）
+- [x] Worker B（Sonnet）：雲端版本備份——`schema-history.sql`（sync_history 表）、每次推送自動留快照保留 10 版、🕘 雲端備份版本視窗一鍵還原、表不存在優雅降級
+- [x] Worker C（Sonnet）：自然語言快速新增（`parseNaturalDateTime()` 純函式＋單元測試）、🎤 語音輸入（Web Speech zh-TW，不支援自動移除按鈕）、📊 每週回顧（`computeWeeklyReview()`）
+- [x] Worker D（Sonnet）：背景推播 scaffold——`push.js`（訂閱管理 UI，webPushPublicKey 空值時零影響）、SW push/notificationclick、`schema-push.sql`（push_subscriptions + push_sent_log）、`supabase/functions/send-reminders/index.ts`（Edge Function）、`CLOUD_PUSH_SETUP.md` 部署教學
+- [x] 總指揮（Fable 5）：整合驗收、push.js 加入 APP_SHELL、CACHE_NAME 升 v16、文件校對
+
+### 使用者尚需自行執行（選用功能啟用步驟）
+1. 雲端版本備份：Supabase SQL Editor 執行 `schema-history.sql`（一次即可）
+2. 背景推播：照 `CLOUD_PUSH_SETUP.md` 走完 VAPID/部署/Cron（進階選用）
+
+## 八、後續大型項目（另案規劃，需資料庫結構大改）
+
+| 功能 | 說明 | 前置 |
+|---|---|---|
+| 家人共享行事曆 | 多帳號共看同一份（如「家庭」分類共享），需新表＋RLS 群組權限設計 | 同步穩定運行一段時間後 |
+| 欄位級同步合併 | 兩台同時改不同行程不互蓋（取代整包 LWW），需逐筆 diff/merge 與衝突 UI | 版本備份先上線當安全網 |

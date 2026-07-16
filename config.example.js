@@ -21,4 +21,5 @@
 window.CALENDAR_SYNC_CONFIG = {
   supabaseUrl: '', // 例如 'https://xxxxxxxxxxxx.supabase.co'
   supabaseAnonKey: '', // 例如 'eyJhbGciOi...'（anon / public 金鑰）
+  webPushPublicKey: '', // 背景推播用的 VAPID 公鑰，設定方式見 CLOUD_PUSH_SETUP.md；空值＝背景推播停用（進階選用功能，不影響雲端同步本身）
 };

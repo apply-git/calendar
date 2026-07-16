@@ -32,6 +32,11 @@
       </section>
 
       <section class="panel compact">
+        <h2>⏳ 倒數日</h2>
+        <div id="countdownList" class="countdown-list"></div>
+      </section>
+
+      <section class="panel compact">
         <h2 id="completionHeading">完成率</h2>
         <div class="progress-ring" aria-label="今日完成率">
           <span id="completionRate">0%</span>
@@ -97,6 +102,7 @@
             <button class="view-btn active" data-view="day">日</button>
             <button class="view-btn" data-view="week">週</button>
             <button class="view-btn" data-view="month">月</button>
+            <button class="view-btn" data-view="agenda">列表</button>
           </div>
           <div class="view-switch" id="dayModeSwitch" role="tablist" aria-label="切換日檢視模式" hidden>
             <button class="view-btn day-mode-btn active" data-day-mode="list">清單</button>
@@ -114,6 +120,7 @@
           <button id="settingsBtn" class="ghost-btn">文字設定</button>
           <button id="pomodoroBtn" class="ghost-btn">🍅 番茄鐘</button>
           <button id="todayTodoBtn" class="ghost-btn">今日待辦</button>
+          <button id="weeklyReviewBtn" class="ghost-btn">📊 週回顧</button>
           <button id="widgetModeBtn" class="ghost-btn">小工具模式</button>
           <button id="cleanupBtn" class="ghost-btn">清理舊行程</button>
           <button id="exportCsvBtn" class="ghost-btn">匯出 Excel</button>
@@ -186,7 +193,11 @@
       <div class="form-grid">
         <div class="field full">
           <label id="taskNameLabel" for="taskTitle">事項名稱</label>
-          <input id="taskTitle" type="text" required placeholder="例如：拜訪客戶、讀書、運動" />
+          <div class="title-input-row">
+            <input id="taskTitle" type="text" required placeholder="例如：拜訪客戶、讀書、運動" />
+            <button type="button" id="voiceInputBtn" class="icon-btn" title="語音輸入">🎤</button>
+          </div>
+          <p class="muted nl-hint">小技巧：輸入「明天下午3點 開會」會自動帶入日期時間</p>
         </div>
 
         <div class="field">
@@ -270,6 +281,9 @@
         </div>
         <div class="field checkbox-field">
           <label><input id="taskPinned" type="checkbox" /> 置頂行程</label>
+        </div>
+        <div class="field checkbox-field">
+          <label><input id="taskCountdown" type="checkbox" /> ⏳ 顯示在倒數日</label>
         </div>
 
         <div class="field full">
@@ -428,12 +442,65 @@
           <button type="button" id="cloudSyncDebugBtn" class="ghost-btn">🔍 疑難排解（顯示同步狀態）</button>
         </div>
         <div class="pomodoro-actions">
+          <button type="button" id="cloudHistoryBtn" class="ghost-btn">🕘 雲端備份版本</button>
+        </div>
+        <div class="pomodoro-actions">
           <button type="button" id="cloudSyncForcePullBtn" class="ghost-btn">⬇️ 強制拉取雲端資料覆蓋本機</button>
         </div>
         <div class="pomodoro-actions">
           <button type="button" id="cloudSyncForcePushBtn" class="ghost-btn">⬆️ 強制推送本機資料覆蓋雲端</button>
         </div>
       </div>
+    </div>
+  </dialog>
+
+  <dialog id="cloudHistoryDialog" class="task-dialog cloud-history-dialog">
+    <div class="dialog-header">
+      <h2>🕘 雲端備份版本</h2>
+      <button type="button" id="closeCloudHistoryBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="cloud-history-body">
+      <p class="muted">每次同步到雲端會自動留存快照，最多保留 10 份。還原會把選定版本套用到本機並重新上傳。</p>
+      <div id="cloudHistoryList"></div>
+    </div>
+  </dialog>
+
+  <dialog id="weeklyReviewDialog" class="task-dialog weekly-review-dialog">
+    <div class="dialog-header">
+      <h2>📊 本週回顧</h2>
+      <button type="button" id="closeWeeklyReviewBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="weekly-review-body">
+      <section class="weekly-review-section">
+        <h3>本週完成率</h3>
+        <div class="weekly-review-rate">
+          <span id="weeklyReviewRateValue" class="weekly-review-rate-value">0%</span>
+          <p id="weeklyReviewCountsLabel" class="muted">總行程 0 件｜已完成 0 件</p>
+        </div>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>與上週比較</h3>
+        <p id="weeklyReviewCompare" class="muted"></p>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>分類統計</h3>
+        <div id="weeklyReviewCategories" class="weekly-review-categories"></div>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>下週預覽</h3>
+        <p id="weeklyReviewNextWeekSummary" class="muted"></p>
+        <ul id="weeklyReviewNextWeekList" class="weekly-review-next-list"></ul>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>每週目標</h3>
+        <p id="weeklyReviewGoals" class="muted"></p>
+      </section>
     </div>
   </dialog>
 
@@ -444,6 +511,7 @@
     </div>
 
     <div class="more-tools-body">
+      <button type="button" class="more-tools-item" id="moreToolsWeeklyReviewBtn">📊 本週回顧</button>
       <button type="button" class="more-tools-item" data-proxy="enableNotificationsBtn">🔔 開啟通知</button>
       <button type="button" class="more-tools-item" data-proxy="backupBtn">備份</button>
       <button type="button" class="more-tools-item" data-proxy="restoreBtn">還原</button>
@@ -463,5 +531,6 @@
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script src="sync.js"></script>
+  <script src="push.js"></script>
 </body>
 </html>

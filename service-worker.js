@@ -1,4 +1,4 @@
-const CACHE_NAME = 'desktop-schedule-pwa-v15';
+const CACHE_NAME = 'desktop-schedule-pwa-v16';
 
 // 把「經過重新導向」的回應重新包成乾淨的 200 回應再存快取。
 // 原因：Cloudflare Pages 會把 /index.html 重導向到 /，導致快取到的回應帶有
@@ -20,6 +20,7 @@ const APP_SHELL = [
   './app.js',
   './config.js',
   './sync.js',
+  './push.js',
   './manifest.json',
   './icons/icon.svg',
   './icons/icon-192.png',
@@ -80,6 +81,56 @@ self.addEventListener('fetch', (event) => {
           return response.redirected ? clean : response;
         })
         .catch(() => caches.match('./index.html').then((fallback) => fallback || caches.match('./')));
+    })
+  );
+});
+
+// ============================================================================
+// 背景推播提醒（Web Push，進階選用功能，見 push.js 與 CLOUD_PUSH_SETUP.md）
+// ----------------------------------------------------------------------------
+// 只有使用者在「☁️ 雲端同步」對話框內主動開啟「背景推播提醒」並訂閱成功後，
+// 瀏覽器才會真的送 push 事件進來；沒有訂閱、或 config.js 的 webPushPublicKey
+// 是空值（整個功能停用）時，這兩個監聽器永遠不會被觸發，對其他功能零影響。
+// ============================================================================
+
+self.addEventListener('push', (event) => {
+  // 預設文字：伺服器傳來的資料解析失敗（不是合法 JSON、或缺欄位）時的保底顯示，
+  // 確保就算 payload 格式有誤也還是會跳出一則通知，而不是整個事件靜默失敗。
+  let data = { title: '行程提醒', body: '', url: './' };
+  try {
+    if (event.data) {
+      const parsed = event.data.json();
+      data = {
+        title: parsed.title || data.title,
+        body: parsed.body || data.body,
+        url: parsed.url || data.url,
+      };
+    }
+  } catch (err) {
+    console.warn('[service-worker] push 事件資料解析失敗，改用預設文字', err);
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
+      data: { url: data.url },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || './';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // 已經有開啟的視窗就直接切過去，不用另外開新分頁。
+      for (const client of windowClients) {
+        if ('focus' in client) return client.focus();
+      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
     })
   );
 });
