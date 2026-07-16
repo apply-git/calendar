@@ -274,6 +274,10 @@ const els = {
   categoryColorInput: $('categoryColorInput'),
   addCategoryBtn: $('addCategoryBtn'),
   toast: $('toast'),
+  fabAddBtn: $('fabAddBtn'),
+  moreToolsBtn: $('moreToolsBtn'),
+  moreToolsDialog: $('moreToolsDialog'),
+  closeMoreToolsBtn: $('closeMoreToolsBtn'),
 };
 
 init();
@@ -289,12 +293,66 @@ function init() {
   // 範例行程曾在雲端同步時被誤推上雲端蓋掉正式資料，且對新使用者也未必需要。
   normalizeStoredData();
   bindEvents();
+  setupMobilePanels();
   render();
   updatePomodoroDisplay();
   requestNotificationPermission();
   registerServiceWorker();
   handleUrlShortcutAction();
   setInterval(checkReminders, 30 * 1000);
+}
+
+// 手機版排版大改（只在 max-width:760px 生效，桌面版完全不受影響）：
+// 1) 側欄面板（今日重點/完成率/每週目標/習慣追蹤/自訂分類/快速範本）、搜尋篩選區、
+//    每日備忘錄改成收合式，預設收合，點標題列展開/收回。
+// 2) 顯示右下角懸浮新增按鈕（FAB）。
+// 3) 顯示工具列「⋯ 更多」按鈕（次要工具鈕的 dialog 由 bindEvents() 綁好，這裡只負責顯示）。
+// 只在 init() 判斷一次 matchMedia，不監聽 resize（規格如此，轉回桌面寬時因為所有收合
+// 樣式都包在 media query 內，class 留著也不會有視覺效果）。
+function setupMobilePanels() {
+  const isMobile = window.matchMedia('(max-width: 760px)').matches;
+  if (!isMobile) return;
+
+  const makeCollapsible = (panel, headEl, startCollapsed = true) => {
+    if (!panel || !headEl || panel.classList.contains('collapsible')) return;
+    headEl.classList.add('panel-collapse-head');
+    panel.classList.add('collapsible');
+    if (startCollapsed) panel.classList.add('collapsed');
+    headEl.addEventListener('click', () => panel.classList.toggle('collapsed'));
+  };
+
+  // 側欄各面板：h2 是既有標題，直接綁。
+  document.querySelectorAll('.sidebar .panel').forEach((panel) => {
+    makeCollapsible(panel, panel.querySelector('h2'));
+  });
+
+  // 搜尋/篩選區（.controls）本來沒有標題列，手機模式動態插入一個可點的 h2。
+  const controls = document.querySelector('.controls');
+  if (controls) {
+    let heading = controls.querySelector('.controls-heading');
+    if (!heading) {
+      heading = document.createElement('h2');
+      heading.className = 'controls-heading';
+      heading.textContent = '搜尋與篩選';
+      controls.insertBefore(heading, controls.firstChild);
+    }
+    makeCollapsible(controls, heading);
+  }
+
+  // 每日備忘錄：沿用既有的 .daily-memo-head（內含標題與「自動儲存」文字）當標題列。
+  const dailyMemo = document.querySelector('.daily-memo');
+  if (dailyMemo) {
+    makeCollapsible(dailyMemo, dailyMemo.querySelector('.daily-memo-head'));
+  }
+
+  // 懸浮新增按鈕（FAB）：小工具模式／今日待辦模式不用特別處理，維持顯示即可。
+  if (els.fabAddBtn) {
+    els.fabAddBtn.hidden = false;
+    els.fabAddBtn.addEventListener('click', () => openTaskDialog({ date: toDateInput(currentDate) }));
+  }
+
+  // 工具列「⋯ 更多」按鈕：顯示出來，實際開關與 proxy click 綁定在 bindEvents()。
+  if (els.moreToolsBtn) els.moreToolsBtn.hidden = false;
 }
 
 // Android PWA「長按主畫面圖示」快捷選單（manifest.json 的 shortcuts）會導向
@@ -400,6 +458,19 @@ function bindEvents() {
   els.exportIcsBtn.addEventListener('click', exportIcs);
   els.importIcsBtn.addEventListener('click', () => els.importIcsFileInput.click());
   els.importIcsFileInput.addEventListener('change', importIcs);
+
+  // 手機版「⋯ 更多」工具視窗：桌面版 moreToolsBtn 一直是 hidden（setupMobilePanels()
+  // 只在手機才移除 hidden），所以這段綁定即使一律執行也不影響桌面行為。dialog 內每顆
+  // 按鈕都是 proxy：先關 dialog，再對原本的按鈕呼叫 .click()，不用搬動任何原按鈕。
+  els.moreToolsBtn?.addEventListener('click', () => els.moreToolsDialog?.showModal());
+  els.closeMoreToolsBtn?.addEventListener('click', () => els.moreToolsDialog?.close());
+  document.querySelectorAll('#moreToolsDialog [data-proxy]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.proxy;
+      els.moreToolsDialog?.close();
+      document.getElementById(targetId)?.click();
+    });
+  });
 
   document.querySelectorAll('.view-btn:not(.day-mode-btn)').forEach((btn) => {
     btn.addEventListener('click', () => {

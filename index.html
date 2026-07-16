@@ -121,6 +121,7 @@
           <button id="exportIcsBtn" class="ghost-btn">匯出 .ics</button>
           <button id="importIcsBtn" class="ghost-btn">匯入 .ics</button>
           <input id="importIcsFileInput" type="file" accept=".ics,text/calendar" hidden />
+          <button id="moreToolsBtn" class="ghost-btn" hidden>⋯ 更多</button>
         </div>
       </header>
 
@@ -170,6 +171,8 @@
       <section id="calendarView" class="calendar-view panel"></section>
     </main>
   </div>
+
+  <button id="fabAddBtn" class="fab-add" hidden aria-label="新增行程">＋</button>
 
   <dialog id="taskDialog" class="task-dialog">
     <form id="taskForm" method="dialog">
@@ -431,6 +434,27 @@
           <button type="button" id="cloudSyncForcePushBtn" class="ghost-btn">⬆️ 強制推送本機資料覆蓋雲端</button>
         </div>
       </div>
+    </div>
+  </dialog>
+
+  <dialog id="moreToolsDialog" class="task-dialog more-tools-dialog">
+    <div class="dialog-header">
+      <h2>⋯ 更多工具</h2>
+      <button type="button" id="closeMoreToolsBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="more-tools-body">
+      <button type="button" class="more-tools-item" data-proxy="enableNotificationsBtn">🔔 開啟通知</button>
+      <button type="button" class="more-tools-item" data-proxy="backupBtn">備份</button>
+      <button type="button" class="more-tools-item" data-proxy="restoreBtn">還原</button>
+      <button type="button" class="more-tools-item" data-proxy="settingsBtn">文字設定</button>
+      <button type="button" class="more-tools-item" data-proxy="pomodoroBtn">🍅 番茄鐘</button>
+      <button type="button" class="more-tools-item" data-proxy="widgetModeBtn">小工具模式</button>
+      <button type="button" class="more-tools-item" data-proxy="cleanupBtn">清理舊行程</button>
+      <button type="button" class="more-tools-item" data-proxy="exportCsvBtn">匯出 Excel</button>
+      <button type="button" class="more-tools-item" data-proxy="printBtn">匯出 PDF</button>
+      <button type="button" class="more-tools-item" data-proxy="exportIcsBtn">匯出 .ics</button>
+      <button type="button" class="more-tools-item" data-proxy="importIcsBtn">匯入 .ics</button>
     </div>
   </dialog>
 

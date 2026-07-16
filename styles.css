@@ -715,6 +715,29 @@ textarea { resize: vertical; }
   border: 1px solid var(--border);
 }
 
+/* 手機版「⋯ 更多」工具視窗：桌面版永遠不會開啟（moreToolsBtn 預設 hidden，
+   只有手機 matchMedia 才會被 JS 移除 hidden），這裡的樣式對桌面版沒有任何影響。 */
+.more-tools-dialog { width: min(360px, calc(100vw - 28px)); }
+.more-tools-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0 4px;
+}
+.more-tools-item {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 14px;
+  color: var(--text);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+}
+
+/* 懸浮新增按鈕（FAB）：桌面版固定隱藏，只有 @media (max-width:760px) 內才會顯示
+   （且需要 JS 在手機時移除 hidden 屬性，兩個條件都成立才真的看得到）。 */
+.fab-add { display: none; }
+
 .toast {
   position: fixed;
   right: 22px;
@@ -757,12 +780,95 @@ body.widget-mode .task-card { font-size: 14px; }
   .brand, .sidebar > .primary-btn { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
-  .app-shell { padding: 14px; }
+  .app-shell { padding: 14px; display: flex; flex-direction: column; }
   .controls, .form-grid, .sidebar { grid-template-columns: 1fr; }
   .week-grid, .month-grid { grid-template-columns: 1fr; }
   .toolbar { align-items: stretch; }
   .toolbar-actions, .calendar-nav { flex-wrap: wrap; }
   .calendar-nav h2 { width: 100%; margin: 6px 0 0; }
+
+  /* 行事曆優先：.main 排到最前面，.sidebar（今日重點/完成率/每週目標/習慣追蹤/
+     自訂分類/快速範本）排到後面，使用者一開頁面先看到行事曆本體。 */
+  .main { order: 1; }
+  .sidebar { order: 2; }
+
+  /* 側欄面板／搜尋篩選區／每日備忘錄：收合式。app.js 的 setupMobilePanels() 只在
+     手機時才幫這些區塊加上 collapsible（可收合）與 collapsed（預設收合）class，
+     並幫標題列加上 panel-collapse-head class 綁 click 切換；桌面寬度時這幾個 class
+     即使還留在 DOM 上，因為所有規則都包在這個 media query 內，不會有任何視覺效果。 */
+  .panel.collapsible > .panel-collapse-head {
+    cursor: pointer;
+    position: relative;
+    padding-right: 22px;
+  }
+  .panel.collapsible > .panel-collapse-head::after {
+    content: '▾';
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .panel.collapsible.collapsed > .panel-collapse-head::after {
+    content: '▸';
+  }
+  .panel.collapsible.collapsed > *:not(.panel-collapse-head) {
+    display: none;
+  }
+  /* 搜尋/篩選區（.controls）本來沒有標題，setupMobilePanels() 會動態插入
+     一個 h2.controls-heading 當可點的標題列，這裡讓它跟其他面板標題視覺一致。 */
+  .controls-heading { margin: 0 0 12px; font-size: 17px; }
+
+  /* 懸浮新增按鈕（FAB）：只有 hidden 屬性被 JS 移除（手機模式）時才真的顯示，
+     用 :not([hidden]) 避免 CSS 的 display:flex 蓋掉 HTML 的 hidden 屬性。 */
+  .fab-add:not([hidden]) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 0;
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+    box-shadow: 0 14px 28px rgba(69, 104, 240, .35);
+    font-size: 28px;
+    font-weight: 700;
+    z-index: 500;
+  }
+
+  /* 工具列只留常用按鈕（檢視切換／日模式切換／清空當日週月／主題／雲端同步／今日待辦），
+     其餘次要工具用 id 列舉藏起來，收進「⋯ 更多」（#moreToolsBtn）彈出的 dialog。 */
+  #enableNotificationsBtn,
+  #backupBtn,
+  #restoreBtn,
+  #settingsBtn,
+  #pomodoroBtn,
+  #widgetModeBtn,
+  #cleanupBtn,
+  #exportCsvBtn,
+  #printBtn,
+  #exportIcsBtn,
+  #importIcsBtn {
+    display: none !important;
+  }
+
+  /* Dialog 手機版改成貼齊底部彈出，上圓角下直角，內容過長可捲動。 */
+  dialog.task-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: 88vh;
+    margin: auto 0 0 0;
+    border-radius: 20px 20px 0 0;
+    overflow-y: auto;
+  }
+
+  /* toast 提示原本跟 FAB 同一個右下角位置，手機加了 FAB 後把 toast 往上推，避免疊在一起。 */
+  .toast { bottom: 86px; }
 }
 
 @media print {
