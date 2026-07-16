@@ -173,6 +173,7 @@ const els = {
   todayBtn: $('todayBtn'),
   nextBtn: $('nextBtn'),
   jumpDateInput: $('jumpDateInput'),
+  jumpDateBtn: $('jumpDateBtn'),
   themeBtn: $('themeBtn'),
   enableNotificationsBtn: $('enableNotificationsBtn'),
   dayModeSwitch: $('dayModeSwitch'),
@@ -342,14 +343,22 @@ function bindEvents() {
     currentDate = startOfDay(next);
     render();
   });
-  // 點標題也能開啟年月日選擇器（showPicker 需要使用者手勢，且舊瀏覽器可能不支援，包 try/catch）。
-  els.currentTitle.addEventListener('click', () => {
+  // 支援 showPicker() 的瀏覽器：把日期輸入框藏起來（版面乾淨），
+  // 用 📅 按鈕或點標題開啟選擇器；不支援的舊瀏覽器保留小輸入框當備援、藏掉 📅 按鈕。
+  const openDatePicker = () => {
     try {
       els.jumpDateInput?.showPicker?.();
     } catch {
       els.jumpDateInput?.focus();
     }
-  });
+  };
+  if (els.jumpDateInput && typeof els.jumpDateInput.showPicker === 'function') {
+    els.jumpDateInput.classList.add('picker-hidden');
+  } else if (els.jumpDateBtn) {
+    els.jumpDateBtn.hidden = true;
+  }
+  els.jumpDateBtn?.addEventListener('click', openDatePicker);
+  els.currentTitle.addEventListener('click', openDatePicker);
   // 行程視窗的日期欄：點整個欄位就打開年月日選擇器，不用瞄準小小的日曆圖示。
   els.taskDate.addEventListener('click', () => {
     try {

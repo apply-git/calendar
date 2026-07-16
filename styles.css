@@ -112,8 +112,10 @@ button { cursor: pointer; }
   background: var(--surface-strong);
   border: 1px solid var(--border);
 }
-/* 導航列的年月日跳轉選擇器：外觀比照 ghost-btn */
+/* 導航列的年月日跳轉選擇器：外觀比照 ghost-btn，蓋掉全域 input width:100% 避免撐開版面 */
 .date-jump {
+  width: auto;
+  flex: 0 0 auto;
   padding: 8px 10px;
   color: var(--text);
   background: var(--surface-strong);
@@ -123,6 +125,18 @@ button { cursor: pointer; }
   font-size: 14px;
   cursor: pointer;
 }
+/* 瀏覽器支援 showPicker() 時，把選擇器本體藏起來（仍需保持 rendered，不能 display:none），
+   只留 📅 按鈕與點標題兩個入口，版面乾淨；不支援的舊瀏覽器則顯示小型輸入框當備援。 */
+.date-jump.picker-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.calendar-nav { position: relative; }
 .danger-btn {
   padding: 10px 14px;
   color: white;
