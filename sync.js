@@ -75,6 +75,7 @@
     syncEls.nowBtn = document.getElementById('cloudSyncNowBtn');
     syncEls.logoutBtn = document.getElementById('cloudSyncLogoutBtn');
     syncEls.debugBtn = document.getElementById('cloudSyncDebugBtn');
+    syncEls.forcePullBtn = document.getElementById('cloudSyncForcePullBtn');
   }
 
   function bindEvents() {
@@ -88,6 +89,7 @@
     syncEls.logoutBtn?.addEventListener('click', logout);
     syncEls.nowBtn?.addEventListener('click', () => syncNow({ silent: false }));
     syncEls.debugBtn?.addEventListener('click', showDebugStatus);
+    syncEls.forcePullBtn?.addEventListener('click', forcePullFromCloud);
     syncEls.autoToggle?.addEventListener('change', () => {
       if (!window.CalendarApp) return;
       window.CalendarApp.setAutoSyncEnabled(syncEls.autoToggle.checked);
@@ -348,7 +350,11 @@
     lines.push('登入狀態：' + (isLoggedIn() ? '已登入' : '未登入'));
     lines.push('帳號：' + (authState?.user?.email || '（無）'));
     lines.push('本機記錄的上次同步時間：' + (meta.lastSyncedAt ? new Date(Number(meta.lastSyncedAt)).toLocaleString() : '（無，等於 0）'));
-    lines.push('本機目前行程筆數：' + (window.CalendarApp ? (window.CalendarApp.buildBackupPayload().tasks || []).length : '（無法讀取）'));
+    const localTasks = window.CalendarApp ? (window.CalendarApp.buildBackupPayload().tasks || []) : null;
+    lines.push('本機目前行程筆數：' + (localTasks ? localTasks.length : '（無法讀取）'));
+    if (localTasks && localTasks.length) {
+      lines.push('本機第一筆標題：' + (localTasks[0].title || '（無標題）') + '　id：' + localTasks[0].id);
+    }
 
     if (!SYNC_ENABLED) {
       alert(lines.join('\n'));
@@ -373,12 +379,50 @@
         lines.push('雲端目前沒有這個帳號的資料列（remote 為 null）');
       } else {
         lines.push('雲端 updated_at：' + remote.updated_at);
-        lines.push('雲端行程筆數：' + ((remote.payload && remote.payload.tasks) ? remote.payload.tasks.length : '（payload 沒有 tasks）'));
+        const remoteTasks = (remote.payload && remote.payload.tasks) ? remote.payload.tasks : null;
+        lines.push('雲端行程筆數：' + (remoteTasks ? remoteTasks.length : '（payload 沒有 tasks）'));
+        if (remoteTasks && remoteTasks.length) {
+          lines.push('雲端第一筆標題：' + (remoteTasks[0].title || '（無標題）') + '　id：' + remoteTasks[0].id);
+        }
       }
     } catch (err) {
       lines.push('連線雲端時發生錯誤：' + (err?.message || String(err)));
     }
     alert(lines.join('\n'));
+  }
+
+  // 疑難排解用：跳過「比對時間、決定 pull 還是 push」的邏輯，直接把雲端資料強制套用到本機，
+  // 並強制整頁重新整理，確保一定看得到最新結果（排除「資料其實已經對了、只是畫面沒重繪」的可能）。
+  // 只做 pull，不會反過來覆蓋雲端，所以就算按錯，最多是本機當下未存檔的操作被換掉，不會弄丟雲端資料。
+  async function forcePullFromCloud() {
+    if (!SYNC_ENABLED) {
+      alert('雲端同步未設定');
+      return;
+    }
+    if (!isLoggedIn()) {
+      alert('尚未登入，無法拉取');
+      return;
+    }
+    if (!confirm('會用雲端上的資料整包覆蓋本機目前畫面（不會影響雲端），確定要繼續嗎？')) return;
+    try {
+      const ok = await ensureFreshToken();
+      if (!ok) {
+        alert('權杖無效，無法連線雲端');
+        return;
+      }
+      const remote = await cloudPull();
+      if (!remote) {
+        alert('雲端目前沒有這個帳號的資料，無法拉取');
+        return;
+      }
+      window.CalendarApp.applyBackupObject(remote.payload || {});
+      const remoteUpdatedAtMs = remote.updated_at ? new Date(remote.updated_at).getTime() : Date.now();
+      saveSyncMeta({ lastSyncedAt: remoteUpdatedAtMs });
+      alert('已套用雲端資料，即將重新整理頁面');
+      window.location.reload();
+    } catch (err) {
+      alert('強制拉取失敗：' + (err?.message || String(err)));
+    }
   }
 
   // ---- 同步主流程（手動「立即同步」與自動同步共用）----
@@ -485,5 +529,6 @@
     logout,
     syncNow,
     showDebugStatus,
+    forcePullFromCloud,
   };
 })();
