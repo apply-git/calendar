@@ -120,6 +120,10 @@
     authState = null;
     try {
       localStorage.removeItem(SYNC_AUTH_KEY);
+      // 一併清掉同步紀錄（lastSyncedAt）：舊版曾用裝置本機時間存過這個值，
+      // 若裝置時鐘不準會殘留錯誤紀錄卡住往後的同步判斷。重新登入視為
+      // 全新一輪同步，清空後下次一定會先跟雲端資料比對，不會誤判本機較新。
+      localStorage.removeItem(SYNC_META_KEY);
     } catch {}
   }
 
@@ -295,23 +299,36 @@
     return Array.isArray(rows) && rows.length ? rows[0] : null;
   }
 
+  // 回傳伺服器實際寫入的 updated_at（ISO 字串）；理論上不該發生但拿不到時回傳 null，
+  // 呼叫端（syncNow）需自行 fallback，不能假設一定拿得到伺服器時間。
   async function cloudPush(backupObject) {
     const ok = await ensureFreshToken();
-    if (!ok) return false;
+    if (!ok) return null;
     const userId = authState.user?.id;
-    if (!userId) return false;
+    if (!userId) return null;
     const url = `${SUPABASE_URL}/rest/v1/sync_state?on_conflict=user_id`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         ...authHeaders(),
         'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
+        Prefer: 'resolution=merge-duplicates,return=representation',
       },
       body: JSON.stringify([{ user_id: userId, payload: backupObject, updated_at: new Date().toISOString() }]),
     });
     if (!res.ok) throw new Error('cloudPush failed: ' + res.status);
-    return true;
+    try {
+      const data = await res.json();
+      const updatedAt = Array.isArray(data) && data[0] ? data[0].updated_at : null;
+      if (!updatedAt) {
+        console.warn('[sync] cloudPush 未取得伺服器 updated_at，將 fallback 用本機時間（可能導致時鐘不準的裝置同步異常）');
+        return null;
+      }
+      return updatedAt;
+    } catch (err) {
+      console.warn('[sync] cloudPush 解析回應失敗，將 fallback 用本機時間', err);
+      return null;
+    }
   }
 
   // ---- 同步主流程（手動「立即同步」與自動同步共用）----
@@ -347,9 +364,11 @@
         toast('已從雲端取得較新的資料並更新本機');
       } else {
         // 本機較新（或雲端還沒有資料）：把本機資料覆蓋上去。
+        // lastSyncedAt 必須用「伺服器」寫入的 updated_at，不能用裝置本機 Date.now()：
+        // 裝置時鐘不準時，之後跟其他裝置的 remoteUpdatedAtMs 比較會永遠判斷錯誤。
         const payload = window.CalendarApp.buildBackupPayload();
-        await cloudPush(payload);
-        saveSyncMeta({ lastSyncedAt: Date.now() });
+        const serverUpdatedAt = await cloudPush(payload);
+        saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
         if (!silent) toast('已同步到雲端');
       }
       return true;
