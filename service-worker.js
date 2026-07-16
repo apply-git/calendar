@@ -1,4 +1,4 @@
-const CACHE_NAME = 'desktop-schedule-pwa-v4';
+const CACHE_NAME = 'desktop-schedule-pwa-v5';
 const APP_SHELL = [
   './',
   './index.html',
