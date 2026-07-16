@@ -76,6 +76,7 @@
     syncEls.logoutBtn = document.getElementById('cloudSyncLogoutBtn');
     syncEls.debugBtn = document.getElementById('cloudSyncDebugBtn');
     syncEls.forcePullBtn = document.getElementById('cloudSyncForcePullBtn');
+    syncEls.forcePushBtn = document.getElementById('cloudSyncForcePushBtn');
   }
 
   function bindEvents() {
@@ -90,6 +91,7 @@
     syncEls.nowBtn?.addEventListener('click', () => syncNow({ silent: false }));
     syncEls.debugBtn?.addEventListener('click', showDebugStatus);
     syncEls.forcePullBtn?.addEventListener('click', forcePullFromCloud);
+    syncEls.forcePushBtn?.addEventListener('click', forcePushToCloud);
     syncEls.autoToggle?.addEventListener('change', () => {
       if (!window.CalendarApp) return;
       window.CalendarApp.setAutoSyncEnabled(syncEls.autoToggle.checked);
@@ -425,6 +427,30 @@
     }
   }
 
+  // 疑難排解／救資料用：跳過時間比對，直接把「本機目前資料」整包強制覆蓋雲端，
+  // 並把 lastSyncedAt 更新成伺服器回傳的時間（讓這台裝置之後不會又誤判要 pull）。
+  // 用途：某台裝置確定是「正確、完整」的那一份，要用它強制修正被別台覆蓋壞掉的雲端。
+  async function forcePushToCloud() {
+    if (!SYNC_ENABLED) {
+      alert('雲端同步未設定');
+      return;
+    }
+    if (!isLoggedIn() || !window.CalendarApp) {
+      alert('尚未登入或找不到本機資料介面，無法推送');
+      return;
+    }
+    const count = (window.CalendarApp.buildBackupPayload().tasks || []).length;
+    if (!confirm(`會用「這台裝置目前的 ${count} 筆行程」整包覆蓋雲端上的資料（其他裝置下次同步會拿到這一份）。\n請確認這台就是資料正確的那一台，確定要繼續嗎？`)) return;
+    try {
+      const payload = window.CalendarApp.buildBackupPayload();
+      const serverUpdatedAt = await cloudPush(payload);
+      saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
+      alert('已把這台的資料強制推送到雲端。接下來到另一台裝置按「⬇️ 強制拉取雲端資料覆蓋本機」即可。');
+    } catch (err) {
+      alert('強制推送失敗：' + (err?.message || String(err)));
+    }
+  }
+
   // ---- 同步主流程（手動「立即同步」與自動同步共用）----
 
   async function syncNow(options = {}) {
@@ -530,5 +556,6 @@
     syncNow,
     showDebugStatus,
     forcePullFromCloud,
+    forcePushToCloud,
   };
 })();
