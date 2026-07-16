@@ -972,6 +972,21 @@ body.widget-mode .task-card { font-size: 14px; }
   .main { order: 1; }
   .sidebar { order: 2; }
 
+  /* 側欄的大顆「＋ 新增行程」在手機隱藏（右下角 FAB 取代，避免重複）。 */
+  #quickAddBtn { display: none; }
+
+  /* 品牌區被 setupMobilePanels() 搬到 .main 最上方當表頭：縮小成精簡一列。 */
+  .brand-mobile { padding: 2px 2px 0; gap: 10px; }
+  .brand-mobile .brand-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    font-size: 22px;
+    box-shadow: 0 6px 16px rgba(69, 104, 240, .25);
+  }
+  .brand-mobile h1 { font-size: 18px; }
+  .brand-mobile p { margin: 1px 0 0; font-size: 12px; }
+
   /* 側欄面板／搜尋篩選區／每日備忘錄：收合式。app.js 的 setupMobilePanels() 只在
      手機時才幫這些區塊加上 collapsible（可收合）與 collapsed（預設收合）class，
      並幫標題列加上 panel-collapse-head class 綁 click 切換；桌面寬度時這幾個 class

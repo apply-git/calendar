@@ -364,6 +364,16 @@ function setupMobilePanels() {
   const isMobile = window.matchMedia('(max-width: 760px)').matches;
   if (!isMobile) return;
 
+  // 品牌區（圖示＋標題＋今天日期）整組搬到 .main 最上方當表頭：
+  // 手機版 .main 排最前（order:1），原本品牌區困在下方的側欄裡很突兀。
+  // 加 brand-mobile class 讓 CSS 縮小尺寸；側欄的大顆「＋ 新增行程」由 CSS 隱藏（右下角 FAB 取代）。
+  const brandEl = document.querySelector('.sidebar .brand');
+  const mainEl = document.querySelector('.main');
+  if (brandEl && mainEl) {
+    brandEl.classList.add('brand-mobile');
+    mainEl.insertBefore(brandEl, mainEl.firstChild);
+  }
+
   const makeCollapsible = (panel, headEl, startCollapsed = true) => {
     if (!panel || !headEl || panel.classList.contains('collapsible')) return;
     headEl.classList.add('panel-collapse-head');
