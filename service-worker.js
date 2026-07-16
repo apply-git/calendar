@@ -1,4 +1,18 @@
-const CACHE_NAME = 'desktop-schedule-pwa-v14';
+const CACHE_NAME = 'desktop-schedule-pwa-v15';
+
+// 把「經過重新導向」的回應重新包成乾淨的 200 回應再存快取。
+// 原因：Cloudflare Pages 會把 /index.html 重導向到 /，導致快取到的回應帶有
+// redirected 旗標；Chrome 對「頁面導航」拒收這種來自 Service Worker 的回應
+// （直接顯示 ERR_FAILED），安裝版 PWA 一打開就掛。重新包一層即可去掉旗標。
+async function sanitizeResponse(response) {
+  if (!response || !response.redirected) return response;
+  const body = await response.blob();
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
 const APP_SHELL = [
   './',
   './index.html',
@@ -20,9 +34,16 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => Promise.all(
         // 逐一快取，單一檔案 fetch 失敗（例如缺圖示）不會讓整個 SW 安裝失敗。
-        APP_SHELL.map((url) => cache.add(url).catch((err) => {
-          console.warn('[service-worker] 快取失敗，略過：', url, err);
-        }))
+        // 不用 cache.add()：要先 sanitizeResponse() 去掉 redirected 旗標再存。
+        APP_SHELL.map((url) => fetch(url)
+          .then((res) => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return sanitizeResponse(res);
+          })
+          .then((clean) => cache.put(url, clean))
+          .catch((err) => {
+            console.warn('[service-worker] 快取失敗，略過：', url, err);
+          }))
       ))
       .then(() => self.skipWaiting())
   );
@@ -52,12 +73,13 @@ self.addEventListener('fetch', (event) => {
       if (cached) return cached;
 
       return fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          return response;
+        .then(async (response) => {
+          // 重新導向過的回應要先包乾淨再快取＋回傳（頁面導航拒收 redirected 回應）。
+          const clean = await sanitizeResponse(response.clone());
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clean.clone())).catch(() => {});
+          return response.redirected ? clean : response;
         })
-        .catch(() => caches.match('./index.html'));
+        .catch(() => caches.match('./index.html').then((fallback) => fallback || caches.match('./')));
     })
   );
 });
