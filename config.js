@@ -18,6 +18,6 @@
 // ============================================================================
 
 window.CALENDAR_SYNC_CONFIG = {
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://uaentjtgdrzbzfkccybs.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZW50anRnZHJ6Ynpma2NjeWJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNzUzMTEsImV4cCI6MjA5OTc1MTMxMX0.SMLhjdcyMmEaySTj4_tr3Soii6_POsPu-Ue1XFvshWM',
 };
