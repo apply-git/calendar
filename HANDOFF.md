@@ -142,11 +142,9 @@ task 物件新增欄位 `excludedDates`（字串陣列，預設 `[]`）：儲存
 `manifest.json` / `service-worker.js` / `icons/` / 離線快取 / README 教學皆已完成。
 仍待做：透過 `start-pwa-local.bat` 本機伺服器實際安裝到手機/電腦跑一輪確認。
 
-### 雲端同步實際上線（scaffold 已完成，尚未實測）
+### 雲端同步實際上線（✅ 已完成並實測收工，2026-07-16）
 
-程式骨架（`sync.js` + `config.js` + `schema.sql` + `CLOUD_SETUP.md`）已就緒，但**尚未拿真實 Supabase 金鑰驗證過**。下一步：
-- 依 `CLOUD_SETUP.md` 建 Supabase 專案、跑 `schema.sql`、啟用 Google 登入、填 `config.js`。
-- 兩台裝置實測 last-write-wins 同步是否如預期。
+已依 `CLOUD_SETUP.md` 建立 Supabase 專案（calendar-gogo）、跑 `schema.sql`、啟用 Google 登入（Google Auth Platform 已發布為實際運作中，家人各自的 Google 帳號都能登入、資料彼此隔離）、填入 `config.js` 正式金鑰。電腦 + Android 手機兩台裝置實測 last-write-wins 同步成功收斂。實測過程抓出並修復四個同步 bug，教訓都記錄在「已知注意事項」。
 
 ### Android 安裝檔
 
@@ -169,7 +167,7 @@ task 物件新增欄位 `excludedDates`（字串陣列，預設 `[]`）：儲存
 
 - 桌面通知在 `file://` 不同瀏覽器限制不同，正式 PWA 用 HTTPS 較穩。
 - iPhone PWA 的通知支援受系統版本影響。
-- 已有雲端同步 scaffold（`sync.js` + `config.js` + `schema.sql` + `CLOUD_SETUP.md`）：預設未設定時仍是純 localStorage、無帳號系統、不跨裝置同步；填好 `config.js` 的 Supabase 專案資訊並登入 Google 後，才會有帳號與跨裝置同步（last-write-wins，非即時多人協作）。目前沒有真的部署 Supabase 專案驗證過（沒有金鑰），架構與程式碼已完成但屬「尚未實測」狀態，之後拿到金鑰要照 `CLOUD_SETUP.md` 走一次完整流程驗證。
+- 雲端同步**已於 2026-07-16 用真實 Supabase 專案（calendar-gogo）＋ Google 登入在電腦與 Android 手機兩台裝置實測收工**：兩台裝置登入同一 Google 帳號、互相推拉資料成功收斂一致。過程中抓出並修掉四個 bug（見下方各條教訓）。`config.js` 已填入正式金鑰（anon key，可公開）。預設未設定時仍是純 localStorage、不發網路請求的行為不變。
 - 登入用的 access/refresh token 存在 `desktop-schedule-sync-auth-v1`，刻意不放進備份 JSON；換瀏覽器/清資料需要重新走一次 Google 登入。
 - **`lastSyncedAt` 必須永遠來自伺服器時間，不能用裝置本機 `Date.now()`（已修過的 bug，教訓記錄）**：`syncNow()` 用 localStorage 存的 `lastSyncedAt`（`desktop-schedule-sync-meta-v1`）跟雲端 `sync_state.updated_at` 比大小，決定要 pull 還是 push。早期版本裡，pull 分支存伺服器時間沒問題，但 push 分支存的是 `Date.now()`（裝置本機時鐘）；`cloudPush()` 當時用 `Prefer: return=minimal`，前端根本拿不到伺服器實際寫入的 `updated_at`，只能用本機時間硬猜。如果某台裝置（常見是手機）系統時鐘跟伺服器對不準，就會一直存下不準的 `lastSyncedAt`，之後每次比較都判斷錯誤，症狀是這台裝置永遠只會單向覆蓋雲端、收不到其他裝置的更新，使用者狂按「立即同步」也沒用。修法：`cloudPush()` 改用 `Prefer: return=representation`，讓 PostgREST upsert 回傳寫入的那一列（陣列格式，取 `data[0].updated_at`），`syncNow()` 的 push 分支改成用這個伺服器回傳值算 `lastSyncedAt`（`new Date(serverUpdatedAt).getTime()`），只有在真的拿不到回傳值時才 fallback 用 `Date.now()`（並 `console.warn` 留記錄）。以後任何會寫 `lastSyncedAt` 的地方都要遵守這條規則。**已修過但這個 bug 觸發過的裝置，`lastSyncedAt` 舊值仍留在該裝置 localStorage，光部署新版程式不會自動修正**（下次同步仍會先用這個殘留的錯誤值比較一次）；因此同時把 `logout()`／`clearAuthState()` 改成登出時一併清掉 `desktop-schedule-sync-meta-v1`，讓「登出→重新登入」變成使用者不用碰開發者工具就能重置同步紀錄的方法：卡住的裝置（通常是手機）登出再登入一次，下次同步會強制重新跟雲端比對。
 - **PWA Service Worker 快取陷阱**：`config.js`/`sync.js` 更新後（例如剛設定好 Supabase 金鑰）部署上線，若某個瀏覽器/裝置之前已經開過這個網址一次，Service Worker 會把「當時那份舊版」`config.js` 存進離線快取，之後不管怎麼重新整理都會被 SW 攔截優先給舊版，導致畫面一直顯示「雲端同步未設定」。驗證方式：`navigator.serviceWorker.getRegistrations()` 逐一 `unregister()` 再 `caches.keys()` 逐一 `caches.delete()`，然後重新整理。一般使用者可以用瀏覽器「清除瀏覽資料/快取」或把 PWA 從主畫面移除重新加入解決。這不是部署失敗，純粹是 SW 離線快取的預期行為。
