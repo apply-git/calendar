@@ -172,6 +172,7 @@ const els = {
   prevBtn: $('prevBtn'),
   todayBtn: $('todayBtn'),
   nextBtn: $('nextBtn'),
+  jumpDateInput: $('jumpDateInput'),
   themeBtn: $('themeBtn'),
   enableNotificationsBtn: $('enableNotificationsBtn'),
   dayModeSwitch: $('dayModeSwitch'),
@@ -333,6 +334,28 @@ function bindEvents() {
   els.prevBtn.addEventListener('click', () => navigate(-1));
   els.todayBtn.addEventListener('click', () => { currentDate = startOfDay(new Date()); render(); });
   els.nextBtn.addEventListener('click', () => navigate(1));
+  // 年月日直選跳轉：改變日期選擇器就跳到那一天（週/月檢視會跳到含該日的那一週/月）。
+  els.jumpDateInput?.addEventListener('change', () => {
+    if (!els.jumpDateInput.value) return;
+    const next = new Date(`${els.jumpDateInput.value}T00:00:00`);
+    if (Number.isNaN(next.getTime())) return;
+    currentDate = startOfDay(next);
+    render();
+  });
+  // 點標題也能開啟年月日選擇器（showPicker 需要使用者手勢，且舊瀏覽器可能不支援，包 try/catch）。
+  els.currentTitle.addEventListener('click', () => {
+    try {
+      els.jumpDateInput?.showPicker?.();
+    } catch {
+      els.jumpDateInput?.focus();
+    }
+  });
+  // 行程視窗的日期欄：點整個欄位就打開年月日選擇器，不用瞄準小小的日曆圖示。
+  els.taskDate.addEventListener('click', () => {
+    try {
+      els.taskDate.showPicker?.();
+    } catch {}
+  });
   els.themeBtn.addEventListener('click', toggleTheme);
   els.enableNotificationsBtn.addEventListener('click', () => requestNotificationPermission(true));
   els.backupBtn.addEventListener('click', exportBackup);
@@ -459,6 +482,7 @@ function renderTitle() {
   }
   if (currentView === 'month') els.currentTitle.textContent = `${currentDate.getFullYear()} 年 ${currentDate.getMonth() + 1} 月`;
   els.lunarDayLabel.textContent = (currentView === 'day' && appSettings.showLunar) ? `🌙 農曆 ${lunarFullLabel(currentDate)}` : '';
+  if (els.jumpDateInput) els.jumpDateInput.value = toDateInput(currentDate);
 }
 
 function renderDailyMemo() {

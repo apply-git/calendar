@@ -63,6 +63,7 @@ task 物件新增欄位 `excludedDates`（字串陣列，預設 `[]`）：儲存
 
 ## 已完成功能
 
+- 年月日直選跳轉：導航列有 `<input type="date">`（`#jumpDateInput`，樣式 `.date-jump`），選日期直接跳到該天（週/月檢視跳到含該日的週/月）；點中間的日期標題（`#currentTitle`）也會呼叫 `showPicker()` 打開選擇器（包 try/catch，舊瀏覽器 fallback focus）。行程視窗的日期欄（`#taskDate`）點整個欄位即開啟原生年月日選擇器。`renderTitle()` 會把 `jumpDateInput.value` 同步成 `currentDate`。
 - 新增 / 編輯 / 刪除行程
 - 日 / 週 / 月檢視
 - 完成勾選
