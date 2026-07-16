@@ -283,7 +283,8 @@ function init() {
   els.todayLabel.textContent = formatLongDate(new Date());
   applyTextSettings();
 
-  if (!tasks.length) seedSampleTasks();
+  // 全新安裝／無資料時保持空白，不再自動塞範例行程：
+  // 範例行程曾在雲端同步時被誤推上雲端蓋掉正式資料，且對新使用者也未必需要。
   normalizeStoredData();
   bindEvents();
   render();
@@ -1917,28 +1918,6 @@ function toggleTheme() {
   const isDark = document.body.classList.contains('dark');
   localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
   els.themeBtn.textContent = isDark ? '☀️' : '🌙';
-}
-
-function seedSampleTasks() {
-  const today = toDateInput(new Date());
-  tasks = [
-    {
-      id: crypto.randomUUID(),
-      title: '規劃今日 3 件重點',
-      date: today,
-      start: '09:00',
-      end: '09:30',
-      priority: 'high',
-      category: '重要事項',
-      repeat: 'daily',
-      reminder: 10,
-      note: '可編輯或刪除此範例',
-      tags: ['重點'],
-      completedDates: [],
-      sortOrder: Date.now(),
-      createdAt: new Date().toISOString(),
-    },
-  ];
 }
 
 function normalizeStoredData() {
