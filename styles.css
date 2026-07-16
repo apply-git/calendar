@@ -794,6 +794,37 @@ textarea { resize: vertical; }
   border: 1px solid var(--border);
 }
 
+/* 背景推播提醒（push.js 動態插入到 #cloudSyncLoggedInBox 尾端）：用分隔線＋小標題
+   跟上面「自動同步／立即同步／登出…」按鈕群拉開視覺區隔，桌機／手機共用同一份樣式，
+   配色沿用既有 CSS 變數（--border/--text/--muted/--surface-strong）自動跟著深色模式切換。 */
+.push-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+.push-heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.push-field { margin: 0; }
+.push-test-hint {
+  margin: 0;
+  font-size: 12px;
+}
+/* 跟 .fab-add 用同一招：只有 push-test-row 沒有 hidden 屬性時才套用 display:flex，
+   避免「作者樣式優先權高於瀏覽器內建 [hidden]{display:none}」導致訂閱前就先跑版露出來。 */
+.push-test-row:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.push-test-row .ghost-btn { width: 100%; }
+
 .cloud-history-dialog { width: min(440px, calc(100vw - 28px)); }
 .cloud-history-body {
   display: flex;

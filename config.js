@@ -20,4 +20,7 @@
 window.CALENDAR_SYNC_CONFIG = {
   supabaseUrl: 'https://uaentjtgdrzbzfkccybs.supabase.co',
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZW50anRnZHJ6Ynpma2NjeWJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNzUzMTEsImV4cCI6MjA5OTc1MTMxMX0.SMLhjdcyMmEaySTj4_tr3Soii6_POsPu-Ue1XFvshWM',
+  // VAPID 公鑰（Web Push 背景推播用，本來就設計成可公開，安全性靠只有伺服器持有的私鑰）。
+  // 私鑰只存在 Supabase Edge Function 的 secrets，絕不放進前端程式碼。
+  webPushPublicKey: 'BL0A8Kp5GJNhYXiH6n0xHAOLxOHxyHGUCOwYrHdxC-zAiUoXZqCDeTKK773KG97UUHYjcyzPaFK3cPdCw8g4SCM',
 };

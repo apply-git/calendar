@@ -60,20 +60,45 @@
   }
 
   function insertUI(box) {
+    // 用分隔線＋小標題跟上面既有的「自動同步／立即同步／登出…」按鈕群拉開視覺區隔，
+    // checkbox＋狀態小字排版沿用既有 .checkbox-field／.muted。測試通知區塊
+    // （#pushTestRow）預設 hidden，只有實際訂閱成功後才顯示，靠 CSS 的
+    // `:not([hidden])` 寫法避免 .push-test-row 的 display:flex 蓋掉 hidden 屬性。
     const wrap = document.createElement('div');
-    wrap.className = 'field checkbox-field push-field';
+    wrap.className = 'push-block';
     wrap.innerHTML =
+      '<h3 class="push-heading">🔔 背景提醒</h3>' +
+      '<div class="field checkbox-field push-field">' +
       '<label><input id="pushEnableToggle" type="checkbox" /> 📲 背景推播提醒（App 關閉也會通知）</label>' +
-      '<p id="pushStatusText" class="muted"></p>';
+      '<p id="pushStatusText" class="muted"></p>' +
+      '</div>' +
+      '<div id="pushTestRow" class="push-test-row" hidden>' +
+      '<button type="button" id="pushTestBtn" class="ghost-btn">🔔 發送測試通知</button>' +
+      '<p class="muted push-test-hint">雲端排程推播需完成 <code>CLOUD_PUSH_SETUP.md</code> 部署後才會運作。</p>' +
+      '</div>';
     box.appendChild(wrap);
 
     els.toggle = wrap.querySelector('#pushEnableToggle');
     els.status = wrap.querySelector('#pushStatusText');
+    els.testRow = wrap.querySelector('#pushTestRow');
+    els.testBtn = wrap.querySelector('#pushTestBtn');
     els.toggle.addEventListener('change', onToggleChange);
+    els.testBtn.addEventListener('click', onTestNotificationClick);
   }
 
   function setStatus(text) {
     if (els.status) els.status.textContent = text;
+  }
+
+  function showTestRow(show) {
+    if (els.testRow) els.testRow.hidden = !show;
+  }
+
+  // iOS Safari 16.4+ 才支援 Web Push，但一定要先「加入主畫面」（standalone 模式）才會生效；
+  // 一般分頁模式下 PushManager 直接不存在。navigator.standalone 只有 iOS Safari 才有這個屬性，
+  // 其他瀏覽器一律是 undefined（=== false 恆不成立），不會誤判。
+  function isIOSNeedsHomeScreen() {
+    return navigator.standalone === false && /iPhone|iPad/.test(navigator.userAgent);
   }
 
   function isLoggedIn() {
@@ -95,7 +120,8 @@
     if (!PUSH_SUPPORTED) {
       els.toggle.checked = false;
       els.toggle.disabled = true;
-      setStatus('此瀏覽器不支援背景推播');
+      setStatus(isIOSNeedsHomeScreen() ? 'iPhone 需先把本頁加入主畫面（iOS 16.4+）才能使用背景提醒' : '此瀏覽器不支援背景推播');
+      showTestRow(false);
       return;
     }
 
@@ -103,6 +129,7 @@
       els.toggle.checked = false;
       els.toggle.disabled = true;
       setStatus('請先登入雲端同步');
+      showTestRow(false);
       return;
     }
 
@@ -110,6 +137,17 @@
       els.toggle.checked = false;
       els.toggle.disabled = true;
       setStatus('雲端同步尚未設定完成，無法使用背景推播');
+      showTestRow(false);
+      return;
+    }
+
+    // 使用者曾經按過「封鎖」：checkbox 直接鎖住，不讓他再勾一次徒勞觸發 requestPermission()
+    // （瀏覽器不會再跳出權限詢問，只會靜默維持 denied），改用狀態文字導引去瀏覽器設定處理。
+    if (Notification.permission === 'denied') {
+      els.toggle.checked = false;
+      els.toggle.disabled = true;
+      setStatus('通知權限已被封鎖，請到瀏覽器網站設定重新允許');
+      showTestRow(false);
       return;
     }
 
@@ -117,17 +155,22 @@
     try {
       const registration = await navigator.serviceWorker.ready;
       const sub = await registration.pushManager.getSubscription();
-      els.toggle.checked = Boolean(sub);
-      setStatus(sub ? '背景推播提醒已開啟' : '背景推播提醒尚未開啟');
+      const subscribed = Boolean(sub);
+      els.toggle.checked = subscribed;
+      setStatus(subscribed ? '背景推播提醒已開啟' : '背景推播提醒尚未開啟');
+      showTestRow(subscribed);
     } catch (err) {
       console.warn('[push] 讀取訂閱狀態失敗', err);
       setStatus('無法讀取目前的訂閱狀態');
+      showTestRow(false);
     }
   }
 
   async function onToggleChange() {
     const wantOn = els.toggle.checked;
     els.toggle.disabled = true;
+    showTestRow(false);
+    setStatus(wantOn ? '訂閱中…' : '取消訂閱中…');
     try {
       if (wantOn) {
         await subscribe();
@@ -139,6 +182,27 @@
       toast('背景推播設定失敗：' + (err?.message || String(err)));
     } finally {
       await refreshUI();
+    }
+  }
+
+  // 「發送測試通知」只驗證「瀏覽器端顯示路徑」（Service Worker 能不能叫出系統通知），
+  // 完全不經過雲端／VAPID／Supabase，按鈕旁小字也有註明。訂閱過程中權限被瀏覽器
+  // 記成「已封鎖」的話（例如訂閱後使用者自己去瀏覽器設定關掉），這裡也要攔下來，
+  // 不能悶不吭聲地失敗。
+  async function onTestNotificationClick() {
+    if (Notification.permission === 'denied') {
+      toast('通知權限已被封鎖，請到瀏覽器設定重新允許通知');
+      return;
+    }
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification('測試通知', {
+        body: '看得到這則就代表通知顯示正常（這是本機測試，不經過雲端）',
+        icon: './icons/icon-192.png',
+      });
+    } catch (err) {
+      console.warn('[push] 測試通知顯示失敗', err);
+      toast('測試通知顯示失敗：' + (err?.message || String(err)));
     }
   }
 
