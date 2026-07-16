@@ -74,6 +74,7 @@
     syncEls.autoToggle = document.getElementById('cloudAutoSyncToggle');
     syncEls.nowBtn = document.getElementById('cloudSyncNowBtn');
     syncEls.logoutBtn = document.getElementById('cloudSyncLogoutBtn');
+    syncEls.debugBtn = document.getElementById('cloudSyncDebugBtn');
   }
 
   function bindEvents() {
@@ -86,6 +87,7 @@
     syncEls.loginBtn?.addEventListener('click', login);
     syncEls.logoutBtn?.addEventListener('click', logout);
     syncEls.nowBtn?.addEventListener('click', () => syncNow({ silent: false }));
+    syncEls.debugBtn?.addEventListener('click', showDebugStatus);
     syncEls.autoToggle?.addEventListener('change', () => {
       if (!window.CalendarApp) return;
       window.CalendarApp.setAutoSyncEnabled(syncEls.autoToggle.checked);
@@ -331,6 +333,48 @@
     }
   }
 
+  // ---- 疑難排解：手機無法開發者工具時，用 alert() 直接把同步狀態顯示出來 ----
+
+  async function showDebugStatus() {
+    const meta = loadSyncMeta();
+    const lines = [];
+    lines.push('雲端同步設定：' + (SYNC_ENABLED ? '已設定' : '未設定'));
+    lines.push('登入狀態：' + (isLoggedIn() ? '已登入' : '未登入'));
+    lines.push('帳號：' + (authState?.user?.email || '（無）'));
+    lines.push('本機記錄的上次同步時間：' + (meta.lastSyncedAt ? new Date(Number(meta.lastSyncedAt)).toLocaleString() : '（無，等於 0）'));
+    lines.push('本機目前行程筆數：' + (window.CalendarApp ? (window.CalendarApp.buildBackupPayload().tasks || []).length : '（無法讀取）'));
+
+    if (!SYNC_ENABLED) {
+      alert(lines.join('\n'));
+      return;
+    }
+    if (!isLoggedIn()) {
+      lines.push('（未登入，不會嘗試連線雲端）');
+      alert(lines.join('\n'));
+      return;
+    }
+
+    lines.push('---- 正在連線雲端 ----');
+    try {
+      const ok = await ensureFreshToken();
+      lines.push('權杖是否有效：' + (ok ? '有效' : '無效／更新失敗'));
+      if (!ok) {
+        alert(lines.join('\n'));
+        return;
+      }
+      const remote = await cloudPull();
+      if (!remote) {
+        lines.push('雲端目前沒有這個帳號的資料列（remote 為 null）');
+      } else {
+        lines.push('雲端 updated_at：' + remote.updated_at);
+        lines.push('雲端行程筆數：' + ((remote.payload && remote.payload.tasks) ? remote.payload.tasks.length : '（payload 沒有 tasks）'));
+      }
+    } catch (err) {
+      lines.push('連線雲端時發生錯誤：' + (err?.message || String(err)));
+    }
+    alert(lines.join('\n'));
+  }
+
   // ---- 同步主流程（手動「立即同步」與自動同步共用）----
 
   async function syncNow(options = {}) {
@@ -434,5 +478,6 @@
     login,
     logout,
     syncNow,
+    showDebugStatus,
   };
 })();
