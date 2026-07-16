@@ -289,15 +289,21 @@
 
   // ---- Supabase REST（PostgREST）：sync_state 表的取回／覆蓋 ----
 
+  // 注意：這裡「連線失敗」跟「雲端本來就還沒有這個帳號的資料列」必須明確分開處理。
+  // 前者要 throw（讓 syncNow 整段中止、不要誤判成可以安全推播覆蓋），
+  // 後者才回傳 null（syncNow 據此判斷「第一次同步，安全推播」）。
+  // 這兩種情況混在一起，曾經導致手機一次暫時的權杖更新失敗，
+  // 被誤判成「雲端沒資料」，反而把手機本機的舊資料整包推上去蓋掉雲端正確資料。
   async function cloudPull() {
     const ok = await ensureFreshToken();
-    if (!ok) return null;
+    if (!ok) throw new Error('cloudPull：登入權杖無效或更新失敗，無法連線雲端（不是雲端沒有資料）');
     const userId = authState.user?.id;
-    if (!userId) return null;
+    if (!userId) throw new Error('cloudPull：找不到使用者 id，無法連線雲端（不是雲端沒有資料）');
     const url = `${SUPABASE_URL}/rest/v1/sync_state?user_id=eq.${encodeURIComponent(userId)}&select=payload,updated_at`;
     const res = await fetch(url, { headers: authHeaders() });
     if (!res.ok) throw new Error('cloudPull failed: ' + res.status);
     const rows = await res.json();
+    // 這裡回傳 null 才是真的「雲端還沒有這個帳號的資料列」（例如第一次同步），是合理、安全的 null。
     return Array.isArray(rows) && rows.length ? rows[0] : null;
   }
 
@@ -305,9 +311,9 @@
   // 呼叫端（syncNow）需自行 fallback，不能假設一定拿得到伺服器時間。
   async function cloudPush(backupObject) {
     const ok = await ensureFreshToken();
-    if (!ok) return null;
+    if (!ok) throw new Error('cloudPush：登入權杖無效或更新失敗，未送出（不能當作已同步）');
     const userId = authState.user?.id;
-    if (!userId) return null;
+    if (!userId) throw new Error('cloudPush：找不到使用者 id，未送出（不能當作已同步）');
     const url = `${SUPABASE_URL}/rest/v1/sync_state?on_conflict=user_id`;
     const res = await fetch(url, {
       method: 'POST',
