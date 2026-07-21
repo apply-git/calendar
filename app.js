@@ -375,6 +375,13 @@ const els = {
 // 元素（例如 tests.html 這種沒有完整 DOM 的頁面）而失敗，錯誤蒐集本身仍然有效。
 setupErrorLogging();
 
+// 工具列溢出收合的共用狀態：必須宣告在 init() 呼叫【之前】。
+// 教訓：原本宣告在檔案更下方，init() → setupToolbarOverflow() 執行時 let 變數
+// 還在暫時性死區（TDZ），拋 ReferenceError 被 init 的 try/catch 吞掉，導致
+// render() 整個沒跑（標題停在「行程」、日檢視按鈕全部消失）。
+const VIEW_CONTROLLED_TOOLBAR_IDS = new Set(['clearDayBtn', 'deferBtn', 'shareCardBtn', 'clearWeekBtn', 'clearMonthBtn']);
+let overflowHiddenIds = []; // stack：越後面代表越晚被藏，還原時優先還原最近被藏的（LIFO）
+
 // init() 包一層 try/catch：正常情況（index.html 有完整 DOM）不會走到 catch，
 // 但 tests.html 只載入 app.js、沒有任何畫面元素時 init() 一定會因為存取 null
 // 的 DOM 節點而丟出例外——沒有這層保護，例外會中斷整支 app.js 的執行，導致
@@ -526,9 +533,6 @@ function setupMobilePanels() {
 // clearDayBtn/deferBtn/shareCardBtn/clearWeekBtn/clearMonthBtn 這幾顆由
 // updateDayModeSwitch() 依目前檢視（日/週/月）自行控制 hidden，为避免互相打架，
 // 這裡的溢出收合刻意排除它們，只處理其餘固定顯示的工具鈕。
-const VIEW_CONTROLLED_TOOLBAR_IDS = new Set(['clearDayBtn', 'deferBtn', 'shareCardBtn', 'clearWeekBtn', 'clearMonthBtn']);
-let overflowHiddenIds = []; // stack：越後面代表越晚被藏，還原時優先還原最近被藏的（LIFO）
-
 function setupToolbarOverflow() {
   const container = document.querySelector('.toolbar-actions');
   if (!container || !els.moreToolsBtn) return;
