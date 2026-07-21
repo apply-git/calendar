@@ -316,6 +316,14 @@ const els = {
   weeklyReviewBtn: $('weeklyReviewBtn'),
   weeklyReviewDialog: $('weeklyReviewDialog'),
   closeWeeklyReviewBtn: $('closeWeeklyReviewBtn'),
+  dashboardBtn: $('dashboardBtn'),
+  dashboardDialog: $('dashboardDialog'),
+  closeDashboardBtn: $('closeDashboardBtn'),
+  dashboardCategoryHours: $('dashboardCategoryHours'),
+  dashboardWeeklyTrend: $('dashboardWeeklyTrend'),
+  dashboardOverdueSummary: $('dashboardOverdueSummary'),
+  dashboardOverdueList: $('dashboardOverdueList'),
+  dashboardTimeDistribution: $('dashboardTimeDistribution'),
   weeklyReviewRateValue: $('weeklyReviewRateValue'),
   weeklyReviewCountsLabel: $('weeklyReviewCountsLabel'),
   weeklyReviewCompare: $('weeklyReviewCompare'),
@@ -718,6 +726,20 @@ function bindEvents() {
     openWeeklyReviewDialog();
   });
 
+  // 統計儀表板：手機版走 #moreToolsDialog 的 data-proxy="dashboardBtn"（沿用既有
+  // proxy click 迴圈，不需要額外綁定）。逾期清單點擊比照 data-countdown-edit 的
+  // 委派寫法，但用 data-dashboard-edit 這組新 dataset key 避免跟既有委派衝突。
+  els.dashboardBtn?.addEventListener('click', openDashboardDialog);
+  els.closeDashboardBtn?.addEventListener('click', closeDashboardDialog);
+  els.dashboardOverdueList?.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-dashboard-edit]');
+    if (!item) return;
+    const task = tasks.find((t) => t.id === item.dataset.dashboardEdit);
+    if (!task) return;
+    closeDashboardDialog();
+    openTaskDialog(task, item.dataset.dashboardDate || '');
+  });
+
   // 資料檢查／修復工具：桌面工具列鈕；手機版由 CSS 隱藏、改走 #moreToolsDialog 的
   // data-proxy 按鈕（沿用既有 proxy click 迴圈，不需要額外綁定）。
   els.dataCheckBtn?.addEventListener('click', openDataCheckDialog);
@@ -790,6 +812,7 @@ const COMMAND_PALETTE_ACTIONS = [
   { label: '深色模式切換', run: () => els.themeBtn.click() },
   { label: '番茄鐘', run: () => els.pomodoroBtn.click() },
   { label: '週回顧', run: () => els.weeklyReviewBtn.click() },
+  { label: '統計', run: () => els.dashboardBtn.click() },
   { label: '批量新增', run: () => els.batchAddBtn.click() },
   { label: '資料檢查', run: () => els.dataCheckBtn.click() },
   { label: '備份', run: () => els.backupBtn.click() },
@@ -1778,6 +1801,163 @@ function openWeeklyReviewDialog() {
 
 function closeWeeklyReviewDialog() {
   els.weeklyReviewDialog.close();
+}
+
+// ----------------------------------------------------------------------------
+// 統計儀表板：computeDashboardStats() 是不碰 DOM 的純函式（只讀全域 tasks /
+// categories），只用既有資料（出現次數／completedDates／start・end／category）
+// 算四塊統計，不要求任何新紀錄。重複行程沿用 occursOnDate() 判斷「每天算一次出現」，
+// 完成判定沿用既有 isTaskDone()。渲染邏輯另外寫在 renderDashboard()。
+// ----------------------------------------------------------------------------
+function computeDashboardStats(baseDate) {
+  const base = startOfDay(baseDate instanceof Date && !Number.isNaN(baseDate.getTime()) ? baseDate : new Date());
+  const rangeDays = 30;
+  const dayKeys = Array.from({ length: rangeDays }, (_, i) => toDateInput(addDays(base, -(rangeDays - 1) + i)));
+
+  const categoryMinutes = new Map();
+  const overdueItems = [];
+  let overdueTotal = 0;
+  let occurrenceTotal = 0;
+  const timeBuckets = { morning: 0, afternoon: 0, evening: 0, dawn: 0 };
+
+  dayKeys.forEach((dateKey) => {
+    const dateObj = startOfDay(new Date(`${dateKey}T00:00:00`));
+    tasks.forEach((task) => {
+      if (!occursOnDate(task, dateKey)) return;
+      occurrenceTotal += 1;
+      const isDone = isTaskDone(task, dateKey);
+
+      const startMin = timeToMinutes(task.start);
+      const endMin = timeToMinutes(task.end);
+      const duration = (task.start && task.end && endMin > startMin) ? endMin - startMin : 0;
+      const catName = task.category || '未分類';
+      categoryMinutes.set(catName, (categoryMinutes.get(catName) || 0) + duration);
+
+      if (!isDone && dateObj < base) {
+        overdueTotal += 1;
+        overdueItems.push({ id: task.id, title: task.title, date: dateKey });
+      }
+
+      if (task.start) {
+        const hour = Math.floor(startMin / 60);
+        if (hour >= 5 && hour < 12) timeBuckets.morning += 1;
+        else if (hour >= 12 && hour < 18) timeBuckets.afternoon += 1;
+        else if (hour >= 18 && hour < 24) timeBuckets.evening += 1;
+        else timeBuckets.dawn += 1;
+      }
+    });
+  });
+
+  const categoryHours = Array.from(categoryMinutes.entries())
+    .map(([name, minutes]) => ({ name, color: getCategoryColor(name), hours: minutes / 60 }))
+    .filter((item) => item.hours > 0)
+    .sort((a, b) => b.hours - a.hours)
+    .slice(0, 8);
+  const maxCategoryHours = categoryHours.reduce((max, item) => Math.max(max, item.hours), 0);
+
+  const thisMonday = startOfWeek(base);
+  const weeklyTrend = Array.from({ length: 8 }, (_, i) => {
+    const monday = addDays(thisMonday, -(7 - i) * 7);
+    const weekDayKeys = Array.from({ length: 7 }, (_, d) => toDateInput(addDays(monday, d)));
+    let total = 0;
+    let done = 0;
+    weekDayKeys.forEach((dateKey) => {
+      tasks.forEach((task) => {
+        if (!occursOnDate(task, dateKey)) return;
+        total += 1;
+        if (isTaskDone(task, dateKey)) done += 1;
+      });
+    });
+    return {
+      label: `${monday.getMonth() + 1}/${monday.getDate()}`,
+      rate: total ? Math.round((done / total) * 100) : 0,
+      total,
+      done,
+    };
+  });
+
+  overdueItems.sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    rangeStart: dayKeys[0],
+    rangeEnd: dayKeys[dayKeys.length - 1],
+    categoryHours,
+    maxCategoryHours,
+    weeklyTrend,
+    overdue: {
+      total: overdueTotal,
+      ratio: occurrenceTotal ? Math.round((overdueTotal / occurrenceTotal) * 100) : 0,
+      occurrenceTotal,
+      items: overdueItems.slice(0, 5),
+    },
+    timeDistribution: [
+      { label: '早 05-12', count: timeBuckets.morning },
+      { label: '午 12-18', count: timeBuckets.afternoon },
+      { label: '晚 18-24', count: timeBuckets.evening },
+      { label: '凌晨 00-05', count: timeBuckets.dawn },
+    ],
+  };
+}
+
+function renderDashboard() {
+  const data = computeDashboardStats(new Date());
+
+  els.dashboardCategoryHours.innerHTML = data.categoryHours.length
+    ? data.categoryHours.map((item) => `
+        <div class="dashboard-bar-row">
+          <div class="dashboard-bar-head">
+            <span class="color-dot" style="--dot-color:${item.color}"></span>
+            <span class="dashboard-bar-label">${escapeHtml(item.name)}</span>
+            <span class="dashboard-bar-value">${item.hours.toFixed(1)} 小時</span>
+          </div>
+          <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:${data.maxCategoryHours ? Math.round((item.hours / data.maxCategoryHours) * 100) : 0}%"></div></div>
+        </div>
+      `).join('')
+    : '<p class="muted">尚無資料</p>';
+
+  els.dashboardWeeklyTrend.innerHTML = data.weeklyTrend.some((week) => week.total > 0)
+    ? `<div class="dashboard-trend-chart">${data.weeklyTrend.map((week) => `
+        <div class="dashboard-trend-col">
+          <span class="dashboard-trend-value">${week.rate}%</span>
+          <div class="dashboard-trend-bar-track"><div class="dashboard-trend-bar-fill" style="height:${Math.round((week.rate / 100) * 96)}px"></div></div>
+          <span class="dashboard-trend-label">${escapeHtml(week.label)}</span>
+        </div>
+      `).join('')}</div>`
+    : '<p class="muted">尚無資料</p>';
+
+  els.dashboardOverdueSummary.textContent = data.overdue.occurrenceTotal
+    ? `近 30 天共 ${data.overdue.occurrenceTotal} 筆行程出現，逾期未完成 ${data.overdue.total} 筆（${data.overdue.ratio}%）`
+    : '尚無資料';
+  els.dashboardOverdueList.innerHTML = data.overdue.items.length
+    ? data.overdue.items.map((item) => `
+        <li class="dashboard-overdue-item" data-dashboard-edit="${item.id}" data-dashboard-date="${item.date}">
+          <span class="dashboard-overdue-date">${formatMonthDay(new Date(`${item.date}T00:00:00`))}</span>
+          <span class="dashboard-overdue-title">${escapeHtml(item.title)}</span>
+        </li>
+      `).join('')
+    : '<li class="muted">尚無資料</li>';
+
+  const maxBucket = data.timeDistribution.reduce((max, bucket) => Math.max(max, bucket.count), 0);
+  els.dashboardTimeDistribution.innerHTML = maxBucket
+    ? data.timeDistribution.map((bucket) => `
+        <div class="dashboard-bar-row">
+          <div class="dashboard-bar-head">
+            <span class="dashboard-bar-label">${bucket.label}</span>
+            <span class="dashboard-bar-value">${bucket.count} 筆</span>
+          </div>
+          <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:${Math.round((bucket.count / maxBucket) * 100)}%"></div></div>
+        </div>
+      `).join('')
+    : '<p class="muted">尚無資料</p>';
+}
+
+function openDashboardDialog() {
+  renderDashboard();
+  els.dashboardDialog.showModal();
+}
+
+function closeDashboardDialog() {
+  els.dashboardDialog.close();
 }
 
 function openTaskDialog(defaults = {}, occurrenceDate = '') {

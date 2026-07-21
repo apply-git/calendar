@@ -123,6 +123,7 @@
           <button id="pomodoroBtn" class="ghost-btn">🍅 番茄鐘</button>
           <button id="todayTodoBtn" class="ghost-btn">今日待辦</button>
           <button id="weeklyReviewBtn" class="ghost-btn">📊 週回顧</button>
+          <button id="dashboardBtn" class="ghost-btn">📈 統計</button>
           <button id="dataCheckBtn" class="ghost-btn" title="檢查行程資料是否有壞資料並可一鍵修復">🩺 資料檢查</button>
           <button id="widgetModeBtn" class="ghost-btn">小工具模式</button>
           <button id="cleanupBtn" class="ghost-btn">清理舊行程</button>
@@ -522,6 +523,36 @@
     </div>
   </dialog>
 
+  <dialog id="dashboardDialog" class="task-dialog dashboard-dialog">
+    <div class="dialog-header">
+      <h2>📈 統計儀表板</h2>
+      <button type="button" id="closeDashboardBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="dashboard-body">
+      <section class="weekly-review-section">
+        <h3>分類工時（近 30 天）</h3>
+        <div id="dashboardCategoryHours" class="dashboard-bar-list"></div>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>近 8 週完成率趨勢</h3>
+        <div id="dashboardWeeklyTrend"></div>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>逾期未完成（近 30 天）</h3>
+        <p id="dashboardOverdueSummary" class="muted"></p>
+        <ul id="dashboardOverdueList" class="dashboard-overdue-list"></ul>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>時段分布（近 30 天）</h3>
+        <div id="dashboardTimeDistribution" class="dashboard-bar-list"></div>
+      </section>
+    </div>
+  </dialog>
+
   <dialog id="dataCheckDialog" class="task-dialog data-check-dialog">
     <div class="dialog-header">
       <h2>🩺 資料檢查</h2>
@@ -554,6 +585,7 @@
 
     <div class="more-tools-body">
       <button type="button" class="more-tools-item" id="moreToolsWeeklyReviewBtn">📊 本週回顧</button>
+      <button type="button" class="more-tools-item" data-proxy="dashboardBtn">📈 統計</button>
       <button type="button" class="more-tools-item" data-proxy="commandPaletteBtn">🔍 命令面板</button>
       <button type="button" class="more-tools-item" data-proxy="dataCheckBtn">🩺 資料檢查</button>
       <button type="button" class="more-tools-item" data-proxy="enableNotificationsBtn">🔔 開啟通知</button>
