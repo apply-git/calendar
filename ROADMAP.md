@@ -86,3 +86,25 @@
 |---|---|---|
 | 家人共享行事曆 | 多帳號共看同一份（如「家庭」分類共享），需新表＋RLS 群組權限設計 | 同步穩定運行一段時間後 |
 | 欄位級同步合併 | 兩台同時改不同行程不互蓋（取代整包 LWW），需逐筆 diff/merge 與衝突 UI | 版本備份先上線當安全網 |
+
+## 九、第三波全速施工（2026-07-22，總指揮 Fable 5，13 包全數完工）
+
+派工原則：模型限 Opus 4.8／Sonnet 5／Haiku 4.5，小包快攻（一包 1–2 功能）、超時停止換派。
+
+- [x] W1（Sonnet）：tests.html 測試跑道 36 案例、🩺 資料檢查修復、錯誤紀錄匯出、SW 立即更新提示
+- [x] W2a（Haiku）：App Badge、習慣 streak
+- [x] W2b（Sonnet）：📋 批量貼上匯入、⚡ 找空檔
+- [x] W2c（Sonnet）：PWA Share Target、⏭ 未完成順延工作日
+- [x] W3a（Sonnet）：Ctrl+K 命令面板
+- [x] W3b（Sonnet）：📈 進階統計儀表板
+- [x] W3c（Sonnet）：提醒通知互動（完成/延後）
+- [x] W4a（Sonnet）：農曆每年重複（lunar-yearly）
+- [x] W4b（Sonnet）：Open-Meteo 天氣整合
+- [x] W4c1（Sonnet）：台灣假日自動更新
+- [x] W4c2（Sonnet）：備份 AES-GCM 密碼加密
+- [x] W5a（Opus）：全域 UI polish
+- [x] W5b（Sonnet）：🖼 分享圖卡；W5c（Sonnet）：掛牆看板模式
+- [x] W5d（Sonnet）：整合稽核（修 async 鏈、9 處 dialog 防連點）；總指揮（Fable 5）：深色 conflict-warning、CACHE_NAME v23、文件統整
+
+### 尚未施作（架構級，另案）
+家庭共享日曆、逐筆同步 diff/merge、Google Calendar 整合、行程附件（IndexedDB）、時區旅行模式、專案任務依賴、錯誤紀錄自動上報、無障礙全面審查

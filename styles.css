@@ -803,6 +803,11 @@ body.dark .streak-badge { color: #fbbf24; }
   background: #ffedd5;
   border: 1px solid #fed7aa;
 }
+body.dark .conflict-warning {
+  color: #fdba74;
+  background: rgba(154, 52, 18, 0.25);
+  border-color: rgba(253, 186, 116, 0.35);
+}
 .pomodoro-dialog { width: min(420px, calc(100vw - 28px)); }
 .pomodoro-body {
   display: flex;
