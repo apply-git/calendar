@@ -1318,7 +1318,8 @@ body.widget-mode .task-card { font-size: 14px; }
   #dashboardBtn,
   #dataCheckBtn,
   #batchAddBtn,
-  #deferBtn {
+  #deferBtn,
+  #shareCardBtn {
     display: none !important;
   }
 

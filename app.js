@@ -212,6 +212,7 @@ const els = {
   dayModeSwitch: $('dayModeSwitch'),
   clearDayBtn: $('clearDayBtn'),
   deferBtn: $('deferBtn'),
+  shareCardBtn: $('shareCardBtn'),
   clearWeekBtn: $('clearWeekBtn'),
   clearMonthBtn: $('clearMonthBtn'),
   backupBtn: $('backupBtn'),
@@ -829,6 +830,7 @@ function bindEvents() {
   els.cleanupBtn.addEventListener('click', cleanupOldTasks);
   els.clearDayBtn.addEventListener('click', clearDayTasks);
   els.deferBtn?.addEventListener('click', deferUnfinishedTasks);
+  els.shareCardBtn?.addEventListener('click', generateShareCard);
   els.clearWeekBtn.addEventListener('click', clearWeekTasks);
   els.clearMonthBtn.addEventListener('click', clearMonthTasks);
   els.addTemplateBtn.addEventListener('click', addTemplateFromDialog);
@@ -1625,6 +1627,7 @@ function updateDayModeSwitch() {
   els.dayModeSwitch.hidden = !visible;
   if (els.clearDayBtn) els.clearDayBtn.hidden = !visible;
   if (els.deferBtn) els.deferBtn.hidden = !visible;
+  if (els.shareCardBtn) els.shareCardBtn.hidden = !visible;
   if (els.clearWeekBtn) els.clearWeekBtn.hidden = !(currentView === 'week' && modeActive);
   if (els.clearMonthBtn) els.clearMonthBtn.hidden = !(currentView === 'month' && modeActive);
   document.querySelectorAll('.day-mode-btn').forEach((btn) => {
@@ -1761,6 +1764,156 @@ function deferUnfinishedTasks() {
   saveJson(STORAGE_KEY, tasks);
   render();
   showToast(`已順延 ${targets.length} 筆到 ${formatMonthDay(nextDate)}`);
+}
+
+// 當日行程分享圖卡：離屏 canvas 畫出當天行程清單，輸出 PNG 供分享或下載。
+// 配色固定亮色系（不跟深色模式連動），字體、留白皆寫死，只服務「分享出去要好看」這件事。
+function generateShareCard() {
+  const dateKey = toDateInput(currentDate);
+  const dayTasks = tasks.filter((task) => occursOnDate(task, dateKey)).sort(compareTasks);
+  if (!dayTasks.length) return showToast('當天沒有行程');
+
+  const WIDTH = 720;
+  const HEADER_H = 150;
+  const FOOTER_H = 60;
+  const ROW_H = 64;
+  const MAX_ROWS = 12;
+  const visibleTasks = dayTasks.slice(0, MAX_ROWS);
+  const overflowCount = dayTasks.length - visibleTasks.length;
+  const listH = visibleTasks.length * ROW_H + (overflowCount > 0 ? ROW_H : 0);
+  const height = HEADER_H + listH + FOOTER_H;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = WIDTH;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, WIDTH, height);
+
+  const weekday = new Intl.DateTimeFormat('zh-TW', { weekday: 'short' }).format(currentDate);
+  const dateTitle = `${currentDate.getMonth() + 1}月${currentDate.getDate()}日 ${weekday}`;
+  const lunarText = `農曆 ${lunarFullLabel(currentDate)}`;
+  const holidayName = getHoliday(dateKey);
+
+  ctx.fillStyle = '#4568f0';
+  ctx.font = 'bold 28px "Microsoft JhengHei", sans-serif';
+  ctx.fillText(dateTitle, 32, 58);
+
+  ctx.fillStyle = '#777777';
+  ctx.font = '15px "Microsoft JhengHei", sans-serif';
+  ctx.fillText(lunarText, 32, 86);
+
+  if (holidayName) {
+    ctx.fillStyle = '#e0562f';
+    ctx.font = 'bold 15px "Microsoft JhengHei", sans-serif';
+    ctx.fillText(`🟢 ${holidayName}`, 32, 110);
+  }
+
+  ctx.strokeStyle = '#e6e9f5';
+  ctx.beginPath();
+  ctx.moveTo(0, HEADER_H);
+  ctx.lineTo(WIDTH, HEADER_H);
+  ctx.stroke();
+
+  let y = HEADER_H;
+  const titleX = 130;
+  const maxTitleWidth = WIDTH - titleX - 56;
+  visibleTasks.forEach((task) => {
+    const done = isTaskDone(task, dateKey);
+    const color = getCategoryColor(task.category);
+
+    ctx.fillStyle = color;
+    ctx.fillRect(0, y, 6, ROW_H);
+
+    const timeLabel = task.start ? task.start : '全天';
+    ctx.fillStyle = '#333333';
+    ctx.font = '17px "Microsoft JhengHei", sans-serif';
+    ctx.fillText(timeLabel, 26, y + ROW_H / 2 + 6);
+
+    ctx.font = done ? '19px "Microsoft JhengHei", sans-serif' : 'bold 19px "Microsoft JhengHei", sans-serif';
+    ctx.fillStyle = done ? '#9a9a9a' : '#222222';
+    let displayTitle = task.title || '';
+    while (ctx.measureText(displayTitle).width > maxTitleWidth && displayTitle.length > 1) {
+      displayTitle = displayTitle.slice(0, -1);
+    }
+    if (displayTitle !== (task.title || '')) displayTitle += '…';
+    const textY = y + ROW_H / 2 + 6;
+    ctx.fillText(displayTitle, titleX, textY);
+
+    if (done) {
+      const titleWidth = ctx.measureText(displayTitle).width;
+      ctx.strokeStyle = '#9a9a9a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(titleX, textY - 6);
+      ctx.lineTo(titleX + titleWidth, textY - 6);
+      ctx.stroke();
+
+      ctx.fillStyle = '#2fae6a';
+      ctx.font = '20px sans-serif';
+      ctx.fillText('✓', WIDTH - 44, textY);
+    }
+
+    ctx.strokeStyle = '#f0f1f8';
+    ctx.beginPath();
+    ctx.moveTo(6, y + ROW_H);
+    ctx.lineTo(WIDTH, y + ROW_H);
+    ctx.stroke();
+
+    y += ROW_H;
+  });
+
+  if (overflowCount > 0) {
+    ctx.fillStyle = '#999999';
+    ctx.font = '17px "Microsoft JhengHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`…還有 ${overflowCount} 筆`, WIDTH / 2, y + ROW_H / 2 + 6);
+    ctx.textAlign = 'left';
+    y += ROW_H;
+  }
+
+  const doneCount = dayTasks.filter((task) => isTaskDone(task, dateKey)).length;
+  ctx.strokeStyle = '#e6e9f5';
+  ctx.beginPath();
+  ctx.moveTo(0, y);
+  ctx.lineTo(WIDTH, y);
+  ctx.stroke();
+
+  ctx.fillStyle = '#4568f0';
+  ctx.font = 'bold 22px "Microsoft JhengHei", sans-serif';
+  ctx.fillText(`完成 ${doneCount}/${dayTasks.length}`, 32, y + FOOTER_H / 2 + 8);
+
+  ctx.fillStyle = '#aaaaaa';
+  ctx.font = '13px "Microsoft JhengHei", sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('桌面行程表', WIDTH - 32, y + FOOTER_H / 2 + 8);
+  ctx.textAlign = 'left';
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) return showToast('圖卡產生失敗');
+    const filename = `行程卡_${dateKey}.png`;
+    let shared = false;
+    if (navigator.share && navigator.canShare) {
+      try {
+        const file = new File([blob], filename, { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: dateTitle });
+          shared = true;
+        }
+      } catch (err) {
+        if (err?.name === 'AbortError') shared = true;
+      }
+    }
+    if (shared) return;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('已下載圖卡');
+  }, 'image/png');
 }
 
 // 下一個工作日：從隔天開始往後找，跳過週六日與 TAIWAN_HOLIDAYS（國定假日對照表，見 getHoliday()）。
