@@ -108,3 +108,21 @@
 
 ### 尚未施作（架構級，另案）
 家庭共享日曆、逐筆同步 diff/merge、Google Calendar 整合、行程附件（IndexedDB）、時區旅行模式、專案任務依賴、錯誤紀錄自動上報、無障礙全面審查
+
+## 十、第四波（2026-07-22 下午，總指揮 Fable 5，7 包全數完工）
+
+- [x] T1（Sonnet）：snooze 延後持久化（重開頁面補發）；T2：農曆重複 .ics 展開未來 5 年逐筆 VEVENT
+- [x] S1（Sonnet）：逐筆同步資料層——task.updatedAt/deletedAt 墓碑、全寫入點 touchTask、90 天墓碑清除
+- [x] S2（Sonnet）：同步改 pull→merge→push 雙向收斂（mergeBackupPayloads 逐筆合併，非 tasks 區塊 generatedAt LWW）
+- [x] S3（Sonnet）：測試跑道固化 48 案例（36 既有＋12 新增）全過
+- [x] F1（Sonnet）：家庭共享 schema-share.sql（share_groups/share_members/shared_state＋RLS＋security definer 防遞迴）＋CLOUD_SETUP 教學
+- [x] F2a+F2b（Sonnet）：task.shared 欄位＋共享 checkbox＋badge；家庭群組管理 UI（建立/邀請碼加入/退出）＋syncSharedTasks 共享同步
+- [x] A1（Sonnet）：行程附件（IndexedDB，單檔5MB/每筆10個，縮圖預覽，不進備份與雲端）
+- [x] 總指揮（Fable 5）：逐包驗收 commit、CACHE_NAME 升 v31、文件統整
+
+### 使用者尚需自行執行
+1. 家庭共享：Supabase SQL Editor 執行 `schema-share.sql`（一次即可），之後在 App 內建群組、傳邀請碼給家人
+2. （前次待確認）schema-history.sql 與背景推播部署驗證
+
+### 剩餘另案項目
+Google Calendar 整合、時區旅行模式、專案任務依賴、錯誤紀錄自動上報、無障礙全面審查、通知 snooze 雲端化

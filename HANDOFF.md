@@ -64,6 +64,14 @@
 
 task 物件新增欄位 `excludedDates`（字串陣列，預設 `[]`）：儲存「這筆（通常是重複）行程被排除、不顯示」的日期字串清單，供「🗑 清空當日」功能使用。`occursOnDate(task, dateKey)` 一開始就會檢查 `excludedDates` 是否包含 `dateKey`，包含就直接回傳 `false`（蓋掉所有重複規則判斷）。`normalizeStoredData()` 會幫舊資料補上空陣列；`buildBackupPayload()` / `applyBackupObject()` 是整包序列化/還原 `tasks` 陣列，`excludedDates` 會自動跟著 task 物件走，不需要額外程式碼。
 
+### 行程附件（IndexedDB，2026-07-22）
+
+- 獨立資料庫：`desktop-schedule-attachments`（IndexedDB，version 1，objectStore `files`，keyPath `id`，`taskId` 建索引）。紀錄形狀：`{ id: 'att-'+隨機, taskId, name, type, size, blob, createdAt }`。附件本體（`blob`）**只存這個 IndexedDB**，不進 `localStorage`、不進 `buildBackupPayload()` 備份 JSON、不隨雲端同步（`sync.js` 完全不知道這個 DB 的存在）。
+- 存取層（app.js）：`idbPut(record)` / `idbGetByTask(taskId)` / `idbDelete(id)` / `idbDeleteByTask(taskId)`，皆回傳 Promise，內部用 `openAttachmentDb()` 開單一共用連線。`attachmentsUnavailable`（模組層旗標）在 `initAttachmentFeature()`（`init()` 內、`normalizeStoredData()` 之後呼叫）偵測 `window.indexedDB` 不存在或開庫失敗時設為 `true`，並呼叫 `hideAttachmentUI()` 隱藏 `#attachmentSection`，其餘功能不受影響。
+- task 物件新增欄位 `attachmentCount`（數字，預設 `0`）：只存「目前有幾個附件」供 `taskCard()` 顯示 `📎N` 徽章，附件本體不在這個欄位裡，會自動跟著 `tasks` 陣列走進備份/雲端（只是個數字，沒有隱私疑慮）。`normalizeStoredData()` 會幫舊資料補 `0`。新增行程尚未存檔時，附件先暫存在模組層 `pendingAttachments` 記憶體陣列，`saveTaskFromForm()` 存檔拿到 `task.id` 後才批次 `idbPut()` 寫入並設定 `attachmentCount`；取消新增（`closeTaskDialog()`）會捨棄 `pendingAttachments`。編輯既有行程時新增/刪除附件是「即點即寫」：直接呼叫 `idbPut()`/`idbDelete()`，同步更新該 task 的 `attachmentCount` 並 `touchTask()` + `saveJson()`。
+- 刪除行程時清附件：所有「使用者刪除行程」路徑（卡片 🗑、對話框刪除、清空當日/週/月、清理舊行程）都會經過中央 helper `tombstoneTask()`，這裡已經一併呼叫 `idbDeleteByTask(task.id)`，不需要在各呼叫點個別處理。`normalizeStoredData()` 的墓碑 90 天到期清除（真的從 `tasks` 陣列移除，非 `tombstoneTask()` 路徑，可能是雲端同步/還原備份帶進來的舊墓碑）也順手呼叫 `idbDeleteByTask()`，避免留下孤兒附件。
+- 複製到明天／重複行程「僅這次」「這次及之後」切割出的新 task（新 id）一律把 `attachmentCount` 重設為 `0`——附件實體仍留在原 task id 底下，新 id 沒有對應附件（已知限制，未做「連同複製附件」）。
+
 ## 已完成功能
 
 - 手機版表頭調整（2026-07-17）：`setupMobilePanels()` 開頭把 `.sidebar .brand`（圖示＋標題＋今天日期）用 `insertBefore` 搬到 `.main` 最上方當表頭並加 `brand-mobile` class（CSS 縮小成精簡一列）；側欄的 `#quickAddBtn`（大顆＋新增行程）在手機用 CSS 隱藏，由右下角 FAB 取代。全部包在 760px matchMedia／media query 內，桌面版不受影響。
@@ -125,6 +133,7 @@ task 物件新增欄位 `excludedDates`（字串陣列，預設 `[]`）：儲存
   - W3 操作統計：Ctrl+K 命令面板（`#commandPalette`，指令＋行程搜尋，`COMMAND_PALETTE_ACTIONS`）；📈 進階統計儀表板（`computeDashboardStats()` 純函式：分類工時/8 週趨勢/逾期/時段分布）；提醒通知互動（SW showNotification actions 完成/延後 10 分鐘，`handleNotificationAction()`，snooze 僅頁面存活時有效；**雲端推播路徑未動**）。
   - W4 台灣家庭包：農曆每年重複（repeat 新合法值 `lunar-yearly`，`occursOnDate()` 農曆月日比對、閏月不匹配、.ics 匯出降級單次）；Open-Meteo 天氣（日/週/月/Agenda 顯示，失敗全靜默）；台灣假日自動更新（`getHoliday()` 先查動態表）；備份可選 AES-GCM 密碼加密（`exportBackup()` **已改 async**，PBKDF2 150k，加密檔 `.enc.json`，`importBackup()` 自動偵測）。
   - W5 美化除錯：全域 UI polish（過渡動畫/dialog 進場/雙層陰影/細捲軸/focus-visible/prefers-reduced-motion）；🖼 當日行程分享圖卡（canvas 720px，Web Share API 優先、下載 fallback）；掛牆看板模式（`#kioskOverlay` 全螢幕時鐘＋今日行程，命令面板或更多選單開啟，Esc 離開）；整合稽核修掉 async 呼叫鏈順序 bug 與 9 個 dialog 連點 InvalidStateError 防護，`.conflict-warning` 補深色模式。
+- 📎 行程附件（2026-07-22）：`#taskDialog` 備註欄之後新增附件區（`#attachmentSection`），可加入照片/檔案（單檔 ≤5MB、每筆行程 ≤10 個），存本機 IndexedDB（`desktop-schedule-attachments`），詳見上方「行程附件（IndexedDB，2026-07-22）」小節。`taskCard()` 顯示 `📎N` 徽章。IndexedDB 不可用時整區隱藏，其餘功能不受影響。
 - 每週回顧：新對話框 `#weeklyReviewDialog`，開啟入口有兩個——桌面工具列 `#weeklyReviewBtn`（放在「今日待辦」旁，手機寬度時比照其他次要工具鈕用 id 加進 CSS 隱藏清單、改走 `#moreToolsDialog`）與 `#moreToolsDialog` 內的 `#moreToolsWeeklyReviewBtn`（不是 proxy click，自己的 click handler 直接關掉更多視窗再開週回顧視窗）。統計邏輯是 `app.js` 的 `computeWeeklyReview(baseDate)`（不碰 DOM 的純函式，只讀全域 `tasks`／`weeklyGoals`／`categories`）：以 `startOfWeek(baseDate)` 算出本週一到週日，逐日呼叫 `occursOnDate()` 掃描每筆行程「當天是否出現」（重複行程每天各算一次出現，不是只算一次），完成判定用既有 `isTaskDone()`；回傳本週/上週的 `{ total, done, rate }`、完成率升降 `trend`（`'up'|'down'|'same'`）、依 `categories` 順序整理且只留「本週有資料」最多 6 筆的分類完成/總數、下週（`thisMonday+7`）總出現次數與前 3 筆 `{date, title}` 預覽（依日期→開始時間排序）、本週 `weeklyGoals`（`week === toDateInput(thisMonday)`）的 `{ total, done }`。渲染另外寫在 `renderWeeklyReview()`（單純读 `computeWeeklyReview()` 回傳值塞進各 DOM 元素，不重複算邏輯）。
 
 ## 重要實作規則

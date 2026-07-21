@@ -633,6 +633,45 @@ textarea { resize: vertical; }
   background: transparent;
   padding: 2px 4px;
 }
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0;
+}
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  max-width: 220px;
+}
+.attachment-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.attachment-thumb-file {
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  background: var(--surface-strong);
+  cursor: pointer;
+}
+.attachment-name {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 110px;
+  cursor: pointer;
+}
 .empty-state {
   display: grid;
   place-items: center;

@@ -291,6 +291,10 @@ const els = {
   taskTags: $('taskTags'),
   taskSubtasks: $('taskSubtasks'),
   taskNote: $('taskNote'),
+  attachmentSection: $('attachmentSection'),
+  attachmentList: $('attachmentList'),
+  addAttachmentBtn: $('addAttachmentBtn'),
+  attachmentFileInput: $('attachmentFileInput'),
   conflictWarning: $('conflictWarning'),
   settingsDialog: $('settingsDialog'),
   settingsForm: $('settingsForm'),
@@ -446,6 +450,103 @@ const TOOLBAR_MENU_GROUPS = [
   },
 ];
 
+// ============================================================================
+// 行程附件（IndexedDB）：DB desktop-schedule-attachments v1、objectStore 'files'
+// （keyPath 'id'，taskId 建索引）。附件本體（blob）只存本機 IndexedDB，不進
+// localStorage／備份 JSON／雲端同步——task 只存 attachmentCount 供卡片顯示數量。
+// 教訓同上：這些狀態變數／常數必須宣告在 init() 呼叫【之前】，避免 TDZ。
+// IndexedDB 開庫失敗（極舊瀏覽器／部分隱私模式）時 attachmentsUnavailable=true，
+// 整個附件 UI 隱藏，其他功能零影響（initAttachmentFeature() 見下方，init() 內呼叫）。
+// ============================================================================
+const ATTACHMENT_DB_NAME = 'desktop-schedule-attachments';
+const ATTACHMENT_DB_VERSION = 1;
+const ATTACHMENT_STORE = 'files';
+const ATTACHMENT_MAX_SIZE = 5 * 1024 * 1024; // 單檔 5MB
+const ATTACHMENT_MAX_PER_TASK = 10; // 每行程最多 10 個附件
+
+let attachmentsUnavailable = false;
+let attachmentDbPromise = null;
+let pendingAttachments = []; // 新增行程尚未儲存時的暫存附件（記憶體陣列，取消時釋放）
+let currentAttachmentRecords = []; // 目前對話框顯示中的附件清單（供刪除/預覽點擊查找）
+let attachmentDialogTaskId = ''; // 目前對話框對應的既有 task.id；新增行程尚未儲存時為空字串
+let attachmentObjectUrls = []; // 縮圖用的 createObjectURL，重新渲染/關窗前先 revoke 避免洩漏
+
+function openAttachmentDb() {
+  if (attachmentDbPromise) return attachmentDbPromise;
+  attachmentDbPromise = new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('indexedDB unavailable')); return; }
+    let request;
+    try {
+      request = window.indexedDB.open(ATTACHMENT_DB_NAME, ATTACHMENT_DB_VERSION);
+    } catch (err) {
+      reject(err);
+      return;
+    }
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(ATTACHMENT_STORE)) {
+        const store = db.createObjectStore(ATTACHMENT_STORE, { keyPath: 'id' });
+        store.createIndex('taskId', 'taskId', { unique: false });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('indexedDB open failed'));
+  });
+  return attachmentDbPromise;
+}
+
+function idbPut(record) {
+  return openAttachmentDb().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(ATTACHMENT_STORE, 'readwrite');
+    tx.objectStore(ATTACHMENT_STORE).put(record);
+    tx.oncomplete = () => resolve(record);
+    tx.onerror = () => reject(tx.error);
+  }));
+}
+
+function idbGetByTask(taskId) {
+  return openAttachmentDb().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(ATTACHMENT_STORE, 'readonly');
+    const req = tx.objectStore(ATTACHMENT_STORE).index('taskId').getAll(taskId);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  }));
+}
+
+function idbDelete(id) {
+  return openAttachmentDb().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(ATTACHMENT_STORE, 'readwrite');
+    tx.objectStore(ATTACHMENT_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  }));
+}
+
+function idbDeleteByTask(taskId) {
+  return idbGetByTask(taskId)
+    .then((records) => Promise.all(records.map((record) => idbDelete(record.id))))
+    .catch(() => {});
+}
+
+// 偵測 IndexedDB 可用性：不可用就整個附件 UI 隱藏，其餘功能不受影響。
+function initAttachmentFeature() {
+  if (!window.indexedDB) {
+    attachmentsUnavailable = true;
+    hideAttachmentUI();
+    return;
+  }
+  openAttachmentDb()
+    .then(() => { attachmentsUnavailable = false; })
+    .catch(() => {
+      attachmentsUnavailable = true;
+      hideAttachmentUI();
+    });
+}
+
+function hideAttachmentUI() {
+  if (els.attachmentSection) els.attachmentSection.hidden = true;
+}
+
 // init() 包一層 try/catch：正常情況（index.html 有完整 DOM）不會走到 catch，
 // 但 tests.html 只載入 app.js、沒有任何畫面元素時 init() 一定會因為存取 null
 // 的 DOM 節點而丟出例外——沒有這層保護，例外會中斷整支 app.js 的執行，導致
@@ -466,6 +567,7 @@ function init() {
   // 全新安裝／無資料時保持空白，不再自動塞範例行程：
   // 範例行程曾在雲端同步時被誤推上雲端蓋掉正式資料，且對新使用者也未必需要。
   normalizeStoredData();
+  initAttachmentFeature();
   const storedHolidays = getStoredHolidays();
   if (storedHolidays && storedHolidays.days) dynamicHolidays = storedHolidays.days;
   bindEvents();
@@ -1170,6 +1272,9 @@ function bindEvents() {
   els.cancelTaskBtn.addEventListener('click', closeTaskDialog);
   els.deleteTaskBtn.addEventListener('click', deleteCurrentTask);
   els.taskForm.addEventListener('submit', saveTaskFromForm);
+  if (els.addAttachmentBtn) els.addAttachmentBtn.addEventListener('click', () => els.attachmentFileInput?.click());
+  if (els.attachmentFileInput) els.attachmentFileInput.addEventListener('change', handleAttachmentFilesSelected);
+  if (els.attachmentList) els.attachmentList.addEventListener('click', handleAttachmentListClick);
   [els.taskDate, els.taskStart, els.taskEnd].forEach((el) => el.addEventListener('input', updateConflictWarning));
   els.taskRepeat.addEventListener('change', updateRepeatFieldsVisibility);
   els.taskScope.addEventListener('change', handleTaskScopeChange);
@@ -1702,6 +1807,7 @@ function taskCard(task, dateKey) {
         ${task.pinned ? '<span class="badge pinned-badge">置頂</span>' : ''}
         ${overdue ? '<span class="badge overdue-badge">逾時</span>' : ''}
         ${task.repeat !== 'none' ? `<span class="badge">${escapeHtml(repeatDisplayLabel(task))}</span>` : ''}
+        ${task.attachmentCount > 0 ? `<span class="badge">📎${task.attachmentCount}</span>` : ''}
         ${(task.tags || []).map((tag) => `<span class="badge tag-badge">#${escapeHtml(tag)}</span>`).join('')}
       </div>
       ${task.subtasks?.length ? `<ul class="subtask-list">${task.subtasks.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
@@ -2701,6 +2807,9 @@ function openTaskDialog(defaults = {}, occurrenceDate = '') {
   els.taskSubtasks.value = (defaults.subtasks || []).join('\n');
   els.taskNote.value = defaults.note || '';
   els.deleteTaskBtn.hidden = !isEdit;
+  attachmentDialogTaskId = isEdit ? defaults.id : '';
+  pendingAttachments = [];
+  loadAttachmentsForDialog(attachmentDialogTaskId);
   updateConflictWarning();
   // 自然語言快速新增：記錄這次開窗當下日期/開始/結束的預設值，saveTaskFromForm() 送出前
   // 的保險解析只在欄位仍等於這份快照時才套用，避免蓋掉使用者手動改過的欄位。
@@ -2715,6 +2824,138 @@ function closeTaskDialog() {
   els.taskScopeField.hidden = true;
   editingOccurrenceDate = '';
   els.conflictWarning.hidden = true;
+  // 取消新增（或存檔完成後關窗）都要釋放暫存附件與縮圖 URL，避免記憶體洩漏／舊資料殘留。
+  pendingAttachments = [];
+  attachmentDialogTaskId = '';
+  currentAttachmentRecords = [];
+  revokeAttachmentObjectUrls();
+}
+
+// ----------------------------------------------------------------------------
+// 附件 UI（#taskDialog 內，備註欄之後）：新增行程尚未儲存時附件先暫存在 pendingAttachments
+// 記憶體陣列，saveTaskFromForm() 拿到 task.id 後才寫入 IndexedDB；編輯既有行程則即寫即存。
+// attachmentsUnavailable 時整個區塊已在 initAttachmentFeature() 隱藏，這裡的函式不會被觸發
+// （addAttachmentBtn/attachmentList 皆為 null，事件不會綁上）。
+// ----------------------------------------------------------------------------
+function revokeAttachmentObjectUrls() {
+  attachmentObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+  attachmentObjectUrls = [];
+}
+
+function loadAttachmentsForDialog(taskId) {
+  if (attachmentsUnavailable || !els.attachmentList) return;
+  if (taskId) {
+    idbGetByTask(taskId).then((records) => renderAttachmentList(records)).catch(() => renderAttachmentList([]));
+  } else {
+    renderAttachmentList(pendingAttachments);
+  }
+}
+
+function renderAttachmentList(records) {
+  currentAttachmentRecords = records;
+  if (!els.attachmentList) return;
+  revokeAttachmentObjectUrls();
+  if (!records.length) {
+    els.attachmentList.innerHTML = '<p class="muted">尚無附件</p>';
+    return;
+  }
+  els.attachmentList.innerHTML = records.map((record) => {
+    const isImage = (record.type || '').startsWith('image/');
+    let thumb;
+    if (isImage) {
+      const url = URL.createObjectURL(record.blob);
+      attachmentObjectUrls.push(url);
+      thumb = `<img src="${url}" alt="" class="attachment-thumb" data-preview-attachment="${record.id}" />`;
+    } else {
+      thumb = `<span class="attachment-thumb attachment-thumb-file" data-preview-attachment="${record.id}">📄</span>`;
+    }
+    return `
+      <div class="attachment-item">
+        ${thumb}
+        <span class="attachment-name" data-preview-attachment="${record.id}" title="${escapeHtml(record.name)}">${escapeHtml(record.name)}</span>
+        <button type="button" class="small-btn" data-delete-attachment="${record.id}" title="刪除附件">🗑</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function makeAttachmentRecord(file, taskId) {
+  return {
+    id: `att-${crypto.randomUUID()}`,
+    taskId: taskId || null,
+    name: file.name,
+    type: file.type || '',
+    size: file.size,
+    blob: file,
+    createdAt: Date.now(),
+  };
+}
+
+function handleAttachmentFilesSelected(event) {
+  const files = Array.from(event.target.files || []);
+  event.target.value = '';
+  if (!files.length || attachmentsUnavailable) return;
+
+  const currentCount = attachmentDialogTaskId ? currentAttachmentRecords.length : pendingAttachments.length;
+  let remaining = ATTACHMENT_MAX_PER_TASK - currentCount;
+  const accepted = [];
+  for (const file of files) {
+    if (remaining <= 0) { showToast(`每筆行程最多 ${ATTACHMENT_MAX_PER_TASK} 個附件`); break; }
+    if (file.size > ATTACHMENT_MAX_SIZE) { showToast(`「${file.name}」超過 5MB，已略過`); continue; }
+    accepted.push(file);
+    remaining--;
+  }
+  if (!accepted.length) return;
+
+  const records = accepted.map((file) => makeAttachmentRecord(file, attachmentDialogTaskId || null));
+
+  if (attachmentDialogTaskId) {
+    Promise.all(records.map((record) => idbPut(record))).then(() => {
+      const task = tasks.find((item) => item.id === attachmentDialogTaskId);
+      if (task) {
+        task.attachmentCount = (task.attachmentCount || 0) + records.length;
+        touchTask(task);
+        saveJson(STORAGE_KEY, tasks);
+        render();
+      }
+      loadAttachmentsForDialog(attachmentDialogTaskId);
+    }).catch(() => showToast('附件儲存失敗'));
+  } else {
+    pendingAttachments = [...pendingAttachments, ...records];
+    renderAttachmentList(pendingAttachments);
+  }
+}
+
+function deleteAttachmentItem(id) {
+  if (attachmentDialogTaskId) {
+    idbDelete(id).then(() => {
+      const task = tasks.find((item) => item.id === attachmentDialogTaskId);
+      if (task) {
+        task.attachmentCount = Math.max(0, (task.attachmentCount || 0) - 1);
+        touchTask(task);
+        saveJson(STORAGE_KEY, tasks);
+        render();
+      }
+      loadAttachmentsForDialog(attachmentDialogTaskId);
+    }).catch(() => showToast('附件刪除失敗'));
+  } else {
+    pendingAttachments = pendingAttachments.filter((record) => record.id !== id);
+    renderAttachmentList(pendingAttachments);
+  }
+}
+
+function openAttachmentPreview(id) {
+  const record = currentAttachmentRecords.find((item) => item.id === id);
+  if (!record) return;
+  const url = URL.createObjectURL(record.blob);
+  window.open(url, '_blank');
+}
+
+function handleAttachmentListClick(event) {
+  const deleteId = event.target.closest('[data-delete-attachment]')?.dataset.deleteAttachment;
+  if (deleteId) { deleteAttachmentItem(deleteId); return; }
+  const previewId = event.target.closest('[data-preview-attachment]')?.dataset.previewAttachment;
+  if (previewId) openAttachmentPreview(previewId);
 }
 
 function updateRepeatFieldsVisibility() {
@@ -2780,6 +3021,7 @@ function saveTaskFromForm(event) {
     completedDates: existingTask?.completedDates || [],
     excludedDates: existingTask?.excludedDates || [],
     repeatUntil: existingTask?.repeatUntil || '',
+    attachmentCount: existingTask?.attachmentCount || 0,
     sortOrder: existingTask?.sortOrder || Date.now(),
     createdAt: existingTask?.createdAt || new Date().toISOString(),
     updatedAt: Date.now(),
@@ -2800,6 +3042,7 @@ function saveTaskFromForm(event) {
       repeat: 'none',
       completedDates: (existingTask.completedDates || []).includes(editingOccurrenceDate) ? [task.date] : [],
       excludedDates: [],
+      attachmentCount: 0, // 附件跟著 originalSeriesId 那筆存在 IndexedDB，這個新拆出的 id 底下沒有實體附件
       originalSeriesId: existingTask.id,
       originalOccurrenceDate: editingOccurrenceDate,
       sortOrder: Date.now(),
@@ -2825,6 +3068,7 @@ function saveTaskFromForm(event) {
         date: splitDate,
         excludedDates: preservedExcludedDates,
         completedDates: originalCompleted.filter((date) => date >= splitDate),
+        attachmentCount: 0, // 同上：附件實體仍在原系列 id 底下
         originalSeriesId: existingTask.id,
         originalOccurrenceDate: splitDate,
         sortOrder: Date.now(),
@@ -2835,6 +3079,14 @@ function saveTaskFromForm(event) {
     const index = tasks.findIndex((item) => item.id === task.id);
     if (index >= 0) tasks[index] = task;
     else tasks.push(task);
+  }
+
+  // 新增行程（無 existingTask）尚未儲存前的暫存附件，此刻拿到 task.id 才真正寫入 IndexedDB。
+  if (!existingTask && pendingAttachments.length && !attachmentsUnavailable) {
+    pendingAttachments.forEach((record) => { record.taskId = task.id; });
+    Promise.all(pendingAttachments.map((record) => idbPut(record))).catch(() => showToast('附件儲存失敗'));
+    task.attachmentCount = pendingAttachments.length;
+    pendingAttachments = [];
   }
 
   saveJson(STORAGE_KEY, tasks);
@@ -3057,6 +3309,7 @@ function copyTaskToTomorrow(id) {
     repeat: 'none',
     completedDates: [],
     excludedDates: [],
+    attachmentCount: 0, // 複製到明天是新 id，附件本體不會跟著複製
     sortOrder: Date.now(),
     createdAt: new Date().toISOString(),
     updatedAt: Date.now(),
@@ -4121,6 +4374,9 @@ function touchTask(task) {
 function tombstoneTask(task) {
   task.deletedAt = Date.now();
   touchTask(task);
+  // 中央 helper：所有「使用者刪除行程」路徑（卡片刪除／對話框刪除／清除當天/週/月／
+  // 清理舊行程）都經過這裡，一併清掉該行程在 IndexedDB 的附件本體。
+  idbDeleteByTask(task.id);
 }
 
 function habitStreak(habit) {
@@ -4188,13 +4444,19 @@ function normalizeStoredData() {
       originalSeriesId: typeof task.originalSeriesId === 'string' ? task.originalSeriesId : '',
       originalOccurrenceDate: typeof task.originalOccurrenceDate === 'string' ? task.originalOccurrenceDate : '',
       repeatUntil: typeof task.repeatUntil === 'string' ? task.repeatUntil : '',
+      attachmentCount: Number.isFinite(Number(task.attachmentCount)) ? Math.max(0, Math.floor(Number(task.attachmentCount))) : 0,
       sortOrder: Number(task.sortOrder || 0),
       updatedAt: Number.isFinite(Number(task.updatedAt)) ? Number(task.updatedAt) : 0,
     };
   });
   // 刪除墓碑（tombstone）超過 90 天：保留期內留給雲端同步合併用，超過就視為
-  // 沒有同步意義，真正從陣列移除，避免本機資料無限增長。
+  // 沒有同步意義，真正從陣列移除，避免本機資料無限增長。這裡不是「使用者刪除」
+  // 的路徑（tombstoneTask() 當下已經清過一次），但順手再清一次 IndexedDB 附件，
+  // 涵蓋「墓碑是從雲端同步/還原備份帶進來、本機從未呼叫過 tombstoneTask()」的情況。
   const TOMBSTONE_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+  tasks
+    .filter((task) => task.deletedAt && Date.now() - task.deletedAt > TOMBSTONE_RETENTION_MS)
+    .forEach((task) => idbDeleteByTask(task.id));
   tasks = tasks.filter((task) => !(task.deletedAt && Date.now() - task.deletedAt > TOMBSTONE_RETENTION_MS));
   appSettings.workStart = clampHour(appSettings.workStart, 0, 23);
   appSettings.workEnd = Math.max(appSettings.workStart, clampHour(appSettings.workEnd, 1, 24));

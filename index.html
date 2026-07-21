@@ -352,6 +352,14 @@
           <label for="taskNote">備註</label>
           <textarea id="taskNote" rows="3" placeholder="補充說明"></textarea>
         </div>
+
+        <div class="field full" id="attachmentSection">
+          <label>📎 附件</label>
+          <div id="attachmentList" class="attachment-list"></div>
+          <button type="button" id="addAttachmentBtn" class="ghost-btn">＋ 加入附件</button>
+          <input type="file" id="attachmentFileInput" multiple hidden />
+          <p class="muted">附件僅存在本機裝置，不會隨備份與雲端同步轉移</p>
+        </div>
       </div>
 
       <div id="conflictWarning" class="conflict-warning" hidden></div>
