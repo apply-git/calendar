@@ -156,6 +156,7 @@ let currentView = 'day';
 let todayTodoMode = false;
 let widgetMode = localStorage.getItem(WIDGET_KEY) === '1';
 let notifiedTaskIds = new Set();
+let reminderSnoozeTimers = new Map();
 let pomodoroState = { mode: 'focus', remainingSeconds: 25 * 60, running: false, intervalId: null };
 let swRegistration = null;
 let swUpdateReloading = false;
@@ -381,6 +382,7 @@ function init() {
   registerServiceWorker();
   handleUrlShortcutAction();
   handleShareTarget();
+  handleNotifUrlAction();
   setInterval(checkReminders, 30 * 1000);
 }
 
@@ -562,6 +564,15 @@ function watchServiceWorkerUpdates(registration) {
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+
+  // 提醒通知的「✔ 完成」「⏰ 延後10分鐘」按鈕由 service-worker.js 的 notificationclick
+  // 轉發過來（頁面仍開著、找得到視窗時）。雲端推播通知沒有 kind 欄位，SW 端已濾掉不會送到這裡。
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    const msg = event.data;
+    if (msg && msg.type === 'NOTIFICATION_ACTION') {
+      handleNotificationAction(msg.action, msg.taskId, msg.dateKey);
+    }
+  });
 
   // 新版 SW 透過 SKIP_WAITING 訊息取得控制權後會觸發這個事件；用旗標防止同一次
   // 更新觸發兩次重新整理（controllerchange 理論上只會在真正切換控制權時觸發一次，
@@ -2644,7 +2655,7 @@ function checkReminders() {
 
     if (now >= remindAt && now <= new Date(remindAt.getTime() + 60 * 1000) && !notifiedTaskIds.has(notificationId)) {
       notifiedTaskIds.add(notificationId);
-      notify(`行程提醒：${task.title}`, `${task.reminder ? `${task.reminder} 分鐘後` : '現在'}開始｜${task.category}`);
+      showTaskNotification(task, nowKey, `行程提醒：${task.title}`, `${task.reminder ? `${task.reminder} 分鐘後` : '現在'}開始｜${task.category}`);
     }
   });
 }
@@ -2664,6 +2675,84 @@ function notify(title, body) {
   } catch {
     showToast(`${title}｜${body}`);
   }
+}
+
+// 行程提醒專用通知：有 Service Worker registration（且非 file:// 本機雙擊開啟）時，
+// 帶「✔ 完成」「⏰ 延後10分鐘」互動按鈕，點擊由 service-worker.js 的 notificationclick
+// 轉發回頁面（NOTIFICATION_ACTION postMessage）交給 handleNotificationAction() 處理。
+// 沒有 SW 或 file:// 情境 fallback 既有 notify()（無按鈕，行為與升級前完全一致）。
+function showTaskNotification(task, dateKey, title, body) {
+  const canUseSw = !!(navigator.serviceWorker && typeof navigator.serviceWorker.getRegistration === 'function') && location.protocol !== 'file:';
+  if (!canUseSw) {
+    notify(title, body);
+    return;
+  }
+  if (!('Notification' in window) || Notification.permission !== 'granted') {
+    showToast(`${title}｜${body}`);
+    return;
+  }
+  const icon = './icons/icon-192.png';
+  navigator.serviceWorker.getRegistration()
+    .then((registration) => {
+      if (!registration || typeof registration.showNotification !== 'function') {
+        notify(title, body);
+        return;
+      }
+      return registration.showNotification(title, {
+        body,
+        icon,
+        badge: icon,
+        actions: [
+          { action: 'done', title: '✔ 完成' },
+          { action: 'snooze', title: '⏰ 延後10分鐘' },
+        ],
+        data: { kind: 'reminder', taskId: task.id, dateKey },
+      }).catch(() => notify(title, body));
+    })
+    .catch(() => notify(title, body));
+}
+
+// 通知互動按鈕（✔ 完成／⏰ 延後10分鐘）的共用處理：由 service-worker.js 的
+// notificationclick 透過 postMessage(NOTIFICATION_ACTION) 轉發過來，或頁面被喚醒開新視窗時
+// 從 ?notifAction= query 讀到。'完成' 直接重用既有打勾完成的邏輯（setTaskDone + 音效 + render，
+// render() 內含 saveJson，不會漏存檔）；'延後' 用 Map 記 timer，重複延後同一筆會先取消舊的。
+function handleNotificationAction(action, taskId, dateKey) {
+  const task = tasks.find((item) => item.id === taskId);
+  if (!task) return;
+  const timerKey = `${taskId}-${dateKey}`;
+
+  if (action === 'done') {
+    if (reminderSnoozeTimers.has(timerKey)) {
+      clearTimeout(reminderSnoozeTimers.get(timerKey));
+      reminderSnoozeTimers.delete(timerKey);
+    }
+    setTaskDone(task, dateKey, true);
+    playDoneSound();
+    render();
+    showToast(`已完成：${task.title}`);
+  } else if (action === 'snooze') {
+    if (reminderSnoozeTimers.has(timerKey)) clearTimeout(reminderSnoozeTimers.get(timerKey));
+    const timer = setTimeout(() => {
+      reminderSnoozeTimers.delete(timerKey);
+      showTaskNotification(task, dateKey, `行程提醒：${task.title}`, `${task.reminder ? `${task.reminder} 分鐘後` : '現在'}開始｜${task.category}`);
+    }, 10 * 60 * 1000);
+    reminderSnoozeTimers.set(timerKey, timer);
+    showToast('10 分鐘後再提醒');
+  }
+}
+
+// 通知按鈕在沒有開啟中的視窗時，service-worker.js 會 openWindow('./?notifAction=...')，
+// 這裡接住 query 走 handleNotificationAction()，處理完清網址避免重整重複觸發，
+// 用法仿照上面的 handleUrlShortcutAction()。
+function handleNotifUrlAction() {
+  const params = new URLSearchParams(window.location.search);
+  const action = params.get('notifAction');
+  const taskId = params.get('taskId');
+  const dateKey = params.get('dateKey');
+  if (!action || !taskId || !dateKey) return;
+
+  handleNotificationAction(action, taskId, dateKey);
+  history.replaceState(null, '', window.location.pathname);
 }
 
 function requestNotificationPermission(manual = false) {

@@ -133,6 +133,29 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const data = event.notification.data || {};
+
+  // 行程提醒的「✔ 完成」「⏰ 延後10分鐘」按鈕：data.kind === 'reminder' 才會有 action。
+  // 雲端推播通知（data 沒有 kind）永遠不會進到這個分支，走下面原本的 focus/開窗邏輯。
+  if (data.kind === 'reminder' && (event.action === 'done' || event.action === 'snooze')) {
+    const { taskId, dateKey } = data;
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+        for (const client of windowClients) {
+          if ('postMessage' in client) {
+            client.postMessage({ type: 'NOTIFICATION_ACTION', action: event.action, taskId, dateKey });
+            if ('focus' in client) return client.focus();
+            return;
+          }
+        }
+        if (clients.openWindow) {
+          return clients.openWindow(`./?notifAction=${event.action}&taskId=${encodeURIComponent(taskId)}&dateKey=${encodeURIComponent(dateKey)}`);
+        }
+      })
+    );
+    return;
+  }
+
   const targetUrl = (event.notification.data && event.notification.data.url) || './';
 
   event.waitUntil(
