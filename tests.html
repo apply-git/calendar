@@ -24,12 +24,13 @@
 </head>
 <body>
   <h1>桌面行程表 - 測試跑道（tests.html）</h1>
-  <p class="desc">純開發工具，不加入 PWA 離線快取（不在 service-worker.js 的 APP_SHELL 內）。載入 app.js 後對 window.CalendarApp 匯出的純函式跑迴歸測試，測試前後會完整快照／還原 localStorage，不會汙染真實行程資料。</p>
+  <p class="desc">純開發工具，不加入 PWA 離線快取（不在 service-worker.js 的 APP_SHELL 內）。依序載入 app.js、sync.js 後，對 window.CalendarApp／window.CalendarSync 匯出的純函式跑迴歸測試，涵蓋 occursOnDate／parseNaturalDateTime／timeOverlaps／備份 roundtrip／S1 墓碑回歸／mergeBackupPayloads 逐筆合併，共 48 個測試案例。測試前後會完整快照／還原 localStorage，不會汙染真實行程資料。</p>
   <div id="allPass">ALL PASS</div>
   <div id="summary">執行中…</div>
   <ul id="results"></ul>
 
   <script src="app.js"></script>
+  <script src="sync.js"></script>
   <script>
     // ------------------------------------------------------------------------
     // 保護措施：tests.html 與 index.html 同源共用 localStorage。app.js 載入時
@@ -89,6 +90,10 @@
     try {
       const CA = window.CalendarApp;
       if (!CA) throw new Error('window.CalendarApp 未定義，app.js 載入失敗');
+      const CS = window.CalendarSync;
+      if (!CS || typeof CS._mergeBackupPayloads !== 'function') {
+        throw new Error('window.CalendarSync._mergeBackupPayloads 未定義，sync.js 載入失敗或曝露被擋住');
+      }
 
       // ====================================================================
       // occursOnDate(task, dateKey)
@@ -273,6 +278,125 @@
         const snapshot2 = CA.buildBackupPayload();
         const strip = (obj) => { const clone = Object.assign({}, obj); delete clone.exportedAt; return clone; };
         assertDeepEqual(strip(snapshot2), strip(snapshot1), '重複套用同一份備份不應該改變內容');
+      });
+
+      // ====================================================================
+      // S1 墓碑回歸：occursOnDate 對墓碑的處理／normalizeStoredData 的墓碑保留期／
+      // touchTask、tombstoneTask 行為（逐筆雲端同步的基礎，防止之後改動悄悄破壞）
+      // ====================================================================
+      group('S1 墓碑回歸');
+      const mkTombstoneFixtureTask = (overrides) => Object.assign({
+        id: 'tomb-fixture', title: '墓碑測試用行程', date: '2026-01-01', category: '工作', repeat: 'none',
+        repeatInterval: 2, repeatWeekday: 1, repeatNth: 1, reminder: 10, pinned: false, countdown: false,
+        tags: [], subtasks: [], completedDates: [], excludedDates: [], repeatUntil: '', sortOrder: 0,
+        originalSeriesId: '', originalOccurrenceDate: '', createdAt: '2026-01-01T00:00:00.000Z',
+      }, overrides);
+
+      test('occursOnDate：已刪除（deletedAt）的行程一律回傳 false', () => {
+        assertEqual(CA.occursOnDate(mk({ deletedAt: Date.now() }), '2026-01-05'), false);
+      });
+
+      test('normalizeStoredData：超過 90 天（91 天前）的墓碑會被清除', () => {
+        categories = defaultCategories;
+        appSettings = { ...defaultAppSettings };
+        const oldAt = Date.now() - 91 * 24 * 60 * 60 * 1000;
+        tasks = [mkTombstoneFixtureTask({ id: 'tomb-old', deletedAt: oldAt, updatedAt: oldAt })];
+        normalizeStoredData();
+        assertEqual(tasks.some((t) => t.id === 'tomb-old'), false, '91 天前的墓碑應該被 normalizeStoredData 清除');
+      });
+
+      test('normalizeStoredData：未滿 90 天（89 天前）的墓碑會被保留', () => {
+        categories = defaultCategories;
+        appSettings = { ...defaultAppSettings };
+        const recentAt = Date.now() - 89 * 24 * 60 * 60 * 1000;
+        tasks = [mkTombstoneFixtureTask({ id: 'tomb-recent', deletedAt: recentAt, updatedAt: recentAt })];
+        normalizeStoredData();
+        assertEqual(tasks.some((t) => t.id === 'tomb-recent'), true, '89 天前的墓碑應該被 normalizeStoredData 保留');
+      });
+
+      test('touchTask／tombstoneTask：分別更新 updatedAt 與標記 deletedAt', () => {
+        const editedTask = { id: 'tt-touch', title: '編輯中', updatedAt: 0 };
+        const before = Date.now();
+        touchTask(editedTask);
+        assertEqual(editedTask.updatedAt >= before, true, 'touchTask 應該把 updatedAt 更新為現在時間');
+        assertEqual(editedTask.deletedAt, undefined, 'touchTask 不應該設定 deletedAt');
+
+        const deletedTask = { id: 'tt-tombstone', title: '待刪除', updatedAt: 0 };
+        tombstoneTask(deletedTask);
+        assertEqual(typeof deletedTask.deletedAt === 'number', true, 'tombstoneTask 應該設定 deletedAt 為時間戳');
+        assertEqual(deletedTask.updatedAt >= deletedTask.deletedAt, true, 'tombstoneTask 應該同時透過 touchTask 更新 updatedAt（不早於 deletedAt）');
+      });
+
+      // ====================================================================
+      // mergeBackupPayloads（逐筆雲端同步：window.CalendarSync._mergeBackupPayloads，純函式）
+      // ====================================================================
+      group('mergeBackupPayloads 逐筆合併');
+
+      test('A/B 各自新增：互不覆蓋，合併後聯集', () => {
+        const local = { generatedAt: 100, tasks: [{ id: 'a', title: 'A新增', updatedAt: 10 }] };
+        const cloud = { generatedAt: 100, tasks: [{ id: 'b', title: 'B新增', updatedAt: 10 }] };
+        const merged = CS._mergeBackupPayloads(local, cloud);
+        const ids = merged.tasks.map((t) => t.id).sort();
+        assertDeepEqual(ids, ['a', 'b'], '合併後應包含雙方各自新增、互不覆蓋的行程');
+      });
+
+      test('同 id：updatedAt 較新的編輯勝出', () => {
+        const local = { generatedAt: 100, tasks: [{ id: 'x', title: 'old', updatedAt: 100 }] };
+        const cloud = { generatedAt: 100, tasks: [{ id: 'x', title: 'new', updatedAt: 200 }] };
+        const merged = CS._mergeBackupPayloads(local, cloud);
+        assertEqual(merged.tasks.find((t) => t.id === 'x').title, 'new', 'updatedAt 較新的一方應該勝出');
+      });
+
+      test('同 id：較新的墓碑（deletedAt）勝過較舊的編輯', () => {
+        const local = { generatedAt: 100, tasks: [{ id: 'y', title: '編輯中', updatedAt: 100 }] };
+        const cloud = { generatedAt: 100, tasks: [{ id: 'y', title: '編輯中', updatedAt: 200, deletedAt: 200 }] };
+        const merged = CS._mergeBackupPayloads(local, cloud);
+        assertEqual(Boolean(merged.tasks.find((t) => t.id === 'y').deletedAt), true, '較新的墓碑應該勝出並維持刪除狀態');
+      });
+
+      test('同 id：較舊的墓碑敗給較新的編輯（等同復活）', () => {
+        const local = { generatedAt: 100, tasks: [{ id: 'z', title: '已刪除', updatedAt: 100, deletedAt: 100 }] };
+        const cloud = { generatedAt: 100, tasks: [{ id: 'z', title: '復活後的編輯', updatedAt: 200 }] };
+        const merged = CS._mergeBackupPayloads(local, cloud);
+        const winner = merged.tasks.find((t) => t.id === 'z');
+        assertEqual(Boolean(winner.deletedAt), false, '較舊的墓碑應該敗給較新的編輯');
+        assertEqual(winner.title, '復活後的編輯', '應該保留較新編輯的內容');
+      });
+
+      test('updatedAt 缺省視為 0：會被有 updatedAt 的一方覆蓋', () => {
+        const local = { generatedAt: 100, tasks: [{ id: 'w', title: '沒有 updatedAt' }] };
+        const cloud = { generatedAt: 100, tasks: [{ id: 'w', title: '有 updatedAt', updatedAt: 50 }] };
+        const merged = CS._mergeBackupPayloads(local, cloud);
+        assertEqual(merged.tasks.find((t) => t.id === 'w').title, '有 updatedAt', '缺 updatedAt（視為 0）應該被有值的一方覆蓋');
+      });
+
+      test('updatedAt 同分：取 local 那份', () => {
+        const local = { generatedAt: 100, tasks: [{ id: 'v', title: 'local版本', updatedAt: 100 }] };
+        const cloud = { generatedAt: 100, tasks: [{ id: 'v', title: 'cloud版本', updatedAt: 100 }] };
+        const merged = CS._mergeBackupPayloads(local, cloud);
+        assertEqual(merged.tasks.find((t) => t.id === 'v').title, 'local版本', 'updatedAt 同分時應該保留 local 那份');
+      });
+
+      test('非 tasks 欄位：整區塊取 generatedAt 較新的那份', () => {
+        const local = { generatedAt: 100, tasks: [], habits: ['local-habit'] };
+        const cloud = { generatedAt: 200, tasks: [], habits: ['cloud-habit'] };
+        const merged = CS._mergeBackupPayloads(local, cloud);
+        assertDeepEqual(merged.habits, ['cloud-habit'], 'generatedAt 較新的一方應該整區塊勝出');
+        assertEqual(merged.generatedAt, 200, 'generatedAt 應該取兩者較大值');
+      });
+
+      test('雲端 payload 缺 tasks 欄位：合併不丟例外（防呆）', () => {
+        const local = { generatedAt: 100, tasks: [{ id: 'only-local', title: '只有本機', updatedAt: 10 }] };
+        const cloud = { generatedAt: 50 }; // 故意不給 tasks 欄位
+        let merged;
+        let threw = false;
+        try {
+          merged = CS._mergeBackupPayloads(local, cloud);
+        } catch (err) {
+          threw = true;
+        }
+        assertEqual(threw, false, '雲端 payload 缺 tasks 欄位不應該讓合併丟出例外');
+        assertDeepEqual(merged.tasks.map((t) => t.id), ['only-local'], '應該保留本機的 tasks（缺少的雲端 tasks 視為空陣列）');
       });
     } finally {
       // 無論測試成功、失敗、或中途丟例外，都一定會執行到這裡：把 localStorage
