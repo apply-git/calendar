@@ -8,6 +8,10 @@ const MEMO_KEY = 'desktop-schedule-daily-memos-v1';
 const TEMPLATE_KEY = 'desktop-schedule-templates-v1';
 const WEEKLY_GOAL_KEY = 'desktop-schedule-weekly-goals-v1';
 const WIDGET_KEY = 'desktop-schedule-widget-mode-v1';
+// 錯誤紀錄（診斷用，見檔案底部 setupErrorLogging()）：只存偵錯必要欄位，
+// 刻意不納入備份匯出/還原（比照 sync-auth key 的處理，buildBackupPayload()/applyBackupObject() 不會碰它）。
+const ERROR_LOG_KEY = 'desktop-schedule-errorlog-v1';
+const ERROR_LOG_MAX = 50;
 
 // 台灣國定假日對照表（2025–2027年，含補假／彈性放假）。資料來源：行政院人事行政總處公告辦公日曆表。
 const TAIWAN_HOLIDAYS = {
@@ -154,8 +158,14 @@ let widgetMode = localStorage.getItem(WIDGET_KEY) === '1';
 let notifiedTaskIds = new Set();
 let pomodoroState = { mode: 'focus', remainingSeconds: 25 * 60, running: false, intervalId: null };
 let swRegistration = null;
+let swUpdateReloading = false;
 let timelineResizeState = null;
 let timelineDragMoved = false;
+// 錯誤紀錄環形緩衝（最多 ERROR_LOG_MAX 筆，超過丟最舊），鏡像存 ERROR_LOG_KEY。
+let errorLog = (() => {
+  const stored = loadJson(ERROR_LOG_KEY, []);
+  return Array.isArray(stored) ? stored : [];
+})();
 // 自然語言快速新增：openTaskDialog() 開窗當下記錄日期/開始/結束欄位的「預設值」快照，
 // saveTaskFromForm() 送出前的保險解析只在欄位仍等於這份快照（=使用者沒手動改過）時才套用，
 // 避免蓋掉使用者手動調整過的日期/時間。
@@ -301,9 +311,32 @@ const els = {
   weeklyReviewNextWeekSummary: $('weeklyReviewNextWeekSummary'),
   weeklyReviewNextWeekList: $('weeklyReviewNextWeekList'),
   weeklyReviewGoals: $('weeklyReviewGoals'),
+  dataCheckBtn: $('dataCheckBtn'),
+  dataCheckDialog: $('dataCheckDialog'),
+  closeDataCheckBtn: $('closeDataCheckBtn'),
+  dataCheckSummary: $('dataCheckSummary'),
+  dataCheckList: $('dataCheckList'),
+  dataCheckFixBtn: $('dataCheckFixBtn'),
+  dataCheckErrorLogSummary: $('dataCheckErrorLogSummary'),
+  exportErrorLogBtn: $('exportErrorLogBtn'),
+  clearErrorLogBtn: $('clearErrorLogBtn'),
+  swUpdateBanner: $('swUpdateBanner'),
+  swUpdateBtn: $('swUpdateBtn'),
 };
 
-init();
+// 全域錯誤紀錄：獨立於 init() 之外、無條件先掛上，這樣即使 init() 因為缺少畫面
+// 元素（例如 tests.html 這種沒有完整 DOM 的頁面）而失敗，錯誤蒐集本身仍然有效。
+setupErrorLogging();
+
+// init() 包一層 try/catch：正常情況（index.html 有完整 DOM）不會走到 catch，
+// 但 tests.html 只載入 app.js、沒有任何畫面元素時 init() 一定會因為存取 null
+// 的 DOM 節點而丟出例外——沒有這層保護，例外會中斷整支 app.js 的執行，導致
+// 檔案最底部的 window.CalendarApp 匯出永遠跑不到。
+try {
+  init();
+} catch (err) {
+  console.error('[app.js] init() 發生錯誤（若在 tests.html 等無 DOM 頁面屬預期行為）', err);
+}
 
 function init() {
   document.body.classList.toggle('widget-mode', widgetMode);
@@ -440,18 +473,73 @@ function handleUrlShortcutAction() {
   history.replaceState(null, '', window.location.pathname);
 }
 
+// 新版 Service Worker 就緒提示：偵測到「已經有舊版在控制目前頁面、且有新版安裝完成
+// 在等待中」時顯示固定橫幅，使用者按「立即更新」才會真的切換過去並重新整理，
+// 不會在背景默默把使用中的頁面換掉。file:// 開啟（無 SW）時 registerServiceWorker()
+// 一開頭就 return，這整段邏輯完全不會執行。
+function showSwUpdateBanner(registration) {
+  if (!els.swUpdateBanner || !els.swUpdateBtn) return;
+  els.swUpdateBanner.hidden = false;
+  els.swUpdateBtn.onclick = () => {
+    const waiting = registration.waiting;
+    if (!waiting) return;
+    els.swUpdateBtn.disabled = true;
+    els.swUpdateBtn.textContent = '更新中…';
+    waiting.postMessage({ type: 'SKIP_WAITING' });
+  };
+}
+
+function watchServiceWorkerUpdates(registration) {
+  // 同一個 registration 物件可能因為 register().then() 與 .ready.then() 都呼叫到這裡而重複執行，
+  // 用一個標記避免重複掛 updatefound 監聽（掛兩次不會出錯，但沒必要）。
+  if (!registration || registration._swUpdateWatched) return;
+  registration._swUpdateWatched = true;
+
+  // 頁面載入時剛好已經有新版在等待（例如上次沒有按「立即更新」就關掉分頁）。
+  if (registration.waiting && navigator.serviceWorker.controller) {
+    showSwUpdateBanner(registration);
+  }
+
+  registration.addEventListener('updatefound', () => {
+    const newWorker = registration.installing;
+    if (!newWorker) return;
+    newWorker.addEventListener('statechange', () => {
+      // 只有「目前頁面已經被某個舊版 SW 控制中」才算是「更新」；全新安裝（沒有
+      // controller）不用提示，直接讓它自然啟用即可。
+      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+        showSwUpdateBanner(registration);
+      }
+    });
+  });
+}
+
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
 
+  // 新版 SW 透過 SKIP_WAITING 訊息取得控制權後會觸發這個事件；用旗標防止同一次
+  // 更新觸發兩次重新整理（controllerchange 理論上只會在真正切換控制權時觸發一次，
+  // 但多層保護避免潛在的重複註冊/重複事件造成使用者困擾）。
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (swUpdateReloading) return;
+    swUpdateReloading = true;
+    location.reload();
+  });
+
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js')
-      .then((registration) => { swRegistration = registration; })
+      .then((registration) => {
+        swRegistration = registration;
+        watchServiceWorkerUpdates(registration);
+      })
       .catch(() => {
         // PWA 離線快取註冊失敗時，不影響一般行程表功能。
       });
   });
 
-  navigator.serviceWorker.ready.then((registration) => { swRegistration = registration; }).catch(() => {});
+  navigator.serviceWorker.ready.then((registration) => {
+    swRegistration = registration;
+    watchServiceWorkerUpdates(registration);
+  }).catch(() => {});
 }
 
 function bindEvents() {
@@ -580,6 +668,14 @@ function bindEvents() {
     els.moreToolsDialog?.close();
     openWeeklyReviewDialog();
   });
+
+  // 資料檢查／修復工具：桌面工具列鈕；手機版由 CSS 隱藏、改走 #moreToolsDialog 的
+  // data-proxy 按鈕（沿用既有 proxy click 迴圈，不需要額外綁定）。
+  els.dataCheckBtn?.addEventListener('click', openDataCheckDialog);
+  els.closeDataCheckBtn?.addEventListener('click', closeDataCheckDialog);
+  els.dataCheckFixBtn?.addEventListener('click', handleDataCheckFix);
+  els.exportErrorLogBtn?.addEventListener('click', exportErrorLog);
+  els.clearErrorLogBtn?.addEventListener('click', clearErrorLog);
 
   els.addHabitBtn.addEventListener('click', addHabit);
   els.habitInput.addEventListener('keydown', (event) => {
@@ -2684,6 +2780,191 @@ function downloadText(filename, content, type) {
   URL.revokeObjectURL(url);
 }
 
+// ============================================================================
+// 錯誤紀錄（診斷用）：全域 window.onerror + unhandledrejection 收集到記憶體
+// 環形緩衝（最多 ERROR_LOG_MAX 筆，超過丟最舊）並鏡像存 ERROR_LOG_KEY。
+// 【絕不可】收集 localStorage 內容、token、行程資料本身，只留偵錯必要欄位：
+// 時間、錯誤訊息、呼叫堆疊前 500 字、瀏覽器 UA、頁面網址（去掉 query）。
+// 此 key 刻意不納入 buildBackupPayload()/applyBackupObject()，比照 sync-auth key 的處理。
+// ============================================================================
+function recordError(message, stack) {
+  try {
+    const entry = {
+      time: new Date().toISOString(),
+      message: String(message == null ? '(無訊息)' : message).slice(0, 2000),
+      stack: String(stack == null ? '' : stack).slice(0, 500),
+      ua: (typeof navigator !== 'undefined' && navigator.userAgent) || '',
+      url: (typeof location !== 'undefined' && (location.origin + location.pathname)) || '',
+    };
+    errorLog.push(entry);
+    if (errorLog.length > ERROR_LOG_MAX) errorLog = errorLog.slice(errorLog.length - ERROR_LOG_MAX);
+    saveJson(ERROR_LOG_KEY, errorLog);
+  } catch {
+    // 記錄錯誤本身不應該再拋出例外影響其他功能。
+  }
+}
+
+function setupErrorLogging() {
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+  window.addEventListener('error', (event) => {
+    const message = event?.message || (event?.error && event.error.message);
+    const stack = event?.error && event.error.stack;
+    recordError(message, stack);
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event?.reason;
+    const message = reason && reason.message ? reason.message : String(reason);
+    const stack = reason && reason.stack ? reason.stack : '';
+    recordError(message, stack);
+  });
+}
+
+function exportErrorLog() {
+  downloadText(`錯誤紀錄-${toDateInput(new Date())}.json`, JSON.stringify(errorLog, null, 2), 'application/json;charset=utf-8;');
+  showToast('已匯出錯誤紀錄');
+}
+
+function clearErrorLog() {
+  errorLog = [];
+  saveJson(ERROR_LOG_KEY, errorLog);
+  renderErrorLogSummary();
+  showToast('已清空錯誤紀錄');
+}
+
+function renderErrorLogSummary() {
+  if (!els.dataCheckErrorLogSummary) return;
+  els.dataCheckErrorLogSummary.textContent = errorLog.length
+    ? `目前有 ${errorLog.length} 筆錯誤紀錄（最多保留 ${ERROR_LOG_MAX} 筆）`
+    : '目前沒有錯誤紀錄';
+}
+
+// ============================================================================
+// 資料檢查／修復工具：純檢查 tasks 陣列的常見壞資料型態，不主動修改資料，
+// 由呼叫端（openDataCheckDialog()）決定何時顯示；真正修改資料的是 fixDataIssues()。
+// ============================================================================
+const VALID_REPEAT_VALUES = new Set(['none', 'daily', 'weekly', 'monthly', 'interval', 'weekdays', 'monthlyNth']);
+const DATE_FIELD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function runDataCheck() {
+  const issues = [];
+  const seenIds = new Set();
+  const categoryNames = new Set(categories.map((category) => category.name));
+
+  tasks.forEach((task, index) => {
+    const label = `#${index + 1}｜${task.title || '(無標題)'}`;
+
+    if (!task.id) {
+      issues.push({ type: 'badId', taskIndex: index, message: `${label}：缺少 id` });
+    } else if (seenIds.has(task.id)) {
+      issues.push({ type: 'badId', taskIndex: index, message: `${label}：id 重複（${task.id}）` });
+    }
+    if (task.id) seenIds.add(task.id);
+
+    if (typeof task.date !== 'string' || !DATE_FIELD_RE.test(task.date)) {
+      issues.push({ type: 'badDate', taskIndex: index, message: `${label}：日期欄位不合法（${task.date}）` });
+    }
+
+    if (!VALID_REPEAT_VALUES.has(task.repeat)) {
+      issues.push({ type: 'badRepeat', taskIndex: index, message: `${label}：重複規則不合法（${task.repeat}）` });
+    }
+
+    if (typeof task.start === 'string' && typeof task.end === 'string' && task.start >= task.end) {
+      issues.push({ type: 'badTimeRange', taskIndex: index, message: `${label}：開始時間需早於結束時間（${task.start}–${task.end}）` });
+    }
+
+    if (!Array.isArray(task.completedDates)) {
+      issues.push({ type: 'badCompletedDates', taskIndex: index, message: `${label}：completedDates 不是陣列` });
+    }
+    if (!Array.isArray(task.excludedDates)) {
+      issues.push({ type: 'badExcludedDates', taskIndex: index, message: `${label}：excludedDates 不是陣列` });
+    }
+
+    if (task.category && !categoryNames.has(task.category)) {
+      issues.push({ type: 'orphanCategory', taskIndex: index, message: `${label}：分類「${task.category}」不存在` });
+    }
+  });
+
+  return issues;
+}
+
+// 一鍵修復：呼叫前一定要先讓使用者確認（由 handleDataCheckFix() 的 confirm() 把關），
+// 這裡開頭一定先觸發既有 exportBackup() 下載一份修復前的完整備份，修壞了還能救回來。
+function fixDataIssues() {
+  exportBackup();
+
+  let fixedCount = 0;
+  const seenIds = new Set();
+  const defaultCategoryName = (categories[0] && categories[0].name) || '';
+
+  // 日期欄位不合法的行程直接剔除：日期是 occursOnDate() 判斷重複規則的基準，
+  // 沒有安全的方式可以幫使用者猜出正確日期。
+  const beforeCount = tasks.length;
+  tasks = tasks.filter((task) => typeof task.date === 'string' && DATE_FIELD_RE.test(task.date));
+  fixedCount += beforeCount - tasks.length;
+
+  tasks.forEach((task) => {
+    if (!task.id || seenIds.has(task.id)) {
+      task.id = crypto.randomUUID();
+      fixedCount += 1;
+    }
+    seenIds.add(task.id);
+
+    if (!VALID_REPEAT_VALUES.has(task.repeat)) {
+      task.repeat = 'none';
+      fixedCount += 1;
+    }
+
+    if (!Array.isArray(task.completedDates)) {
+      task.completedDates = [];
+      fixedCount += 1;
+    }
+    if (!Array.isArray(task.excludedDates)) {
+      task.excludedDates = [];
+      fixedCount += 1;
+    }
+
+    if (task.category && !categories.some((category) => category.name === task.category) && defaultCategoryName) {
+      task.category = defaultCategoryName;
+      fixedCount += 1;
+    }
+
+    if (typeof task.start === 'string' && typeof task.end === 'string' && task.start >= task.end) {
+      task.end = addMinutesToTime(task.start, 30);
+      fixedCount += 1;
+    }
+  });
+
+  saveJson(STORAGE_KEY, tasks);
+  render();
+  return fixedCount;
+}
+
+function renderDataCheckResults(issues) {
+  if (!els.dataCheckSummary || !els.dataCheckList) return;
+  els.dataCheckSummary.textContent = issues.length ? `⚠️ 發現 ${issues.length} 筆問題` : '✅ 沒有發現問題，資料狀態正常。';
+  els.dataCheckList.innerHTML = issues.length
+    ? issues.map((issue) => `<div class="data-check-issue">${escapeHtml(issue.message)}</div>`).join('')
+    : '';
+  if (els.dataCheckFixBtn) els.dataCheckFixBtn.hidden = issues.length === 0;
+}
+
+function openDataCheckDialog() {
+  renderDataCheckResults(runDataCheck());
+  renderErrorLogSummary();
+  els.dataCheckDialog?.showModal();
+}
+
+function closeDataCheckDialog() {
+  els.dataCheckDialog?.close();
+}
+
+function handleDataCheckFix() {
+  if (!confirm('修復前會先自動下載一份備份，確定要繼續一鍵修復嗎？')) return;
+  const fixedCount = fixDataIssues();
+  renderDataCheckResults(runDataCheck());
+  showToast(fixedCount ? `已修復 ${fixedCount} 筆問題` : '沒有可修復的問題');
+}
+
 function loadJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
   catch { return fallback; }
@@ -3085,10 +3366,12 @@ function showToast(message) {
 }
 
 // ============================================================================
-// 提供給 sync.js（雲端同步 scaffold）使用的介面。
+// 提供給 sync.js（雲端同步 scaffold）與 tests.html（純函式測試跑道）使用的介面。
 // sync.js 不直接碰 tasks / appSettings 等內部變數，一律透過這個介面，
 // 讓「備份資料格式」與「本機儲存」維持單一真相在 app.js。
 // index.html 若沒有載入 sync.js，這個物件單純不會被用到，不影響任何原有功能。
+// occursOnDate / parseNaturalDateTime / timeOverlaps / computeWeeklyReview 是額外
+// 加上的純函式匯出，只給 tests.html 呼叫做迴歸測試，不影響原本 sync.js 的用法。
 // ============================================================================
 window.CalendarApp = {
   buildBackupPayload,
@@ -3099,6 +3382,10 @@ window.CalendarApp = {
     saveJson(APP_SETTINGS_KEY, appSettings);
   },
   showToast,
+  occursOnDate,
+  parseNaturalDateTime,
+  timeOverlaps,
+  computeWeeklyReview,
   // sync.js 會把自己的 notifyLocalChange 掛在這裡；render() 存檔後會呼叫（如果有掛的話）。
   onDataChanged: null,
 };

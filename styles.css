@@ -847,6 +847,35 @@ textarea { resize: vertical; }
 .cloud-history-info { font-size: 13px; color: var(--muted); }
 .cloud-history-row .ghost-btn { flex-shrink: 0; padding: 6px 12px; }
 
+.data-check-dialog { width: min(480px, calc(100vw - 28px)); }
+.data-check-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0 4px;
+}
+.data-check-body hr {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+.data-check-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.data-check-issue {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text);
+}
+
 .weekly-review-dialog { width: min(480px, calc(100vw - 28px)); }
 .weekly-review-body {
   display: flex;
@@ -931,6 +960,37 @@ textarea { resize: vertical; }
   transition: .2s ease;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
+
+/* SW 新版更新提示：跟 .fab-add 同一招，用 :not([hidden]) 避免 display 蓋掉 hidden 屬性。
+   file:// 開啟（無 Service Worker）時 app.js 整段邏輯靜默跳過，這顆橫幅永遠不會被顯示。 */
+.sw-update-banner { display: none; }
+.sw-update-banner:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  padding: 10px 14px 10px 18px;
+  border-radius: 14px;
+  color: #fff;
+  background: #111827;
+  box-shadow: var(--shadow);
+  z-index: 900;
+  max-width: calc(100vw - 32px);
+}
+.sw-update-banner button {
+  background: var(--primary);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sw-update-banner button:disabled { opacity: .6; cursor: not-allowed; }
 
 body.widget-mode .sidebar .panel:not(:first-of-type),
 body.widget-mode .controls,
@@ -1051,7 +1111,8 @@ body.widget-mode .task-card { font-size: 14px; }
   #printBtn,
   #exportIcsBtn,
   #importIcsBtn,
-  #weeklyReviewBtn {
+  #weeklyReviewBtn,
+  #dataCheckBtn {
     display: none !important;
   }
 

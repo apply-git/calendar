@@ -121,6 +121,7 @@
           <button id="pomodoroBtn" class="ghost-btn">🍅 番茄鐘</button>
           <button id="todayTodoBtn" class="ghost-btn">今日待辦</button>
           <button id="weeklyReviewBtn" class="ghost-btn">📊 週回顧</button>
+          <button id="dataCheckBtn" class="ghost-btn" title="檢查行程資料是否有壞資料並可一鍵修復">🩺 資料檢查</button>
           <button id="widgetModeBtn" class="ghost-btn">小工具模式</button>
           <button id="cleanupBtn" class="ghost-btn">清理舊行程</button>
           <button id="exportCsvBtn" class="ghost-btn">匯出 Excel</button>
@@ -515,6 +516,30 @@
     </div>
   </dialog>
 
+  <dialog id="dataCheckDialog" class="task-dialog data-check-dialog">
+    <div class="dialog-header">
+      <h2>🩺 資料檢查</h2>
+      <button type="button" id="closeDataCheckBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="data-check-body">
+      <p class="muted">檢查項目：id 重複／日期欄位不合法／重複規則不合法／開始時間需早於結束時間／completedDates·excludedDates 非陣列／分類引用不存在。</p>
+      <p id="dataCheckSummary" class="muted">檢查中…</p>
+      <div id="dataCheckList" class="data-check-list"></div>
+      <div class="pomodoro-actions">
+        <button type="button" id="dataCheckFixBtn" class="danger-btn" hidden>一鍵修復（先自動下載備份）</button>
+      </div>
+
+      <hr />
+      <p class="muted">錯誤紀錄：本機自動收集程式錯誤（不含行程內容或帳號資訊），供回報問題時參考。</p>
+      <p id="dataCheckErrorLogSummary" class="muted">目前沒有錯誤紀錄</p>
+      <div class="pomodoro-actions">
+        <button type="button" id="exportErrorLogBtn" class="ghost-btn">匯出錯誤紀錄</button>
+        <button type="button" id="clearErrorLogBtn" class="ghost-btn">清空紀錄</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="moreToolsDialog" class="task-dialog more-tools-dialog">
     <div class="dialog-header">
       <h2>⋯ 更多工具</h2>
@@ -523,6 +548,7 @@
 
     <div class="more-tools-body">
       <button type="button" class="more-tools-item" id="moreToolsWeeklyReviewBtn">📊 本週回顧</button>
+      <button type="button" class="more-tools-item" data-proxy="dataCheckBtn">🩺 資料檢查</button>
       <button type="button" class="more-tools-item" data-proxy="enableNotificationsBtn">🔔 開啟通知</button>
       <button type="button" class="more-tools-item" data-proxy="backupBtn">備份</button>
       <button type="button" class="more-tools-item" data-proxy="restoreBtn">還原</button>
@@ -538,6 +564,11 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="swUpdateBanner" class="sw-update-banner" hidden role="status">
+    <span>🔄 有新版本</span>
+    <button type="button" id="swUpdateBtn">立即更新</button>
+  </div>
 
   <script src="config.js"></script>
   <script src="app.js"></script>

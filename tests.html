@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>桌面行程表 - 測試跑道</title>
+<style>
+  body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; background: #101623; color: #e8edf7; margin: 0; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.desc { color: #8b96ab; font-size: 13px; margin: 0 0 20px; }
+  #summary { font-size: 15px; font-weight: 700; margin: 0 0 14px; padding: 12px 16px; border-radius: 12px; background: #1b2436; }
+  #allPass { display: none; font-size: 40px; font-weight: 900; text-align: center; padding: 22px; margin: 0 0 18px; border-radius: 16px; background: linear-gradient(135deg,#1f9d55,#12b886); color: #fff; letter-spacing: 2px; }
+  #allPass.show { display: block; }
+  ul#results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  li { padding: 9px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; background: #171f30; border: 1px solid #232d43; }
+  li.pass { border-left: 4px solid #22c55e; }
+  li.fail { border-left: 4px solid #ef4444; background: #2a1620; }
+  .mark { display: inline-block; width: 18px; font-weight: 900; }
+  li.pass .mark { color: #22c55e; }
+  li.fail .mark { color: #ef4444; }
+  .err { color: #f7a8a8; display: block; margin: 4px 0 0 24px; font-family: monospace; white-space: pre-wrap; }
+  .group-title { margin: 20px 0 6px; font-size: 13px; font-weight: 700; color: #8b96ab; text-transform: uppercase; letter-spacing: .06em; }
+</style>
+</head>
+<body>
+  <h1>桌面行程表 - 測試跑道（tests.html）</h1>
+  <p class="desc">純開發工具，不加入 PWA 離線快取（不在 service-worker.js 的 APP_SHELL 內）。載入 app.js 後對 window.CalendarApp 匯出的純函式跑迴歸測試，測試前後會完整快照／還原 localStorage，不會汙染真實行程資料。</p>
+  <div id="allPass">ALL PASS</div>
+  <div id="summary">執行中…</div>
+  <ul id="results"></ul>
+
+  <script src="app.js"></script>
+  <script>
+    // ------------------------------------------------------------------------
+    // 保護措施：tests.html 與 index.html 同源共用 localStorage。app.js 載入時
+    // 會讀（loadJson）目前的 localStorage，測試過程中呼叫 applyBackupObject()
+    // 等函式一定會寫入 localStorage。這裡把「執行任何測試之前」的完整 localStorage
+    // 內容全部快照下來，不管測試中間發生什麼（包含丟例外），最後 finally 一定會
+    // 把 localStorage 完全還原成原始狀態，絕不讓使用者真實資料被測試汙染。
+    // ------------------------------------------------------------------------
+    function snapshotLocalStorage() {
+      const snap = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        snap[key] = localStorage.getItem(key);
+      }
+      return snap;
+    }
+    function restoreLocalStorage(snap) {
+      localStorage.clear();
+      Object.keys(snap).forEach((key) => localStorage.setItem(key, snap[key]));
+    }
+
+    // 額外防呆：任何非預期的全域錯誤（例如測試以外的程式碼路徑）都不應該讓整頁
+    // 中斷或洗版 console；app.js 本身的 init() 已經用 try/catch 包起來了，這裡
+    // 純粹是保險。
+    window.addEventListener('error', (event) => { event.preventDefault(); });
+    window.addEventListener('unhandledrejection', (event) => { event.preventDefault(); });
+
+    // ------------------------------------------------------------------------
+    // 極簡測試框架
+    // ------------------------------------------------------------------------
+    const results = [];
+    let currentGroup = '';
+    function group(name) { currentGroup = name; }
+    function test(name, fn) {
+      try {
+        fn();
+        results.push({ group: currentGroup, name, pass: true });
+      } catch (err) {
+        results.push({ group: currentGroup, name, pass: false, error: (err && err.message) ? err.message : String(err) });
+      }
+    }
+    function assertEqual(actual, expected, label) {
+      if (actual !== expected) {
+        throw new Error(`${label || '值不相等'}：預期 ${JSON.stringify(expected)}，實際 ${JSON.stringify(actual)}`);
+      }
+    }
+    function assertDeepEqual(actual, expected, label) {
+      const a = JSON.stringify(actual);
+      const e = JSON.stringify(expected);
+      if (a !== e) {
+        throw new Error(`${label || '物件不相等'}：預期 ${e}，實際 ${a}`);
+      }
+    }
+
+    const localStorageSnapshot = snapshotLocalStorage();
+
+    try {
+      const CA = window.CalendarApp;
+      if (!CA) throw new Error('window.CalendarApp 未定義，app.js 載入失敗');
+
+      // ====================================================================
+      // occursOnDate(task, dateKey)
+      // ====================================================================
+      group('occursOnDate');
+      const mk = (overrides) => Object.assign({
+        id: 't', date: '2026-01-05', repeat: 'none',
+        repeatInterval: 2, repeatWeekday: 1, repeatNth: 1,
+        repeatUntil: '', excludedDates: [],
+      }, overrides);
+
+      test('每天重複：未來日期出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'daily' }), '2026-03-10'), true);
+      });
+      test('每天重複：起始日之前不出現（超出範圍負例）', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'daily' }), '2026-01-01'), false);
+      });
+      test('每週重複：同星期後一週出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'weekly' }), '2026-01-12'), true);
+      });
+      test('每週重複：不同星期不出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'weekly' }), '2026-01-13'), false);
+      });
+      test('每月重複：同一天下個月出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'monthly' }), '2026-02-05'), true);
+      });
+      test('每月重複：不同天不出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'monthly' }), '2026-02-06'), false);
+      });
+      test('每隔 N 天：對齊間隔出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'interval', repeatInterval: 3 }), '2026-01-08'), true);
+      });
+      test('每隔 N 天：未對齊間隔不出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'interval', repeatInterval: 3 }), '2026-01-07'), false);
+      });
+      test('只工作日：週二出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'weekdays' }), '2026-01-06'), true);
+      });
+      test('只工作日：週六不出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'weekdays' }), '2026-01-10'), false);
+      });
+      test('每月第 N 個週幾：第 2 個星期一出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'monthlyNth', repeatWeekday: 1, repeatNth: 2 }), '2026-01-12'), true);
+      });
+      test('每月第 N 個週幾：最後一個星期一（nth=-1）出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'monthlyNth', repeatWeekday: 1, repeatNth: -1 }), '2026-01-26'), true);
+      });
+      test('excludedDates：被排除的日期不出現（即使重複規則會命中）', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'daily', excludedDates: ['2026-01-10'] }), '2026-01-10'), false);
+      });
+      test('單次行程：本身日期出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'none' }), '2026-01-05'), true);
+      });
+      test('單次行程：其他日期不出現（負例）', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'none' }), '2026-01-06'), false);
+      });
+      test('repeatUntil：邊界當天仍出現', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'daily', repeatUntil: '2026-01-10' }), '2026-01-10'), true);
+      });
+      test('repeatUntil：超過截止日不出現（超出範圍負例）', () => {
+        assertEqual(CA.occursOnDate(mk({ repeat: 'daily', repeatUntil: '2026-01-10' }), '2026-01-11'), false);
+      });
+
+      // ====================================================================
+      // parseNaturalDateTime(text, baseDate)
+      // ====================================================================
+      group('parseNaturalDateTime');
+      const base = new Date(2026, 0, 5); // 固定基準日：2026-01-05（星期一），測試結果與「今天」無關
+
+      test('明天下午3點 開會', () => {
+        const r = CA.parseNaturalDateTime('明天下午3點 開會', base);
+        assertDeepEqual(r, { title: '開會', date: '2026-01-06', start: '15:00', end: '16:00' });
+      });
+      test('下週五 14:00-15:00 專案會議（時間區間）', () => {
+        const r = CA.parseNaturalDateTime('下週五14:00-15:00 專案會議', base);
+        assertDeepEqual(r, { title: '專案會議', date: '2026-01-16', start: '14:00', end: '15:00' });
+      });
+      test('3點檔要記得看：不得誤判為時間', () => {
+        const r = CA.parseNaturalDateTime('3點檔要記得看', base);
+        assertDeepEqual(r, { title: '3點檔要記得看', date: null, start: null, end: null });
+      });
+      test('7/15 繳信用卡費（斜線日期）', () => {
+        const r = CA.parseNaturalDateTime('7/15 繳信用卡費', base);
+        assertDeepEqual(r, { title: '繳信用卡費', date: '2026-07-15', start: null, end: null });
+      });
+      test('後天早上九點半 回診（中文數字＋半）', () => {
+        const r = CA.parseNaturalDateTime('後天早上九點半 回診', base);
+        assertDeepEqual(r, { title: '回診', date: '2026-01-07', start: '09:30', end: '10:30' });
+      });
+      test('禮拜三 開會：本週尚未到，落在本週', () => {
+        const r = CA.parseNaturalDateTime('禮拜三 開會', base); // base 本身是星期一
+        assertDeepEqual(r, { title: '開會', date: '2026-01-07', start: null, end: null });
+      });
+      test('禮拜一 開會：本週已過，順延到下週', () => {
+        const thursday = new Date(2026, 0, 8); // 星期四
+        const r = CA.parseNaturalDateTime('禮拜一 開會', thursday);
+        assertEqual(r.date, '2026-01-12');
+      });
+      test('3點到5點 開會：無上下午詞的區間（<8 視為下午）', () => {
+        const r = CA.parseNaturalDateTime('3點到5點 開會', base);
+        assertDeepEqual(r, { title: '開會', date: null, start: '15:00', end: '17:00' });
+      });
+      test('8點 晨會：8~12 裸數字維持原值（不誤判為晚上）', () => {
+        const r = CA.parseNaturalDateTime('8點 晨會', base);
+        assertDeepEqual(r, { title: '晨會', date: null, start: '08:00', end: '09:00' });
+      });
+      test('十二點 吃午餐：中文數字十二', () => {
+        const r = CA.parseNaturalDateTime('十二點 吃午餐', base);
+        assertDeepEqual(r, { title: '吃午餐', date: null, start: '12:00', end: '13:00' });
+      });
+      test('明天１５：００ 面試：全形數字／冒號正規化', () => {
+        const r = CA.parseNaturalDateTime('明天１５：００ 面試', base);
+        assertDeepEqual(r, { title: '面試', date: '2026-01-06', start: '15:00', end: '16:00' });
+      });
+
+      // ====================================================================
+      // timeOverlaps(aStart, aEnd, bStart, bEnd)
+      // ====================================================================
+      group('timeOverlaps');
+      test('完全重疊', () => {
+        assertEqual(CA.timeOverlaps('09:00', '10:00', '09:30', '09:45'), true);
+      });
+      test('相接不算重疊（邊界）', () => {
+        assertEqual(CA.timeOverlaps('09:00', '10:00', '10:00', '11:00'), false);
+      });
+      test('完全不相關', () => {
+        assertEqual(CA.timeOverlaps('09:00', '10:00', '11:00', '12:00'), false);
+      });
+      test('B 包含在 A 之內', () => {
+        assertEqual(CA.timeOverlaps('09:00', '12:00', '10:00', '11:00'), true);
+      });
+      test('A 包含在 B 之內', () => {
+        assertEqual(CA.timeOverlaps('10:00', '11:00', '09:00', '12:00'), true);
+      });
+      test('完全相同時段', () => {
+        assertEqual(CA.timeOverlaps('09:00', '10:00', '09:00', '10:00'), true);
+      });
+
+      // ====================================================================
+      // 備份 roundtrip：buildBackupPayload() → applyBackupObject() → 再次 build 比對一致
+      // ====================================================================
+      group('備份 roundtrip');
+      test('buildBackupPayload → applyBackupObject → 再次 build 內容一致', () => {
+        // 直接改寫 app.js 內部的模組層級變數（tasks/categories/... 皆為頂層 let，
+        // 與這支 <script> 共用同一份全域詞法作用域，可以直接以裸識別字賦值），
+        // 塞入一組「已經是 normalizeStoredData() 正規化後形狀」的乾淨假資料，
+        // 避免和使用者真實行程資料混在一起比較。
+        tasks = [{
+          id: 'rt-1', title: 'roundtrip 測試', date: '2026-07-21', start: '09:00', end: '10:00',
+          priority: 'medium', category: '工作', repeat: 'none', repeatInterval: 2, repeatWeekday: 1,
+          repeatNth: 1, reminder: 10, pinned: false, countdown: false, tags: [], subtasks: [], note: '',
+          completedDates: [], excludedDates: [], repeatUntil: '', sortOrder: 0,
+          createdAt: '2026-01-01T00:00:00.000Z', originalSeriesId: '', originalOccurrenceDate: '',
+        }];
+        categories = defaultCategories;
+        habits = [];
+        textSettings = defaultTextSettings;
+        appSettings = defaultAppSettings;
+        dailyMemos = {};
+        templates = defaultTemplates;
+        weeklyGoals = [];
+        widgetMode = false;
+        localStorage.setItem(THEME_KEY, 'light');
+
+        const before = CA.buildBackupPayload();
+        const payload = JSON.parse(JSON.stringify(before));
+        try {
+          // tests.html 沒有完整 DOM，applyBackupObject() 內部呼叫的 render() 一定會
+          // 因為找不到畫面元素而丟出例外；資料本身（saveJson 等）在 render() 之前
+          // 就已經寫完，這裡刻意吞掉例外，只驗證資料結果是否正確。
+          CA.applyBackupObject(payload);
+        } catch {}
+        const after = CA.buildBackupPayload();
+
+        const strip = (obj) => { const clone = Object.assign({}, obj); delete clone.exportedAt; return clone; };
+        assertDeepEqual(strip(after), strip(before), '備份 roundtrip 後內容應與原始一致');
+      });
+      test('套用同一份備份兩次結果穩定（normalizeStoredData 冪等）', () => {
+        const snapshot1 = CA.buildBackupPayload();
+        try { CA.applyBackupObject(JSON.parse(JSON.stringify(snapshot1))); } catch {}
+        const snapshot2 = CA.buildBackupPayload();
+        const strip = (obj) => { const clone = Object.assign({}, obj); delete clone.exportedAt; return clone; };
+        assertDeepEqual(strip(snapshot2), strip(snapshot1), '重複套用同一份備份不應該改變內容');
+      });
+    } finally {
+      // 無論測試成功、失敗、或中途丟例外，都一定會執行到這裡：把 localStorage
+      // 還原成執行測試之前的原始狀態，保護使用者的真實行程資料。
+      restoreLocalStorage(localStorageSnapshot);
+    }
+
+    // --------------------------------------------------------------------
+    // 渲染結果
+    // --------------------------------------------------------------------
+    const listEl = document.getElementById('results');
+    const summaryEl = document.getElementById('summary');
+    const allPassEl = document.getElementById('allPass');
+
+    let lastGroup = null;
+    results.forEach((r) => {
+      if (r.group !== lastGroup) {
+        lastGroup = r.group;
+        const heading = document.createElement('div');
+        heading.className = 'group-title';
+        heading.textContent = lastGroup;
+        listEl.appendChild(heading);
+      }
+      const li = document.createElement('li');
+      li.className = r.pass ? 'pass' : 'fail';
+      li.innerHTML = `<span class="mark">${r.pass ? '✓' : '✗'}</span>${r.name}` + (r.error ? `<span class="err">${r.error}</span>` : '');
+      listEl.appendChild(li);
+    });
+
+    const passCount = results.filter((r) => r.pass).length;
+    const totalCount = results.length;
+    summaryEl.textContent = `通過 ${passCount} / ${totalCount}`;
+    if (passCount === totalCount && totalCount > 0) {
+      allPassEl.classList.add('show');
+    }
+  </script>
+</body>
+</html>

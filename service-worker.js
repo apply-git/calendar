@@ -46,8 +46,19 @@ self.addEventListener('install', (event) => {
             console.warn('[service-worker] 快取失敗，略過：', url, err);
           }))
       ))
-      .then(() => self.skipWaiting())
+      // 注意：這裡刻意【不】呼叫 self.skipWaiting()。全新安裝（沒有舊版在控制頁面）
+      // 不受影響，仍會直接啟用；但「更新」情境下，新版會停在 waiting 狀態，
+      // 直到使用者在畫面上按「立即更新」（app.js 對 waiting worker postMessage
+      // {type:'SKIP_WAITING'}，下面的 message 監聽收到後才呼叫 self.skipWaiting()）。
+      // 這是刻意的行為改動，讓「新版就緒」變成使用者可控的動作，而不是背景默默切換。
   );
+});
+
+// 收到頁面（app.js 的「立即更新」按鈕）送來的訊息才真正跳過 waiting 狀態、進入 activate。
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {
