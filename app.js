@@ -1315,7 +1315,7 @@ function renderCommandPaletteResults(query) {
   const q = query.trim();
   const matchedCommands = COMMAND_PALETTE_ACTIONS.filter((cmd) => !q || commandPaletteFuzzyMatch(cmd.label, q));
   const matchedTasks = q
-    ? tasks.filter((task) => commandPaletteFuzzyMatch(task.title, q) || commandPaletteFuzzyMatch(task.note, q)).slice(0, 8)
+    ? tasks.filter((task) => !task.deletedAt && (commandPaletteFuzzyMatch(task.title, q) || commandPaletteFuzzyMatch(task.note, q))).slice(0, 8)
     : [];
 
   commandPaletteItems = [
@@ -1738,7 +1738,7 @@ function renderCountdownPanel() {
   if (!els.countdownList) return;
   const todayKey = toDateInput(new Date());
   const items = tasks
-    .filter((task) => task.countdown)
+    .filter((task) => !task.deletedAt && task.countdown)
     .map((task) => {
       const dateKey = nextCountdownOccurrence(task, todayKey);
       return dateKey ? { task, dateKey } : null;
@@ -1848,6 +1848,7 @@ function applyTemplate(id) {
     excludedDates: [],
     sortOrder: Date.now(),
     createdAt: new Date().toISOString(),
+    updatedAt: Date.now(),
   });
   saveJson(STORAGE_KEY, tasks);
   render();
@@ -2075,11 +2076,10 @@ function updatePomodoroDisplay() {
 
 function cleanupOldTasks() {
   const todayKey = toDateInput(new Date());
-  const removable = tasks.filter((task) => task.repeat === 'none' && task.date < todayKey && (task.completedDates || []).length);
+  const removable = tasks.filter((task) => !task.deletedAt && task.repeat === 'none' && task.date < todayKey && (task.completedDates || []).length);
   if (!removable.length) return showToast('沒有可清理的舊行程');
   if (!confirm(`確定刪除 ${removable.length} 筆已完成的過去行程？`)) return;
-  const ids = new Set(removable.map((task) => task.id));
-  tasks = tasks.filter((task) => !ids.has(task.id));
+  removable.forEach((task) => tombstoneTask(task));
   saveJson(STORAGE_KEY, tasks);
   render();
   showToast(`已清理 ${removable.length} 筆舊行程`);
@@ -2092,11 +2092,12 @@ function clearDayTasks() {
   if (!confirm(`即將清除今天 ${dayTasks.length} 筆行程，此動作無法復原，確定要繼續嗎？`)) return;
   dayTasks.forEach((task) => {
     if (task.repeat === 'none') {
-      tasks = tasks.filter((item) => item.id !== task.id);
+      tombstoneTask(task);
       return;
     }
     task.excludedDates = Array.isArray(task.excludedDates) ? task.excludedDates : [];
     if (!task.excludedDates.includes(dateKey)) task.excludedDates.push(dateKey);
+    touchTask(task);
   });
   saveJson(STORAGE_KEY, tasks);
   render();
@@ -2115,7 +2116,7 @@ function deferUnfinishedTasks() {
   const nextDateKey = toDateInput(nextDate);
   if (!confirm(`即將把 ${targets.length} 筆未完成行程順延到 ${formatMonthDay(nextDate)}，確定要繼續嗎？`)) return;
 
-  targets.forEach((task) => { task.date = nextDateKey; });
+  targets.forEach((task) => { task.date = nextDateKey; touchTask(task); });
   saveJson(STORAGE_KEY, tasks);
   render();
   showToast(`已順延 ${targets.length} 筆到 ${formatMonthDay(nextDate)}`);
@@ -2317,14 +2318,18 @@ function clearTasksForDateKeys(dateKeys, label) {
   if (!count) return showToast(`${label}沒有行程可清除`);
   if (!confirm(`即將清除${label} ${count} 筆行程，此動作無法復原，確定要繼續嗎？`)) return;
 
-  tasks = tasks.filter((task) => !removeIds.has(task.id));
   tasks.forEach((task) => {
+    if (removeIds.has(task.id)) {
+      tombstoneTask(task);
+      return;
+    }
     const excludeDates = excludeMap.get(task.id);
     if (!excludeDates) return;
     task.excludedDates = Array.isArray(task.excludedDates) ? task.excludedDates : [];
     excludeDates.forEach((dateKey) => {
       if (!task.excludedDates.includes(dateKey)) task.excludedDates.push(dateKey);
     });
+    touchTask(task);
   });
 
   saveJson(STORAGE_KEY, tasks);
@@ -2774,6 +2779,7 @@ function saveTaskFromForm(event) {
     repeatUntil: existingTask?.repeatUntil || '',
     sortOrder: existingTask?.sortOrder || Date.now(),
     createdAt: existingTask?.createdAt || new Date().toISOString(),
+    updatedAt: Date.now(),
   };
 
   if (!task.title) return showToast('請輸入事項名稱');
@@ -2783,6 +2789,7 @@ function saveTaskFromForm(event) {
   const editFuture = Boolean(existingTask && editingOccurrenceDate && existingTask.repeat !== 'none' && els.taskScope.value === 'future');
   if (editOnce) {
     existingTask.excludedDates = [...new Set([...(existingTask.excludedDates || []), editingOccurrenceDate])];
+    touchTask(existingTask);
     tasks.push({
       ...task,
       id: crypto.randomUUID(),
@@ -2807,6 +2814,7 @@ function saveTaskFromForm(event) {
       const preservedExcludedDates = oldExcludedDates.filter((date) => date >= splitDate);
       existingTask.excludedDates = oldExcludedDates.filter((date) => date < splitDate);
       existingTask.repeatUntil = splitUntil;
+      touchTask(existingTask);
       const originalCompleted = Array.isArray(existingTask.completedDates) ? existingTask.completedDates : [];
       tasks.push({
         ...task,
@@ -2918,6 +2926,7 @@ function importBatchAddRows() {
       repeatUntil: '',
       sortOrder: Date.now(),
       createdAt: new Date().toISOString(),
+      updatedAt: Date.now(),
     });
   });
 
@@ -3024,8 +3033,9 @@ function deleteCurrentTask() {
   const deleteOnce = Boolean(task && editingOccurrenceDate && task.repeat !== 'none' && els.taskScope.value === 'once');
   if (deleteOnce) {
     task.excludedDates = [...new Set([...(task.excludedDates || []), editingOccurrenceDate])];
-  } else {
-    tasks = tasks.filter((item) => item.id !== id);
+    touchTask(task);
+  } else if (task) {
+    tombstoneTask(task);
   }
   saveJson(STORAGE_KEY, tasks);
   closeTaskDialog();
@@ -3046,6 +3056,7 @@ function copyTaskToTomorrow(id) {
     excludedDates: [],
     sortOrder: Date.now(),
     createdAt: new Date().toISOString(),
+    updatedAt: Date.now(),
   });
   saveJson(STORAGE_KEY, tasks);
   render();
@@ -3056,6 +3067,7 @@ function toggleTaskPinned(id) {
   const task = tasks.find((item) => item.id === id);
   if (!task) return;
   task.pinned = !task.pinned;
+  touchTask(task);
   saveJson(STORAGE_KEY, tasks);
   render();
   showToast(task.pinned ? '行程已置頂' : '已取消置頂');
@@ -3089,7 +3101,8 @@ function handleCalendarClick(event) {
     if (task) openTaskDialog(task, occurrenceDate);
   }
   if (deleteId) {
-    tasks = tasks.filter((task) => task.id !== deleteId);
+    const deleteTarget = tasks.find((item) => item.id === deleteId);
+    if (deleteTarget) tombstoneTask(deleteTarget);
     saveJson(STORAGE_KEY, tasks);
     render();
     showToast('行程已刪除');
@@ -3172,6 +3185,7 @@ function handleDrop(event) {
     const oldDate = task.date;
     task.date = target.dataset.dropDate;
     task.sortOrder = Date.now();
+    touchTask(task);
     saveJson(STORAGE_KEY, tasks);
     render();
     showToast(oldDate === task.date ? '已調整行程順序' : '已調整行程日期');
@@ -3227,6 +3241,7 @@ function handleTimelinePointerUp(event) {
   const newEnd = minutesToTime(state.taskStartMin + durationMin);
   if (newEnd > task.start) {
     task.end = newEnd;
+    touchTask(task);
     saveJson(STORAGE_KEY, tasks);
     showToast(`已更新結束時間為 ${newEnd}`);
   }
@@ -3542,7 +3557,7 @@ function updateNotificationButton() {
 function exportCsv() {
   const statusDate = toDateInput(currentDate);
   const headers = ['日期', '開始', '結束', '事項', '分類', '優先順序', '狀態', '置頂', '重複', '提醒分鐘', '標籤', '子任務', '備註'];
-  const rows = tasks.sort(compareTasks).map((task) => [
+  const rows = tasks.filter((task) => !task.deletedAt).sort(compareTasks).map((task) => [
     task.date,
     task.start,
     task.end,
@@ -3725,7 +3740,7 @@ function exportIcs() {
     'PRODID:-//桌面行程表//zh-TW//',
     'CALSCALE:GREGORIAN',
   ];
-  tasks.forEach((task) => {
+  tasks.filter((task) => !task.deletedAt).forEach((task) => {
     if (task.repeat === 'lunar-yearly') {
       pushLunarYearlyIcsEvents(lines, task);
       return;
@@ -3890,6 +3905,7 @@ function parseIcsEvent(block) {
     excludedDates: [],
     sortOrder: Date.now(),
     createdAt: new Date().toISOString(),
+    updatedAt: Date.now(),
   };
 
   if (props.RRULE) applyRRuleToTask(task, props.RRULE.value);
@@ -4066,7 +4082,7 @@ function addCategory() {
 }
 
 function deleteCategory(name) {
-  const inUse = tasks.some((task) => task.category === name);
+  const inUse = tasks.some((task) => !task.deletedAt && task.category === name);
   if (inUse) return showToast('此分類已有行程使用，無法刪除');
   categories = categories.filter((category) => category.name !== name || category.system);
   saveJson(CATEGORY_KEY, categories);
@@ -4089,6 +4105,19 @@ function setTaskDone(task, dateKey, done) {
     ? [...new Set([...task.completedDates, dateKey])]
     : task.completedDates.filter((date) => date !== dateKey);
   delete task.done;
+  touchTask(task);
+}
+
+// 逐筆同步用的中央 helper：任何「使用者動作改變某筆 task 內容」都要呼叫 touchTask()
+// 記錄最後修改時間；「真刪除」一律改叫 tombstoneTask() 留墓碑供之後雲端同步合併判斷，
+// 不從 tasks 陣列真的移除（例外：fixDataIssues 對非法日期壞資料維持真刪除）。
+function touchTask(task) {
+  task.updatedAt = Date.now();
+}
+
+function tombstoneTask(task) {
+  task.deletedAt = Date.now();
+  touchTask(task);
 }
 
 function habitStreak(habit) {
@@ -4156,8 +4185,13 @@ function normalizeStoredData() {
       originalOccurrenceDate: typeof task.originalOccurrenceDate === 'string' ? task.originalOccurrenceDate : '',
       repeatUntil: typeof task.repeatUntil === 'string' ? task.repeatUntil : '',
       sortOrder: Number(task.sortOrder || 0),
+      updatedAt: Number.isFinite(Number(task.updatedAt)) ? Number(task.updatedAt) : 0,
     };
   });
+  // 刪除墓碑（tombstone）超過 90 天：保留期內留給雲端同步合併用，超過就視為
+  // 沒有同步意義，真正從陣列移除，避免本機資料無限增長。
+  const TOMBSTONE_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+  tasks = tasks.filter((task) => !(task.deletedAt && Date.now() - task.deletedAt > TOMBSTONE_RETENTION_MS));
   appSettings.workStart = clampHour(appSettings.workStart, 0, 23);
   appSettings.workEnd = Math.max(appSettings.workStart, clampHour(appSettings.workEnd, 1, 24));
   appSettings.showLunar = typeof appSettings.showLunar === 'boolean' ? appSettings.showLunar : true;
@@ -4175,6 +4209,7 @@ function mergeCategories(base, saved) {
 }
 
 function occursOnDate(task, dateKey) {
+  if (task.deletedAt) return false;
   if (Array.isArray(task.excludedDates) && task.excludedDates.includes(dateKey)) return false;
   if (task.date === dateKey) return true;
   if (task.repeat === 'none') return false;
@@ -4380,6 +4415,8 @@ function runDataCheck() {
   const categoryNames = new Set(categories.map((category) => category.name));
 
   tasks.forEach((task, index) => {
+    if (task.deletedAt) return; // 墓碑不當壞資料檢查，保留供同步合併用
+
     const label = `#${index + 1}｜${task.title || '(無標題)'}`;
 
     if (!task.id) {
@@ -4435,35 +4472,47 @@ async function fixDataIssues() {
   fixedCount += beforeCount - tasks.length;
 
   tasks.forEach((task) => {
+    if (task.deletedAt) return; // 墓碑不修、不算修復筆數，保留原樣供同步合併用
+
+    let changed = false;
+
     if (!task.id || seenIds.has(task.id)) {
       task.id = crypto.randomUUID();
       fixedCount += 1;
+      changed = true;
     }
     seenIds.add(task.id);
 
     if (!VALID_REPEAT_VALUES.has(task.repeat)) {
       task.repeat = 'none';
       fixedCount += 1;
+      changed = true;
     }
 
     if (!Array.isArray(task.completedDates)) {
       task.completedDates = [];
       fixedCount += 1;
+      changed = true;
     }
     if (!Array.isArray(task.excludedDates)) {
       task.excludedDates = [];
       fixedCount += 1;
+      changed = true;
     }
 
     if (task.category && !categories.some((category) => category.name === task.category) && defaultCategoryName) {
       task.category = defaultCategoryName;
       fixedCount += 1;
+      changed = true;
     }
 
     if (typeof task.start === 'string' && typeof task.end === 'string' && task.start >= task.end) {
       task.end = addMinutesToTime(task.start, 30);
       fixedCount += 1;
+      changed = true;
     }
+
+    if (changed) touchTask(task);
   });
 
   saveJson(STORAGE_KEY, tasks);
