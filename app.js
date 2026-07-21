@@ -26,6 +26,11 @@ const HOLIDAYS_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 天內不重抓
 let holidayWarned = false; // console.warn 最多一次，避免零設定環境洗版
 let dynamicHolidays = {}; // init() 時從 localStorage 載入進記憶體，供 getHoliday() 優先查詢
 
+// 提醒延後（snooze）持久化：key 為 `${taskId}|${dateKey}`（用 '|' 分隔避免與 UUID/日期裡的 '-' 混淆），
+// value 為 snooze 到期時間戳。只是排程用暫存，刻意不納入 buildBackupPayload()/applyBackupObject()。
+const SNOOZE_KEY = 'desktop-schedule-snooze-v1';
+const SNOOZE_STALE_MS = 24 * 60 * 60 * 1000; // 到期超過 24 小時的殘留視為過期，清掉不補發
+
 // 台灣國定假日對照表（2025–2027年，含補假／彈性放假）。資料來源：行政院人事行政總處公告辦公日曆表。
 const TAIWAN_HOLIDAYS = {
   '2025-01-01': '元旦',
@@ -3331,9 +3336,59 @@ function handleFindSlotClick() {
   showToast('未來 7 天都沒有足夠空檔');
 }
 
+// 提醒延後持久化表的存取小工具，key 格式見 SNOOZE_KEY 註解。
+function loadSnoozeTable() {
+  return loadJson(SNOOZE_KEY, {});
+}
+
+function saveSnoozeRecord(taskId, dateKey, until) {
+  const table = loadSnoozeTable();
+  table[`${taskId}|${dateKey}`] = until;
+  saveJson(SNOOZE_KEY, table);
+}
+
+function removeSnoozeRecord(taskId, dateKey) {
+  const table = loadSnoozeTable();
+  const key = `${taskId}|${dateKey}`;
+  if (key in table) {
+    delete table[key];
+    saveJson(SNOOZE_KEY, table);
+  }
+}
+
+// 頁面重開（原本記憶體 setTimeout 已消失）後，checkReminders() 每輪開頭都會補跑這裡：
+// (a) 已到期的延後項目→立即補發通知並從表中刪除；(b) 到期超過 24 小時的殘留（分頁長時間
+// 沒開）直接清掉不補發，避免一開頁面被舊提醒洗版。已完成的行程不補發。
+function processSnoozeTable(now) {
+  const table = loadSnoozeTable();
+  let changed = false;
+  Object.keys(table).forEach((key) => {
+    const sepIndex = key.lastIndexOf('|');
+    if (sepIndex < 0) { delete table[key]; changed = true; return; }
+    const taskId = key.slice(0, sepIndex);
+    const dateKey = key.slice(sepIndex + 1);
+    const until = Number(table[key]);
+    if (!Number.isFinite(until) || now.getTime() >= until + SNOOZE_STALE_MS) {
+      delete table[key];
+      changed = true;
+      return;
+    }
+    if (now.getTime() < until) return;
+    delete table[key];
+    changed = true;
+    const task = tasks.find((item) => item.id === taskId);
+    if (task && !isTaskDone(task, dateKey)) {
+      showTaskNotification(task, dateKey, `行程提醒：${task.title}`, `${task.reminder ? `${task.reminder} 分鐘後` : '現在'}開始｜${task.category}`);
+    }
+  });
+  if (changed) saveJson(SNOOZE_KEY, table);
+}
+
 function checkReminders() {
   const now = new Date();
   const nowKey = toDateInput(now);
+
+  processSnoozeTable(now);
 
   tasks.forEach((task) => {
     if (task.reminder < 0 || isTaskDone(task, nowKey) || !occursOnDate(task, nowKey)) return;
@@ -3414,6 +3469,7 @@ function handleNotificationAction(action, taskId, dateKey) {
       clearTimeout(reminderSnoozeTimers.get(timerKey));
       reminderSnoozeTimers.delete(timerKey);
     }
+    removeSnoozeRecord(taskId, dateKey);
     setTaskDone(task, dateKey, true);
     playDoneSound();
     render();
@@ -3422,9 +3478,11 @@ function handleNotificationAction(action, taskId, dateKey) {
     if (reminderSnoozeTimers.has(timerKey)) clearTimeout(reminderSnoozeTimers.get(timerKey));
     const timer = setTimeout(() => {
       reminderSnoozeTimers.delete(timerKey);
+      removeSnoozeRecord(taskId, dateKey);
       showTaskNotification(task, dateKey, `行程提醒：${task.title}`, `${task.reminder ? `${task.reminder} 分鐘後` : '現在'}開始｜${task.category}`);
     }, 10 * 60 * 1000);
     reminderSnoozeTimers.set(timerKey, timer);
+    saveSnoozeRecord(taskId, dateKey, Date.now() + 10 * 60 * 1000);
     showToast('10 分鐘後再提醒');
   }
 }
@@ -3668,6 +3726,10 @@ function exportIcs() {
     'CALSCALE:GREGORIAN',
   ];
   tasks.forEach((task) => {
+    if (task.repeat === 'lunar-yearly') {
+      pushLunarYearlyIcsEvents(lines, task);
+      return;
+    }
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:${task.id}@desktop-schedule`);
     lines.push(`DTSTAMP:${toIcsUtcDateTime(new Date())}`);
@@ -3698,9 +3760,34 @@ function buildRRule(task) {
       return `FREQ=MONTHLY;BYDAY=${nth}${weekday}`;
     }
     // 'lunar-yearly'：標準 RRULE 無法表達「依農曆日期每年重複」，故不產生 RRULE，
-    // 匯出時降級為單次事件（.ics 只會有 DTSTART 那天，即首次日期）。
+    // 改由 exportIcs() 的 pushLunarYearlyIcsEvents() 展開成多個獨立 VEVENT。
     case 'lunar-yearly': return '';
     default: return '';
+  }
+}
+
+// 農曆每年重複行程無法用標準 RRULE 表達，改為展開「從 task.date 起未來 5 年」內
+// 每年實際發生的國曆日期：逐日掃描並重用既有 occursOnDate() 判斷是否發生（excludedDates
+// 天然被排除），每個發生日各輸出一個 VEVENT，UID 加日期後綴確保跨事件唯一。
+function pushLunarYearlyIcsEvents(lines, task) {
+  const base = startOfDay(new Date(`${task.date}T00:00:00`));
+  const endDate = addDays(base, 5 * 366);
+  const dtstamp = toIcsUtcDateTime(new Date());
+  let cursor = base;
+  while (cursor <= endDate) {
+    const dateKey = toDateInput(cursor);
+    if (occursOnDate(task, dateKey)) {
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:${task.id}-${dateKey}@calendar`);
+      lines.push(`DTSTAMP:${dtstamp}`);
+      lines.push(`DTSTART:${toIcsLocalDateTime(dateKey, task.start)}`);
+      lines.push(`DTEND:${toIcsLocalDateTime(dateKey, task.end)}`);
+      lines.push(`SUMMARY:${icsEscape(task.title)}`);
+      if (task.note) lines.push(`DESCRIPTION:${icsEscape(task.note)}`);
+      if (task.category) lines.push(`CATEGORIES:${icsEscape(task.category)}`);
+      lines.push('END:VEVENT');
+    }
+    cursor = addDays(cursor, 1);
   }
 }
 
