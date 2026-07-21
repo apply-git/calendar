@@ -112,6 +112,7 @@
           <button id="deferBtn" class="ghost-btn" hidden>⏭ 未完成順延</button>
           <button id="clearWeekBtn" class="ghost-btn" hidden>🗑 清空本週</button>
           <button id="clearMonthBtn" class="ghost-btn" hidden>🗑 清空本月</button>
+          <button id="commandPaletteBtn" class="ghost-btn" title="命令面板 (Ctrl+K)" aria-label="命令面板">🔍</button>
           <button id="themeBtn" class="ghost-btn">🌙</button>
           <button id="enableNotificationsBtn" class="ghost-btn">🔔 開啟通知</button>
           <button id="cloudSyncBtn" class="ghost-btn">☁️ 雲端同步</button>
@@ -553,6 +554,7 @@
 
     <div class="more-tools-body">
       <button type="button" class="more-tools-item" id="moreToolsWeeklyReviewBtn">📊 本週回顧</button>
+      <button type="button" class="more-tools-item" data-proxy="commandPaletteBtn">🔍 命令面板</button>
       <button type="button" class="more-tools-item" data-proxy="dataCheckBtn">🩺 資料檢查</button>
       <button type="button" class="more-tools-item" data-proxy="enableNotificationsBtn">🔔 開啟通知</button>
       <button type="button" class="more-tools-item" data-proxy="backupBtn">備份</button>
@@ -568,6 +570,11 @@
       <button type="button" class="more-tools-item" data-proxy="batchAddBtn">📋 批量新增</button>
       <button type="button" class="more-tools-item" data-proxy="deferBtn">⏭ 未完成順延</button>
     </div>
+  </dialog>
+
+  <dialog id="commandPalette" class="command-palette-dialog">
+    <input id="commandPaletteInput" type="text" placeholder="輸入指令，或搜尋行程標題／備註..." autocomplete="off" />
+    <ul id="commandPaletteResults" class="command-palette-results"></ul>
   </dialog>
 
   <dialog id="batchAddDialog" class="task-dialog batch-add-dialog">

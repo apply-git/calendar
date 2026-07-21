@@ -334,6 +334,10 @@ const els = {
   clearErrorLogBtn: $('clearErrorLogBtn'),
   swUpdateBanner: $('swUpdateBanner'),
   swUpdateBtn: $('swUpdateBtn'),
+  commandPaletteBtn: $('commandPaletteBtn'),
+  commandPalette: $('commandPalette'),
+  commandPaletteInput: $('commandPaletteInput'),
+  commandPaletteResults: $('commandPaletteResults'),
 };
 
 // 全域錯誤紀錄：獨立於 init() 之外、無條件先掛上，這樣即使 init() 因為缺少畫面
@@ -738,6 +742,131 @@ function bindEvents() {
   document.addEventListener('drop', handleDrop);
   document.addEventListener('mousedown', handleTimelinePointerDown);
   document.addEventListener('touchstart', handleTimelinePointerDown, { passive: false });
+
+  // 全域命令面板（Ctrl+K / Cmd+K）：面板開著時原生 <dialog> 已經吃掉大部分鍵盤焦點，
+  // 這裡沒有其他全域快捷鍵需要互斥，Esc 交給 <dialog> 原生行為關閉。
+  els.commandPaletteBtn?.addEventListener('click', openCommandPalette);
+  els.commandPaletteInput?.addEventListener('input', (event) => renderCommandPaletteResults(event.target.value));
+  els.commandPaletteInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setCommandPaletteActive(commandPaletteActiveIndex + 1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setCommandPaletteActive(commandPaletteActiveIndex - 1);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      runCommandPaletteActive();
+    }
+  });
+  els.commandPaletteResults?.addEventListener('mousemove', (event) => {
+    const item = event.target.closest('[data-cp-index]');
+    if (item) setCommandPaletteActive(Number(item.dataset.cpIndex));
+  });
+  els.commandPaletteResults?.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-cp-index]');
+    if (!item) return;
+    commandPaletteActiveIndex = Number(item.dataset.cpIndex);
+    runCommandPaletteActive();
+  });
+  document.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      openCommandPalette();
+    }
+  });
+}
+
+// 全域命令面板（Ctrl+K）：COMMAND_PALETTE_ACTIONS 是固定指令清單，全部透過既有函式或
+// 按鈕 .click() 觸發，不重複實作邏輯。輸入 >=1 字時額外把標題／備註符合關鍵字的行程
+// 一併列進結果（最多 8 筆），Enter／點擊會跳到該行程日期的日檢視並開啟編輯視窗。
+const COMMAND_PALETTE_ACTIONS = [
+  { label: '新增行程', run: () => openTaskDialog({ date: toDateInput(currentDate) }) },
+  { label: '今天', run: () => els.todayBtn.click() },
+  { label: '日檢視', run: () => document.querySelector('.view-btn[data-view="day"]')?.click() },
+  { label: '週檢視', run: () => document.querySelector('.view-btn[data-view="week"]')?.click() },
+  { label: '月檢視', run: () => document.querySelector('.view-btn[data-view="month"]')?.click() },
+  { label: '列表檢視', run: () => document.querySelector('.view-btn[data-view="agenda"]')?.click() },
+  { label: '深色模式切換', run: () => els.themeBtn.click() },
+  { label: '番茄鐘', run: () => els.pomodoroBtn.click() },
+  { label: '週回顧', run: () => els.weeklyReviewBtn.click() },
+  { label: '批量新增', run: () => els.batchAddBtn.click() },
+  { label: '資料檢查', run: () => els.dataCheckBtn.click() },
+  { label: '備份', run: () => els.backupBtn.click() },
+  { label: '今日待辦模式', run: () => els.todayTodoBtn.click() },
+];
+
+let commandPaletteItems = [];
+let commandPaletteActiveIndex = -1;
+
+function openCommandPalette() {
+  if (!els.commandPalette) return;
+  if (els.commandPalette.open) {
+    els.commandPaletteInput.focus();
+    return;
+  }
+  els.commandPaletteInput.value = '';
+  renderCommandPaletteResults('');
+  els.commandPalette.showModal();
+  els.commandPaletteInput.focus();
+}
+
+function closeCommandPalette() {
+  els.commandPalette?.close();
+}
+
+function commandPaletteFuzzyMatch(text, query) {
+  return String(text || '').toLowerCase().includes(query.toLowerCase());
+}
+
+function renderCommandPaletteResults(query) {
+  const q = query.trim();
+  const matchedCommands = COMMAND_PALETTE_ACTIONS.filter((cmd) => !q || commandPaletteFuzzyMatch(cmd.label, q));
+  const matchedTasks = q
+    ? tasks.filter((task) => commandPaletteFuzzyMatch(task.title, q) || commandPaletteFuzzyMatch(task.note, q)).slice(0, 8)
+    : [];
+
+  commandPaletteItems = [
+    ...matchedCommands.map((cmd) => ({ type: 'command', label: cmd.label, run: cmd.run })),
+    ...matchedTasks.map((task) => ({ type: 'task', label: task.title, sub: task.date, run: () => jumpToTaskAndEdit(task) })),
+  ];
+
+  if (!commandPaletteItems.length) {
+    els.commandPaletteResults.innerHTML = '<li class="command-palette-empty">沒有符合的指令或行程</li>';
+    commandPaletteActiveIndex = -1;
+    return;
+  }
+
+  els.commandPaletteResults.innerHTML = commandPaletteItems.map((item, index) => `
+    <li class="command-palette-item${index === 0 ? ' active' : ''}" data-cp-index="${index}">
+      <span>${item.type === 'task' ? '🗓 ' : '⚡ '}${escapeHtml(item.label)}</span>
+      ${item.sub ? `<span class="cp-sub">${escapeHtml(item.sub)}</span>` : ''}
+    </li>
+  `).join('');
+  commandPaletteActiveIndex = 0;
+}
+
+function setCommandPaletteActive(index) {
+  const items = els.commandPaletteResults.querySelectorAll('.command-palette-item');
+  if (!items.length) return;
+  commandPaletteActiveIndex = (index + items.length) % items.length;
+  items.forEach((item, i) => item.classList.toggle('active', i === commandPaletteActiveIndex));
+  items[commandPaletteActiveIndex].scrollIntoView({ block: 'nearest' });
+}
+
+function runCommandPaletteActive() {
+  const item = commandPaletteItems[commandPaletteActiveIndex];
+  if (!item) return;
+  closeCommandPalette();
+  item.run();
+}
+
+function jumpToTaskAndEdit(task) {
+  currentView = 'day';
+  document.querySelectorAll('.view-btn:not(.day-mode-btn)').forEach((btn) => btn.classList.toggle('active', btn.dataset.view === 'day'));
+  currentDate = startOfDay(new Date(`${task.date}T00:00:00`));
+  render();
+  openTaskDialog(task, task.repeat && task.repeat !== 'none' ? task.date : '');
 }
 
 function render() {

@@ -825,6 +825,57 @@ body.dark .streak-badge { color: #fbbf24; }
 .pomodoro-actions button { flex: 1; }
 .pomodoro-actions button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
+/* 全域命令面板（Ctrl+K）：獨立輕量樣式，不共用 .task-dialog 的表單版型，
+   置頂置中（top: 8vh + margin-inline: auto），手機寬度滿版 90%。 */
+.command-palette-dialog {
+  top: 8vh;
+  margin: 0 auto;
+  width: min(560px, calc(100vw - 28px));
+  max-height: 76vh;
+  border: 0;
+  border-radius: 16px;
+  padding: 0;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+.command-palette-dialog::backdrop { background: rgba(6, 10, 20, .5); backdrop-filter: blur(3px); }
+#commandPaletteInput {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  padding: 16px 18px;
+  outline: none;
+}
+.command-palette-results {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.command-palette-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.command-palette-item .cp-sub { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+.command-palette-item.active { background: var(--primary); color: #fff; }
+.command-palette-item.active .cp-sub { color: rgba(255, 255, 255, .85); }
+.command-palette-empty { padding: 14px; color: var(--muted); text-align: center; font-size: 13px; }
+@media (max-width: 760px) {
+  .command-palette-dialog { width: 90%; top: 6vh; }
+}
+
 .cloud-sync-dialog { width: min(440px, calc(100vw - 28px)); }
 .cloud-sync-body {
   display: flex;
@@ -1144,6 +1195,7 @@ body.widget-mode .task-card { font-size: 14px; }
 
   /* 工具列只留常用按鈕（檢視切換／日模式切換／清空當日週月／主題／雲端同步／今日待辦），
      其餘次要工具用 id 列舉藏起來，收進「⋯ 更多」（#moreToolsBtn）彈出的 dialog。 */
+  #commandPaletteBtn,
   #enableNotificationsBtn,
   #backupBtn,
   #restoreBtn,
