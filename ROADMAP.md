@@ -122,7 +122,7 @@
 
 ### 使用者尚需自行執行
 1. 家庭共享：Supabase SQL Editor 執行 `schema-share.sql`（一次即可），之後在 App 內建群組、傳邀請碼給家人
-2. （前次待確認）schema-history.sql 與背景推播部署驗證
+2. ~~（前次待確認）schema-history.sql 與背景推播部署驗證~~ → 2026-07-22 實測通過（快照列表正常、推播訂閱成功）
 
 ### 剩餘另案項目
 Google Calendar 整合、時區旅行模式、專案任務依賴、錯誤紀錄自動上報、無障礙全面審查、通知 snooze 雲端化
