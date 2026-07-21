@@ -3015,9 +3015,78 @@ function buildBackupPayload() {
   };
 }
 
-function exportBackup() {
+// 備份加密輔助：base64 <-> ArrayBuffer 自寫小工具（file:// 下不依賴任何額外套件）。
+function arrayBufferToBase64(buffer) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// 用密碼加密備份 JSON 字串：PBKDF2(SHA-256, 150000 次) 導出 AES-GCM 256 金鑰，
+// salt(16B)/iv(12B) 隨機產生並隨密文一起輸出（都是 base64），供 decryptBackupJson() 還原用。
+async function encryptBackupJson(text, password) {
+  const enc = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  );
+  const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(text));
+  return {
+    encryptedBackup: true,
+    v: 1,
+    salt: arrayBufferToBase64(salt),
+    iv: arrayBufferToBase64(iv),
+    data: arrayBufferToBase64(cipherBuf),
+  };
+}
+
+// 解密 encryptBackupJson() 產生的物件，密碼錯誤或資料損壞時 AES-GCM 驗證失敗會直接 throw，
+// 呼叫端（importBackup）負責 catch 並顯示「密碼錯誤或檔案損壞」。
+async function decryptBackupJson(obj, password) {
+  const salt = base64ToArrayBuffer(obj.salt);
+  const iv = base64ToArrayBuffer(obj.iv);
+  const data = base64ToArrayBuffer(obj.data);
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  );
+  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+  return new TextDecoder().decode(plainBuf);
+}
+
+async function exportBackup() {
   const payload = buildBackupPayload();
-  downloadText(`行程表備份-${toDateInput(new Date())}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8;');
+  const jsonText = JSON.stringify(payload, null, 2);
+  const dateStr = toDateInput(new Date());
+  // file:// 下 crypto.subtle 可能不存在：偵測不到就完全跳過密碼流程，直接走原本未加密下載。
+  if (window.crypto?.subtle) {
+    const password = prompt('設定備份密碼（留空＝不加密）');
+    if (password) {
+      const encrypted = await encryptBackupJson(jsonText, password);
+      downloadText(`行程表備份-${dateStr}.enc.json`, JSON.stringify(encrypted), 'application/json;charset=utf-8;');
+      return;
+    }
+  }
+  downloadText(`行程表備份-${dateStr}.json`, jsonText, 'application/json;charset=utf-8;');
 }
 
 // 套用一份備份物件（等同「還原」的流程）。單一真相：importBackup()（讀檔還原用）與
@@ -3056,9 +3125,23 @@ function importBackup(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const data = JSON.parse(reader.result);
+      if (data && data.encryptedBackup === true) {
+        const password = prompt('此備份已加密，請輸入密碼');
+        if (password === null) return; // 取消 → 中止
+        let decryptedText;
+        try {
+          decryptedText = await decryptBackupJson(data, password);
+        } catch {
+          showToast('密碼錯誤或檔案損壞');
+          return;
+        }
+        applyBackupObject(JSON.parse(decryptedText));
+        showToast('備份已還原');
+        return;
+      }
       applyBackupObject(data);
       showToast('備份已還原');
     } catch {
