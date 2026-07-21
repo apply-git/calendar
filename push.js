@@ -269,7 +269,7 @@
     if (window.CalendarApp && typeof window.CalendarApp.showToast === 'function') {
       window.CalendarApp.showToast(message);
     } else {
-      console.log('[push]', message);
+      console.warn('[push]', message);
     }
   }
 

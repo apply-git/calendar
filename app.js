@@ -1721,6 +1721,7 @@ function updateDayModeSwitch() {
 }
 
 function openPomodoroDialog() {
+  if (els.pomodoroDialog.open) return;
   renderPomodoroTaskOptions();
   updatePomodoroDisplay();
   els.pomodoroDialog.showModal();
@@ -2225,6 +2226,7 @@ function renderWeeklyReview() {
 }
 
 function openWeeklyReviewDialog() {
+  if (els.weeklyReviewDialog.open) return;
   renderWeeklyReview();
   els.weeklyReviewDialog.showModal();
 }
@@ -2382,6 +2384,7 @@ function renderDashboard() {
 }
 
 function openDashboardDialog() {
+  if (els.dashboardDialog.open) return;
   renderDashboard();
   els.dashboardDialog.showModal();
 }
@@ -2391,6 +2394,7 @@ function closeDashboardDialog() {
 }
 
 function openTaskDialog(defaults = {}, occurrenceDate = '') {
+  if (els.taskDialog.open) return;
   renderCategoryOptions();
   const isEdit = Boolean(defaults.id);
   const isRecurringOccurrence = isEdit && defaults.repeat !== 'none' && Boolean(occurrenceDate);
@@ -2568,6 +2572,7 @@ const BATCH_ADD_MAX_LINES = 50;
 let batchAddParsedRows = [];
 
 function openBatchAddDialog() {
+  if (els.batchAddDialog.open) return;
   els.batchAddInput.value = '';
   els.batchAddHint.hidden = true;
   els.batchAddPreviewWrap.hidden = true;
@@ -3621,6 +3626,7 @@ function applyTextSettings() {
 }
 
 function openSettingsDialog() {
+  if (els.settingsDialog.open) return;
   els.settingAppTitle.value = textSettings.appTitle;
   els.settingAddTaskText.value = textSettings.addTaskText;
   els.settingTopThreeTitle.value = textSettings.topThreeTitle;
@@ -4061,8 +4067,11 @@ function runDataCheck() {
 
 // 一鍵修復：呼叫前一定要先讓使用者確認（由 handleDataCheckFix() 的 confirm() 把關），
 // 這裡開頭一定先觸發既有 exportBackup() 下載一份修復前的完整備份，修壞了還能救回來。
-function fixDataIssues() {
-  exportBackup();
+async function fixDataIssues() {
+  // exportBackup() 是 async（可能跳出密碼 prompt 並 await 加密）：這裡一定要 await，
+  // 確保「先下載完修復前備份、再動資料」的順序不會被 fire-and-forget 打亂
+  // （例如使用者選擇加密備份時，加密／下載尚未完成就搶先修改 tasks）。
+  await exportBackup();
 
   let fixedCount = 0;
   const seenIds = new Set();
@@ -4121,6 +4130,7 @@ function renderDataCheckResults(issues) {
 }
 
 function openDataCheckDialog() {
+  if (els.dataCheckDialog?.open) return;
   renderDataCheckResults(runDataCheck());
   renderErrorLogSummary();
   els.dataCheckDialog?.showModal();
@@ -4130,9 +4140,9 @@ function closeDataCheckDialog() {
   els.dataCheckDialog?.close();
 }
 
-function handleDataCheckFix() {
+async function handleDataCheckFix() {
   if (!confirm('修復前會先自動下載一份備份，確定要繼續一鍵修復嗎？')) return;
-  const fixedCount = fixDataIssues();
+  const fixedCount = await fixDataIssues();
   renderDataCheckResults(runDataCheck());
   showToast(fixedCount ? `已修復 ${fixedCount} 筆問題` : '沒有可修復的問題');
 }

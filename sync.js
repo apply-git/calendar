@@ -87,6 +87,7 @@
   function bindEvents() {
     if (!syncEls.btn || !syncEls.dialog) return; // index.html 沒有這組 UI 時整段安全跳過
     syncEls.btn.addEventListener('click', () => {
+      if (syncEls.dialog.open) return;
       updateUI();
       if (typeof syncEls.dialog.showModal === 'function') syncEls.dialog.showModal();
     });
@@ -549,6 +550,7 @@
   // 開啟「雲端備份版本」對話框並載入清單。
   async function openCloudHistoryDialog() {
     if (!syncEls.historyDialog) return;
+    if (syncEls.historyDialog.open) return;
     if (typeof syncEls.historyDialog.showModal === 'function') syncEls.historyDialog.showModal();
     if (syncEls.historyList) syncEls.historyList.innerHTML = '<p class="muted">載入中…</p>';
     const list = await listHistory();
@@ -704,7 +706,7 @@
     if (window.CalendarApp && typeof window.CalendarApp.showToast === 'function') {
       window.CalendarApp.showToast(message);
     } else {
-      console.log('[sync]', message);
+      console.warn('[sync]', message);
     }
   }
 
