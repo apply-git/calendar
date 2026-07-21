@@ -710,6 +710,7 @@ function render() {
   updateModeButtons();
   updateDayModeSwitch();
   updateNotificationButton();
+  updateAppBadge();
   saveJson(STORAGE_KEY, tasks);
   saveJson(CATEGORY_KEY, categories);
   saveJson(APP_SETTINGS_KEY, appSettings);
@@ -1410,10 +1411,12 @@ function renderHabits() {
   const todayKey = toDateInput(new Date());
   els.habitList.innerHTML = habits.length ? habits.map((habit) => {
     const checked = habit.records?.includes(todayKey);
+    const streak = habitStreak(habit);
+    const streakBadge = streak >= 2 ? `<span class="streak-badge">🔥${streak}</span>` : '';
     return `
       <div class="habit-item">
         <label><input type="checkbox" ${checked ? 'checked' : ''} data-toggle-habit="${habit.id}" /> ${escapeHtml(habit.name)}</label>
-        <span class="streak">連續 ${habitStreak(habit)} 天 <button class="small-btn" data-delete-habit="${habit.id}">✕</button></span>
+        <span class="streak">${streakBadge}<button class="small-btn" data-delete-habit="${habit.id}">✕</button></span>
       </div>
     `;
   }).join('') : '<p class="muted">可新增每日習慣</p>';
@@ -2602,6 +2605,39 @@ function setTaskDone(task, dateKey, done) {
     ? [...new Set([...task.completedDates, dateKey])]
     : task.completedDates.filter((date) => date !== dateKey);
   delete task.done;
+}
+
+function habitStreak(habit) {
+  if (!Array.isArray(habit.records)) return 0;
+  let count = 0;
+  let checkDate = new Date();
+  while (true) {
+    const dateKey = toDateInput(checkDate);
+    if (!habit.records.includes(dateKey)) break;
+    count++;
+    checkDate = addDays(checkDate, -1);
+  }
+  return count;
+}
+
+function updateAppBadge() {
+  try {
+    if (!navigator.setAppBadge) return;
+    const todayKey = toDateInput(new Date());
+    let count = 0;
+    for (const task of tasks) {
+      if (occursOnDate(task, todayKey) && !isTaskDone(task, todayKey)) {
+        count++;
+      }
+    }
+    if (count > 0) {
+      navigator.setAppBadge(count).catch(() => {});
+    } else {
+      navigator.clearAppBadge().catch(() => {});
+    }
+  } catch (err) {
+    // Feature not available or failed, gracefully ignore
+  }
 }
 
 function toggleTheme() {
