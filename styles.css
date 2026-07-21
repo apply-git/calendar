@@ -1157,7 +1157,8 @@ body.widget-mode .task-card { font-size: 14px; }
   #importIcsBtn,
   #weeklyReviewBtn,
   #dataCheckBtn,
-  #batchAddBtn {
+  #batchAddBtn,
+  #deferBtn {
     display: none !important;
   }
 

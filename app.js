@@ -195,6 +195,7 @@ const els = {
   enableNotificationsBtn: $('enableNotificationsBtn'),
   dayModeSwitch: $('dayModeSwitch'),
   clearDayBtn: $('clearDayBtn'),
+  deferBtn: $('deferBtn'),
   clearWeekBtn: $('clearWeekBtn'),
   clearMonthBtn: $('clearMonthBtn'),
   backupBtn: $('backupBtn'),
@@ -367,6 +368,7 @@ function init() {
   requestNotificationPermission();
   registerServiceWorker();
   handleUrlShortcutAction();
+  handleShareTarget();
   setInterval(checkReminders, 30 * 1000);
 }
 
@@ -479,6 +481,28 @@ function handleUrlShortcutAction() {
     if (!todayTodoMode) toggleTodayTodoMode();
   } else if (action === 'pomodoro') {
     openPomodoroDialog();
+  }
+
+  history.replaceState(null, '', window.location.pathname);
+}
+
+// PWA 分享目標：手機上其他 App 用「分享」把文字/連結送進來時，Android 會帶
+// ?share_title=...&share_text=...&share_url=... 開啟（manifest.json 的 share_target）。
+// param 名故意加 share_ 前綴，避免跟上面 handleUrlShortcutAction() 的 ?action= 快捷衝突。
+// title＋text 合併成標題丟給 openTaskDialog()，再借用既有的 applyNaturalLanguageParse()
+// 自動解析日期/時間語彙；share_url 有值則附加到備註欄，方便保留原始分享連結。
+function handleShareTarget() {
+  const params = new URLSearchParams(window.location.search);
+  const title = params.get('share_title') || '';
+  const text = params.get('share_text') || '';
+  const url = params.get('share_url') || '';
+  if (!title && !text && !url) return;
+
+  const combinedTitle = [title, text].filter(Boolean).join(' ').trim();
+  openTaskDialog({ date: toDateInput(currentDate), title: combinedTitle });
+  applyNaturalLanguageParse();
+  if (url) {
+    els.taskNote.value = els.taskNote.value ? `${els.taskNote.value}\n${url}` : url;
   }
 
   history.replaceState(null, '', window.location.pathname);
@@ -608,6 +632,7 @@ function bindEvents() {
   }));
   els.cleanupBtn.addEventListener('click', cleanupOldTasks);
   els.clearDayBtn.addEventListener('click', clearDayTasks);
+  els.deferBtn?.addEventListener('click', deferUnfinishedTasks);
   els.clearWeekBtn.addEventListener('click', clearWeekTasks);
   els.clearMonthBtn.addEventListener('click', clearMonthTasks);
   els.addTemplateBtn.addEventListener('click', addTemplateFromDialog);
@@ -1255,6 +1280,7 @@ function updateDayModeSwitch() {
   const visible = currentView === 'day' && modeActive;
   els.dayModeSwitch.hidden = !visible;
   if (els.clearDayBtn) els.clearDayBtn.hidden = !visible;
+  if (els.deferBtn) els.deferBtn.hidden = !visible;
   if (els.clearWeekBtn) els.clearWeekBtn.hidden = !(currentView === 'week' && modeActive);
   if (els.clearMonthBtn) els.clearMonthBtn.hidden = !(currentView === 'month' && modeActive);
   document.querySelectorAll('.day-mode-btn').forEach((btn) => {
@@ -1373,6 +1399,33 @@ function clearDayTasks() {
   saveJson(STORAGE_KEY, tasks);
   render();
   showToast(`已清除今天 ${dayTasks.length} 筆行程`);
+}
+
+// 未完成行程一鍵順延到下個工作日：只處理「目前檢視日期」當天非重複且未完成的行程，
+// 直接把 task.date 改到下一個工作日。重複行程跳過不動——改 date 對重複系列沒有單次
+// 順延的意義（會連動整個系列的起始日/出現規則），使用者要調整請走既有的編輯功能。
+function deferUnfinishedTasks() {
+  const dateKey = toDateInput(currentDate);
+  const targets = tasks.filter((task) => occursOnDate(task, dateKey) && task.repeat === 'none' && !isTaskDone(task, dateKey));
+  if (!targets.length) return showToast('當天沒有可順延的未完成行程');
+
+  const nextDate = nextWorkingDay(currentDate);
+  const nextDateKey = toDateInput(nextDate);
+  if (!confirm(`即將把 ${targets.length} 筆未完成行程順延到 ${formatMonthDay(nextDate)}，確定要繼續嗎？`)) return;
+
+  targets.forEach((task) => { task.date = nextDateKey; });
+  saveJson(STORAGE_KEY, tasks);
+  render();
+  showToast(`已順延 ${targets.length} 筆到 ${formatMonthDay(nextDate)}`);
+}
+
+// 下一個工作日：從隔天開始往後找，跳過週六日與 TAIWAN_HOLIDAYS（國定假日對照表，見 getHoliday()）。
+function nextWorkingDay(date) {
+  let next = addDays(startOfDay(date), 1);
+  while (next.getDay() === 0 || next.getDay() === 6 || getHoliday(toDateInput(next))) {
+    next = addDays(next, 1);
+  }
+  return next;
 }
 
 function clearWeekTasks() {
