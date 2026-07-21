@@ -655,11 +655,24 @@ function setupToolbarMenus() {
       closeAllToolbarMenus(); // 互斥：開一個關其他
       if (!wasOpen) {
         renderToolbarMenuItems(group, menu);
+        // position:fixed 由 JS 依按鈕位置定位：.toolbar-actions 有 overflow:hidden
+        // （溢出偵測需要），absolute 選單會被整個裁掉看不到，fixed 才能跳出裁切。
+        const rect = btn.getBoundingClientRect();
+        menu.style.top = `${rect.bottom + 6}px`;
+        menu.style.left = 'auto';
         menu.hidden = false;
         btn.classList.add('active');
+        // 先顯示才量得到選單寬度；右緣超出視窗時往左收
+        const menuRect = menu.getBoundingClientRect();
+        const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuRect.width - 8));
+        menu.style.left = `${left}px`;
       }
     });
   });
+
+  // fixed 定位跟著視窗捲動/縮放會漂移，直接關閉最單純。
+  window.addEventListener('scroll', closeAllToolbarMenus, { passive: true });
+  window.addEventListener('resize', closeAllToolbarMenus);
 
   document.addEventListener('click', (event) => {
     if (event.target.closest('.toolbar-menu-wrap')) return; // 點在選單/群組鈕內部不處理

@@ -215,10 +215,10 @@ button:active { transform: translateY(0); }
   border-color: var(--primary);
 }
 .toolbar-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 50;
+  /* fixed（top/left 由 JS 依按鈕位置設定）：父層 .toolbar-actions 有 overflow:hidden
+     （溢出偵測需要），absolute 會被裁切看不到，fixed 才能跳出裁切範圍。 */
+  position: fixed;
+  z-index: 200;
   min-width: 170px;
   display: flex;
   flex-direction: column;
