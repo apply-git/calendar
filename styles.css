@@ -992,6 +992,11 @@ body.dark .conflict-warning {
 }
 .push-test-row .ghost-btn { width: 100%; }
 
+/* 家庭共享（index.html 靜態放在 #cloudSyncLoggedInBox 內、沿用 .push-block 分隔線＋
+   小標題樣式；內容由 sync.js 的 renderShareGroupUI() 動態換 innerHTML）。 */
+.share-group-body p { margin: 0 0 8px; }
+.share-group-body .pomodoro-actions .ghost-btn { width: 100%; }
+
 .cloud-history-dialog { width: min(440px, calc(100vw - 28px)); }
 .cloud-history-body {
   display: flex;

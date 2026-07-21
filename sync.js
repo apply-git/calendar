@@ -33,6 +33,7 @@
 (function () {
   const SYNC_AUTH_KEY = 'desktop-schedule-sync-auth-v1'; // 登入權杖，不納入備份 JSON（帳號憑證不該被匯出/分享）
   const SYNC_META_KEY = 'desktop-schedule-sync-meta-v1'; // 最後同步時間等狀態，不納入備份 JSON
+  const SHARE_KEY = 'desktop-schedule-share-v1'; // 家庭共享群組（{groupId, groupName}），裝置本機狀態，不納入備份 JSON、登出時清除
   const AUTO_SYNC_DEBOUNCE_MS = 4000;
 
   const rawConfig = (typeof window.CALENDAR_SYNC_CONFIG === 'object' && window.CALENDAR_SYNC_CONFIG) || {};
@@ -41,6 +42,7 @@
   const SYNC_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
   let authState = loadAuthState();
+  let shareState = loadShareState();
   let autoSyncTimer = null;
   let syncing = false;
   let lastHistoryList = []; // 快取 listHistory() 最近一次結果（含 payload），restoreHistory(id) 依此找快照內容，避免再打一次 API
@@ -87,6 +89,7 @@
     syncEls.historyDialog = document.getElementById('cloudHistoryDialog');
     syncEls.historyCloseBtn = document.getElementById('closeCloudHistoryBtn');
     syncEls.historyList = document.getElementById('cloudHistoryList');
+    syncEls.shareBody = document.getElementById('shareGroupBody');
   }
 
   function bindEvents() {
@@ -94,6 +97,7 @@
     syncEls.btn.addEventListener('click', () => {
       if (syncEls.dialog.open) return;
       updateUI();
+      renderShareGroupUI();
       if (typeof syncEls.dialog.showModal === 'function') syncEls.dialog.showModal();
     });
     syncEls.closeBtn?.addEventListener('click', () => syncEls.dialog.close());
@@ -115,6 +119,15 @@
       window.CalendarApp.setAutoSyncEnabled(syncEls.autoToggle.checked);
       toast(syncEls.autoToggle.checked ? '已開啟自動同步' : '已關閉自動同步');
       if (syncEls.autoToggle.checked) notifyLocalChange();
+    });
+
+    // 家庭共享區塊的按鈕是 renderShareGroupUI() 動態產生（每次重繪會整段換掉 innerHTML），
+    // 用事件委派掛在容器上，不用每次重繪都重新綁定。
+    syncEls.shareBody?.addEventListener('click', (e) => {
+      if (e.target.closest('#shareCreateBtn')) createShareGroup();
+      else if (e.target.closest('#shareJoinBtn')) joinShareGroup();
+      else if (e.target.closest('#shareCopyBtn')) copyShareInviteCode();
+      else if (e.target.closest('#shareLeaveBtn')) leaveShareGroup();
     });
   }
 
@@ -148,11 +161,44 @@
       // 若裝置時鐘不準會殘留錯誤紀錄卡住往後的同步判斷。重新登入視為
       // 全新一輪同步，清空後下次一定會先跟雲端資料比對，不會誤判本機較新。
       localStorage.removeItem(SYNC_META_KEY);
+      // 家庭共享的群組歸屬也是「這個帳號」的狀態，登出視為離開群組（重新登入或換帳號
+      // 不該沿用舊帳號加入的群組）；比照上面 sync-meta 的處理方式一併清除。
+      clearShareState();
     } catch {}
   }
 
   function isLoggedIn() {
     return Boolean(authState && authState.accessToken && authState.user && authState.user.id);
+  }
+
+  // ---- 家庭共享：本機群組歸屬狀態（localStorage，不進備份 JSON，登出即清除）----
+
+  function loadShareState() {
+    try {
+      const raw = localStorage.getItem(SHARE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && parsed.groupId ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveShareState(state) {
+    shareState = state;
+    try {
+      localStorage.setItem(SHARE_KEY, JSON.stringify(state));
+    } catch {
+      // localStorage 滿了或被封鎖：群組歸屬這次不會被記住，但不影響本機行程功能，
+      // 下次重新整理頁面會被視為「尚未加入群組」。
+    }
+  }
+
+  function clearShareState() {
+    shareState = null;
+    try {
+      localStorage.removeItem(SHARE_KEY);
+    } catch {}
   }
 
   function loadSyncMeta() {
@@ -373,15 +419,11 @@
   // 其餘欄位（habits/categories/appSettings/textSettings/dailyMemos/templates/
   //   weeklyGoals/widgetMode/theme/version/exportedAt…全部非 tasks 欄位）：v1 做法
   //   是整區塊取 generatedAt 較新那份 payload 的值（沒辦法逐筆合併，可接受）。
-  function mergeBackupPayloads(localObj, cloudObj) {
-    localObj = localObj && typeof localObj === 'object' ? localObj : {};
-    cloudObj = cloudObj && typeof cloudObj === 'object' ? cloudObj : {};
-
-    const localGen = Number(localObj.generatedAt) || 0;
-    const cloudGen = Number(cloudObj.generatedAt) || 0;
-    // 同分取 local（跟下面 tasks 合併的同分規則一致）。
-    const newerBlock = cloudGen > localGen ? cloudObj : localObj;
-
+  // 純函式：兩份 tasks 陣列依 id 取聯集，同 id 整筆取 updatedAt 較大者（缺 updatedAt 視為 0，
+  // 同分取 a 那份）。墓碑（deletedAt）就是整筆的一部分，天然達成「刪除較新維持刪除、編輯較新
+  // 則復活」不需要額外邏輯。抽出成獨立函式供 mergeBackupPayloads()（個人跨裝置同步）與
+  // syncSharedTasks()（家庭共享）共用同一套規則，避免同一段邏輯兩處各自維護、日後改一邊漏改另一邊。
+  function mergeTaskLists(a, b) {
     const taskMap = new Map();
     const putTask = (task) => {
       if (!task || !task.id) return;
@@ -392,16 +434,27 @@
       }
       const existingUpdated = Number(existing.updatedAt) || 0;
       const incomingUpdated = Number(task.updatedAt) || 0;
-      // 嚴格大於才覆蓋：local 先跑一輪放進 map，同分（含都缺 = 0）時 cloud 那輪
-      // 不會覆蓋掉已存在的 local 那筆，天然達成「同分取 local」。
+      // 嚴格大於才覆蓋：a 先跑一輪放進 map，同分（含都缺 = 0）時 b 那輪
+      // 不會覆蓋掉已存在的 a 那筆，天然達成「同分取 a」。
       if (incomingUpdated > existingUpdated) taskMap.set(task.id, task);
     };
-    (Array.isArray(localObj.tasks) ? localObj.tasks : []).forEach(putTask);
-    (Array.isArray(cloudObj.tasks) ? cloudObj.tasks : []).forEach(putTask);
+    (Array.isArray(a) ? a : []).forEach(putTask);
+    (Array.isArray(b) ? b : []).forEach(putTask);
+    return Array.from(taskMap.values());
+  }
+
+  function mergeBackupPayloads(localObj, cloudObj) {
+    localObj = localObj && typeof localObj === 'object' ? localObj : {};
+    cloudObj = cloudObj && typeof cloudObj === 'object' ? cloudObj : {};
+
+    const localGen = Number(localObj.generatedAt) || 0;
+    const cloudGen = Number(cloudObj.generatedAt) || 0;
+    // 同分取 local（跟 tasks 合併的同分規則一致）。
+    const newerBlock = cloudGen > localGen ? cloudObj : localObj;
 
     return {
       ...newerBlock,
-      tasks: Array.from(taskMap.values()),
+      tasks: mergeTaskLists(localObj.tasks, cloudObj.tasks),
       generatedAt: Math.max(localGen, cloudGen) || Date.now(),
     };
   }
@@ -431,6 +484,9 @@
     }
     lines.push('本機墓碑數：' + (localTasks ? localTasks.filter((t) => t.deletedAt).length : '（無法讀取）'));
     lines.push('合併模式：逐筆（pull → merge → push）');
+    lines.push('---- 家庭共享 ----');
+    lines.push('已加入群組：' + (shareState && shareState.groupId ? `${shareState.groupName || '(未命名群組)'}（id: ${shareState.groupId}）` : '（未加入）'));
+    lines.push('本機共享行程數：' + (localTasks ? localTasks.filter((t) => t.shared).length : '（無法讀取）'));
 
     if (!SYNC_ENABLED) {
       alert(lines.join('\n'));
@@ -672,6 +728,243 @@
     }
   }
 
+  // ---- 家庭共享：群組管理 UI（share_groups / share_members，schema-share.sql）----
+  //
+  // 設計原則跟 sync_history（雲端備份版本）一樣：schema-share.sql 是選用功能，使用者可能
+  // 還沒執行。任何一支請求失敗（表不存在時常見是 404 或 PostgREST 的 PGRST205）都必須
+  // 優雅降級成顯示「尚未設定」小字，不能整段炸掉、也不能影響上面的個人同步 UI。
+
+  function escapeHtmlLocal(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // 重繪「家庭共享」區塊：先用一次輕量探測請求確認 share_groups 表存不存在，
+  // 存在才依 shareState（本機是否記得已加入某個群組）畫出「未加入／已加入」兩種畫面。
+  async function renderShareGroupUI() {
+    if (!syncEls.shareBody) return;
+    if (!SYNC_ENABLED || !isLoggedIn()) {
+      syncEls.shareBody.innerHTML = '';
+      return;
+    }
+    const notSetupHtml = '<p class="muted">尚未設定（管理者需先執行 schema-share.sql，見 CLOUD_SETUP.md）</p>';
+    try {
+      const ok = await ensureFreshToken();
+      if (!ok) {
+        syncEls.shareBody.innerHTML = notSetupHtml;
+        return;
+      }
+      const probeRes = await fetch(`${SUPABASE_URL}/rest/v1/share_groups?select=id&limit=1`, {
+        headers: authHeaders(),
+        cache: 'no-store',
+      });
+      if (!probeRes.ok) {
+        // 表不存在（404/PGRST205）是最常見原因，其他連線問題也一併保守顯示「尚未設定」，
+        // 這個區塊的目標只是「零影響地」告知使用者功能還不能用，不需要細分錯誤原因。
+        syncEls.shareBody.innerHTML = notSetupHtml;
+        return;
+      }
+    } catch (err) {
+      console.warn('[sync] 家庭共享功能偵測失敗，視為尚未設定', err);
+      syncEls.shareBody.innerHTML = notSetupHtml;
+      return;
+    }
+
+    shareState = loadShareState();
+    if (shareState && shareState.groupId) {
+      syncEls.shareBody.innerHTML =
+        `<p class="muted" style="margin:0 0 8px;">已加入群組：${escapeHtmlLocal(shareState.groupName || '(未命名群組)')}</p>` +
+        '<div class="pomodoro-actions">' +
+        '<button type="button" id="shareCopyBtn" class="ghost-btn">📋 複製邀請碼</button>' +
+        '<button type="button" id="shareLeaveBtn" class="ghost-btn">退出群組</button>' +
+        '</div>';
+    } else {
+      syncEls.shareBody.innerHTML =
+        '<p class="muted" style="margin:0 0 8px;">尚未加入家庭共享群組</p>' +
+        '<div class="pomodoro-actions">' +
+        '<button type="button" id="shareCreateBtn" class="ghost-btn">建立家庭群組</button>' +
+        '<button type="button" id="shareJoinBtn" class="ghost-btn">輸入邀請碼加入</button>' +
+        '</div>';
+    }
+  }
+
+  async function createShareGroup() {
+    if (!SYNC_ENABLED || !isLoggedIn()) return;
+    const name = prompt('家庭群組名稱：');
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      const ok = await ensureFreshToken();
+      if (!ok) throw new Error('登入權杖無效，請重新登入');
+      const userId = authState.user?.id;
+      if (!userId) throw new Error('找不到使用者 id');
+
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/share_groups`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ name: trimmed, owner_id: userId }),
+      });
+      if (!res.ok) throw new Error('建立群組失敗（HTTP ' + res.status + '）');
+      const rows = await res.json();
+      const group = Array.isArray(rows) ? rows[0] : rows;
+      if (!group || !group.id) throw new Error('建立群組回應缺少 id');
+
+      // 同時把自己加進 share_members：owner 邏輯上（is_group_member()）已經算成員，
+      // 這裡補一列只是讓「群組成員名單」更直覺完整，失敗也不影響 owner 使用共享功能。
+      const memberRes = await fetch(`${SUPABASE_URL}/rest/v1/share_members`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ group_id: group.id, user_id: userId }),
+      });
+      if (!memberRes.ok) {
+        console.warn('[sync] 建立群組後補寫 share_members 失敗（owner 邏輯上仍算成員，不影響使用）', memberRes.status);
+      }
+
+      saveShareState({ groupId: group.id, groupName: group.name || trimmed });
+      toast('已建立家庭群組：' + (group.name || trimmed));
+      renderShareGroupUI();
+    } catch (err) {
+      console.warn('[sync] createShareGroup 失敗', err);
+      toast('建立家庭群組失敗：' + (err?.message || String(err)));
+    }
+  }
+
+  async function joinShareGroup() {
+    if (!SYNC_ENABLED || !isLoggedIn()) return;
+    const code = prompt('請輸入家人給你的邀請碼：');
+    if (code === null) return;
+    const groupId = code.trim();
+    if (!groupId) return;
+    try {
+      const ok = await ensureFreshToken();
+      if (!ok) throw new Error('登入權杖無效');
+      const userId = authState.user?.id;
+      if (!userId) throw new Error('找不到使用者 id');
+
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/share_members`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ group_id: groupId, user_id: userId }),
+      });
+      // 邀請碼格式錯誤／群組不存在／RLS 拒絕都會讓這支請求失敗，統一在這裡當作「邀請碼無效」。
+      if (!res.ok) throw new Error('邀請碼無效');
+
+      const groupRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/share_groups?id=eq.${encodeURIComponent(groupId)}&select=id,name`,
+        { headers: authHeaders(), cache: 'no-store' }
+      );
+      let groupName = '(未命名群組)';
+      if (groupRes.ok) {
+        const rows = await groupRes.json();
+        if (Array.isArray(rows) && rows[0] && rows[0].name) groupName = rows[0].name;
+      }
+
+      saveShareState({ groupId, groupName });
+      toast('已加入家庭群組：' + groupName);
+      renderShareGroupUI();
+    } catch (err) {
+      console.warn('[sync] joinShareGroup 失敗', err);
+      toast('邀請碼無效');
+    }
+  }
+
+  async function copyShareInviteCode() {
+    if (!shareState || !shareState.groupId) return;
+    const code = shareState.groupId;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(code);
+        toast('已複製邀請碼');
+        return;
+      }
+    } catch (err) {
+      console.warn('[sync] 複製邀請碼到剪貼簿失敗，改用 prompt 顯示', err);
+    }
+    // Clipboard API 不可用（例如非安全上下文）或被拒絕時，用 prompt 讓使用者自行選取複製。
+    prompt('複製這串邀請碼給家人：', code);
+  }
+
+  async function leaveShareGroup() {
+    if (!shareState || !shareState.groupId) return;
+    if (!confirm('確定要退出這個家庭群組嗎？（群組本身不會被刪除，其他成員不受影響）')) return;
+    try {
+      const ok = await ensureFreshToken();
+      if (!ok) throw new Error('登入權杖無效');
+      const userId = authState.user?.id;
+      if (!userId) throw new Error('找不到使用者 id');
+      const url = `${SUPABASE_URL}/rest/v1/share_members?group_id=eq.${encodeURIComponent(shareState.groupId)}&user_id=eq.${encodeURIComponent(userId)}`;
+      const res = await fetch(url, { method: 'DELETE', headers: authHeaders() });
+      if (!res.ok) throw new Error('退出群組失敗（HTTP ' + res.status + '）');
+      clearShareState();
+      toast('已退出家庭群組');
+      renderShareGroupUI();
+    } catch (err) {
+      console.warn('[sync] leaveShareGroup 失敗', err);
+      toast('退出群組失敗：' + (err?.message || String(err)));
+    }
+  }
+
+  // ---- 家庭共享：共享行程同步（shared_state，schema-share.sql）----
+  //
+  // 時機：syncNow() 個人同步成功後才呼叫（見下方 syncNow 內的呼叫點），且整段包在自己的
+  // try/catch 裡、絕不 throw 出去——共享同步失敗不得讓個人同步跟著失敗（鐵則 2）。
+  // 強制拉取／強制推送（forcePullFromCloud / forcePushToCloud）刻意不呼叫這裡，維持
+  // 那兩個「疑難排解」按鈕原本單純、只動個人 sync_state 的行為。
+  async function syncSharedTasks(options = {}) {
+    const { silent = false } = options;
+    if (!shareState || !shareState.groupId) return; // 沒加入群組：直接 return，零請求。
+    if (!window.CalendarApp) return;
+    try {
+      const ok = await ensureFreshToken();
+      if (!ok) throw new Error('登入權杖無效或更新失敗');
+      const groupId = shareState.groupId;
+
+      // a. 取雲端共享 payload（0 筆＝空 {tasks: []}，跟 cloudPull 對 sync_state 的「null 才是真的
+      //    沒有資料列」邏輯一致：這裡 rows.length === 0 就是雲端還沒有這個群組的共享資料）。
+      const getUrl = `${SUPABASE_URL}/rest/v1/shared_state?group_id=eq.${encodeURIComponent(groupId)}&select=payload,updated_at`;
+      const getRes = await fetch(getUrl, { headers: authHeaders(), cache: 'no-store' });
+      if (!getRes.ok) throw new Error('讀取共享行程失敗（HTTP ' + getRes.status + '）');
+      const rows = await getRes.json();
+      const cloudPayload = Array.isArray(rows) && rows.length ? rows[0].payload || {} : {};
+      const cloudSharedTasks = Array.isArray(cloudPayload.tasks) ? cloudPayload.tasks : [];
+
+      // b. 本機共享集合：勾了「與家人共享」的行程，含墓碑（shared 且 deletedAt）讓刪除也會傳播出去。
+      const localBackup = window.CalendarApp.buildBackupPayload();
+      const localAllTasks = Array.isArray(localBackup.tasks) ? localBackup.tasks : [];
+      const localSharedTasks = localAllTasks.filter((t) => t && t.shared);
+
+      // c. 合併：重用 mergeBackupPayloads() 內部抽出的 mergeTaskLists()，跟個人同步同一套
+      //    「依 id 取聯集、同 id 取 updatedAt 較大者」規則，不重複寫一份合併邏輯。
+      const mergedSharedTasks = mergeTaskLists(localSharedTasks, cloudSharedTasks);
+
+      // d. 寫回本機：app.js 不可修改，沒有「只更新部分 tasks」的介面，改用現有的
+      //    buildBackupPayload() 取整包 → 替換 tasks 陣列中屬於 shared 的部分（非 shared 的
+      //    行程保持原樣）→ applyBackupObject() 套用整包。其餘欄位跟目前本機狀態完全相同，
+      //    對 habits/categories/... 來說是無操作的重新套用。
+      const nonSharedLocalTasks = localAllTasks.filter((t) => !(t && t.shared));
+      window.CalendarApp.applyBackupObject({ ...localBackup, tasks: [...nonSharedLocalTasks, ...mergedSharedTasks] });
+
+      // e. upsert 回雲端（比照 cloudPush 的 on_conflict + merge-duplicates 寫法）。
+      const pushRes = await fetch(`${SUPABASE_URL}/rest/v1/shared_state?on_conflict=group_id`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders(),
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=representation',
+        },
+        body: JSON.stringify([{ group_id: groupId, payload: { tasks: mergedSharedTasks }, updated_at: new Date().toISOString() }]),
+      });
+      if (!pushRes.ok) throw new Error('推送共享行程失敗（HTTP ' + pushRes.status + '）');
+
+      // f. 提示：靜默自動同步時不額外彈 toast（跟主同步流程的 silent 慣例一致），
+      //    手動「立即同步」才顯示筆數，避免跟主同步的「已雙向合併同步」toast 疊在一起太吵。
+      if (!silent) toast(`已同步家庭共享 ${mergedSharedTasks.length} 筆`);
+    } catch (err) {
+      console.warn('[sync] syncSharedTasks 失敗（不影響個人同步）', err);
+      toast('家庭共享同步失敗：' + (err?.message || String(err)));
+    }
+  }
+
   // ---- 同步主流程（手動「立即同步」與自動同步共用）----
 
   async function syncNow(options = {}) {
@@ -707,6 +1000,12 @@
         saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
         saveHistorySnapshot(payload).catch(() => {});
         if (!silent) toast('已同步到雲端');
+        // 家庭共享同步：獨立 try/catch，個人同步（上面已經成功）不會因為這裡失敗而跟著失敗（鐵則 2）。
+        try {
+          await syncSharedTasks({ silent });
+        } catch (shareErr) {
+          console.warn('[sync] 家庭共享同步發生未預期錯誤（不影響個人同步）', shareErr);
+        }
         return true;
       }
 
@@ -717,6 +1016,11 @@
       saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
       saveHistorySnapshot(merged).catch(() => {});
       if (!silent) toast('已雙向合併同步');
+      try {
+        await syncSharedTasks({ silent });
+      } catch (shareErr) {
+        console.warn('[sync] 家庭共享同步發生未預期錯誤（不影響個人同步）', shareErr);
+      }
       return true;
     } catch (err) {
       console.warn('[sync] 同步失敗', err);
@@ -788,5 +1092,6 @@
     getAuthState: () => (authState ? { ...authState, user: authState.user ? { ...authState.user } : null } : null),
     // 純函式，供 node 腳本直接測試合併邏輯用，不依賴登入狀態或網路。
     _mergeBackupPayloads: mergeBackupPayloads,
+    _mergeTaskLists: mergeTaskLists,
   };
 })();
