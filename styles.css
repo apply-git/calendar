@@ -168,6 +168,11 @@ button:active { transform: translateY(0); }
   align-items: center;
   gap: 10px;
 }
+.toolbar-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
 .calendar-nav h2 { margin: 0 0 0 8px; font-size: 28px; }
 .lunar-text {
   font-size: 13px;
