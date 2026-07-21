@@ -9,7 +9,7 @@
   --primary: #4568f0;
   --primary-strong: #2f4ed8;
   --danger: #e5484d;
-  --shadow: 0 24px 70px rgba(44, 64, 105, 0.14);
+  --shadow: 0 2px 8px rgba(44, 64, 105, 0.06), 0 24px 60px rgba(44, 64, 105, 0.14);
   --radius: 22px;
   --work: #3b82f6;
   --home: #f97316;
@@ -25,10 +25,10 @@ body.dark {
   --surface-strong: #172033;
   --text: #ecf2ff;
   --muted: #9ba8bd;
-  --border: rgba(219, 229, 255, 0.12);
+  --border: rgba(219, 229, 255, 0.16);
   --primary: #7c97ff;
   --primary-strong: #607cff;
-  --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 24px 60px rgba(0, 0, 0, 0.5);
 }
 
 * { box-sizing: border-box; }
@@ -1156,7 +1156,7 @@ body.dark .streak-badge { color: #fbbf24; }
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
-  transition: .2s ease;
+  transition: opacity .24s ease, transform .24s cubic-bezier(.2, .8, .2, 1);
 }
 .toast.show { opacity: 1; transform: translateY(0); }
 
@@ -1334,6 +1334,85 @@ body.widget-mode .task-card { font-size: 14px; }
 
   /* toast 提示原本跟 FAB 同一個右下角位置，手機加了 FAB 後把 toast 往上推，避免疊在一起。 */
   .toast { bottom: 86px; }
+}
+
+/* ============================================================
+   UI 美化增強：過渡／dialog 動畫／捲軸／focus-visible／卡片
+   hover 層次／reduced-motion。全走既有 CSS 變數，深色模式陰影
+   一律黑色系。此區塊刻意排在 @media print 之前，讓列印區塊的
+   box-shadow:none 等規則仍可覆蓋，不影響列印輸出。
+   ============================================================ */
+
+/* 1. 卡片／清單項目 hover 過渡（按鈕已於上方統一，故此處不重複） */
+.task-card,
+.timeline-block,
+.countdown-item,
+.habit-item,
+.category-item,
+.template-apply,
+.week-day,
+.month-day,
+.dashboard-overdue-item {
+  transition: background .15s ease, box-shadow .15s ease, transform .15s ease, border-color .15s ease;
+}
+/* ghost-btn hover 補一層淡陰影（上浮由全域 button:hover 提供） */
+.ghost-btn:hover { box-shadow: 0 6px 16px rgba(44, 64, 105, .12); }
+body.dark .ghost-btn:hover { box-shadow: 0 6px 16px rgba(0, 0, 0, .4); }
+
+/* 2. dialog 開啟動畫（fade + scale in），一組共用 */
+@keyframes dialog-pop-in {
+  from { opacity: 0; transform: translateY(6px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+dialog[open] { animation: dialog-pop-in .18s ease-out; }
+/* 未被個別 backdrop 規則（.task-dialog / .command-palette-dialog）覆蓋時的統一樣式 */
+dialog::backdrop { background: rgba(6, 10, 20, .45); backdrop-filter: blur(2px); }
+
+/* 3. 卡片層次：task-card hover 陰影加深（保留 pinned 內框環） */
+.task-card:hover { box-shadow: 0 6px 18px rgba(44, 64, 105, .13); }
+.task-card.pinned:hover { box-shadow: inset 0 0 0 1px rgba(245, 158, 11, .55), 0 6px 18px rgba(44, 64, 105, .13); }
+body.dark .task-card:hover { box-shadow: 0 6px 18px rgba(0, 0, 0, .5); }
+body.dark .task-card.pinned:hover { box-shadow: inset 0 0 0 1px rgba(245, 158, 11, .55), 0 6px 18px rgba(0, 0, 0, .5); }
+
+/* 4. 捲軸美化：細版 8px 圓角，全域套用 */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* 5. focus-visible：鍵盤聚焦統一外框，不影響滑鼠點擊 */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+.command-palette-item:focus-visible,
+.template-apply:focus-visible,
+.countdown-item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* 6. 月／週檢視格子 hover 背景輕微提亮（不新增閃爍動畫） */
+.month-day:hover,
+.week-day:hover {
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface-strong));
+}
+
+/* 8. 空狀態文字：字級行高微調，emoji 與文字垂直置中 */
+.empty-state { line-height: 1.7; }
+.empty-state p { margin: 6px 0 0; }
+.command-palette-empty { line-height: 1.6; }
+.empty-list:empty::after { display: inline-block; line-height: 1.6; }
+
+/* 9. prefers-reduced-motion：一律關閉上述動畫／過渡 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 @media print {
