@@ -174,6 +174,13 @@ button:active { transform: translateY(0); }
   font-weight: 600;
   color: var(--muted);
 }
+.weather-day-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.weather-day-text:empty { display: none; }
 .view-switch {
   padding: 5px;
   border-radius: 16px;
@@ -444,6 +451,13 @@ textarea { resize: vertical; }
   font-weight: 600;
   color: var(--muted);
 }
+.weather-mini {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.agenda-weather { margin-left: 0; }
 .holiday-banner {
   margin-bottom: 12px;
   padding: 8px 14px;
@@ -1209,6 +1223,9 @@ body.widget-mode .task-card { font-size: 14px; }
   .toolbar { align-items: stretch; }
   .toolbar-actions, .calendar-nav { flex-wrap: wrap; }
   .calendar-nav h2 { width: 100%; margin: 6px 0 0; }
+
+  /* 天氣資訊在手機窄版只留 emoji，隱藏溫度文字，避免標題列/欄頭擠版換行。 */
+  .weather-temp { display: none; }
 
   /* 檢視切換多了第四顆「列表」鈕，手機寬度縮小 padding/字級才放得下四顆不擠壓換行。 */
   .view-switch .view-btn { padding: 7px 10px; font-size: 13px; }

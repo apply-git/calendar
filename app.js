@@ -13,6 +13,14 @@ const WIDGET_KEY = 'desktop-schedule-widget-mode-v1';
 const ERROR_LOG_KEY = 'desktop-schedule-errorlog-v1';
 const ERROR_LOG_MAX = 50;
 
+// 天氣（Open-Meteo，免金鑰，見檔案底部 fetchWeather()）：只是顯示用快取，
+// 刻意不納入 buildBackupPayload()/applyBackupObject()，比照 sync-auth key 的處理。
+const WEATHER_KEY = 'desktop-schedule-weather-v1';
+const WEATHER_TTL_MS = 3 * 60 * 60 * 1000; // 3 小時內不重抓
+const WEATHER_FALLBACK_LAT = 22.63; // 高雄（定位被拒絕/逾時/失敗時的預設座標）
+const WEATHER_FALLBACK_LON = 120.30;
+let weatherWarned = false; // console.warn 最多一次，避免零設定環境洗版
+
 // 台灣國定假日對照表（2025–2027年，含補假／彈性放假）。資料來源：行政院人事行政總處公告辦公日曆表。
 const TAIWAN_HOLIDAYS = {
   '2025-01-01': '元旦',
@@ -181,6 +189,7 @@ const els = {
   todayLabel: $('todayLabel'),
   currentTitle: $('currentTitle'),
   lunarDayLabel: $('lunarDayLabel'),
+  weatherDayLabel: $('weatherDayLabel'),
   calendarView: $('calendarView'),
   quickAddBtn: $('quickAddBtn'),
   topThreeHeading: $('topThreeHeading'),
@@ -385,6 +394,12 @@ function init() {
   handleShareTarget();
   handleNotifUrlAction();
   setInterval(checkReminders, 30 * 1000);
+
+  // 天氣（Open-Meteo，免金鑰）：零設定零影響——file:// 雙擊開啟或離線時完全跳過，
+  // 不顯示天氣但其他功能不受影響；fetchWeather() 內部已包 try/catch 靜默降級。
+  if (location.protocol !== 'file:' && navigator.onLine) {
+    fetchWeather();
+  }
 }
 
 // 深色模式三段循環（淺色 → 深色 → 自動(跟隨系統) → 淺色）：THEME_KEY 存 'light'|'dark'|'auto'。
@@ -599,6 +614,102 @@ function registerServiceWorker() {
     swRegistration = registration;
     watchServiceWorkerUpdates(registration);
   }).catch(() => {});
+}
+
+// ============================================================================
+// 天氣整合（Open-Meteo，免金鑰）。零設定零影響：init() 只在非 file:// 且
+// navigator.onLine 時才呼叫 fetchWeather()；任何失敗（無網路、定位被拒、API 掛掉）
+// 都靜默降級，不顯示天氣、不影響其他功能，console 最多 warn 一次（見 weatherWarned）。
+// WEATHER_KEY 只是顯示快取，刻意不納入 buildBackupPayload()/applyBackupObject()。
+// ============================================================================
+
+// WMO weather code → emoji。對照不到的代碼回傳空字串（顯示端會直接不占位）。
+function weatherEmoji(code) {
+  if (code === 0) return '☀️';
+  if (code === 1 || code === 2) return '🌤';
+  if (code === 3) return '☁️';
+  if (code === 45 || code === 48) return '🌫';
+  if (code >= 51 && code <= 67) return '🌧';
+  if (code >= 71 && code <= 77) return '🌨';
+  if (code >= 80 && code <= 82) return '🌦';
+  if (code >= 95 && code <= 99) return '⛈';
+  return '';
+}
+
+function getStoredWeather() {
+  return loadJson(WEATHER_KEY, null);
+}
+
+function isWeatherFresh(w) {
+  return Boolean(w && w.fetchedAt && (Date.now() - w.fetchedAt) < WEATHER_TTL_MS && w.days);
+}
+
+// 取某天（'YYYY-MM-DD'）的天氣資料，沒有快取或該天不在 7 天預報內時回傳 null。
+function getWeatherDay(dateKey) {
+  const w = getStoredWeather();
+  return (w && w.days && w.days[dateKey]) || null;
+}
+
+// 日檢視標題旁的天氣文字（emoji＋高低溫，降雨機率 ≥30% 才附加 ☔）。
+// 拆成 weather-emoji / weather-temp 兩個 span，手機寬度可只縮小或隱藏溫度只留 emoji。
+function weatherDayHtml(w) {
+  const emoji = weatherEmoji(w.code);
+  const rainPart = (typeof w.rain === 'number' && w.rain >= 30) ? ` ☔${w.rain}%` : '';
+  return `<span class="weather-emoji">${emoji}</span><span class="weather-temp">高低溫 ↑${w.tmax}° ↓${w.tmin}°${rainPart}</span>`;
+}
+
+// 定位：優先用瀏覽器 geolocation（5 秒逾時），使用者拒絕／逾時／失敗一律 fallback 高雄，
+// 不丟錯誤、不中斷天氣抓取流程。
+function getWeatherGeoPosition() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve({ lat: WEATHER_FALLBACK_LAT, lon: WEATHER_FALLBACK_LON });
+      return;
+    }
+    let settled = false;
+    const finish = (lat, lon) => {
+      if (settled) return;
+      settled = true;
+      resolve({ lat, lon });
+    };
+    const timer = setTimeout(() => finish(WEATHER_FALLBACK_LAT, WEATHER_FALLBACK_LON), 5000);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { clearTimeout(timer); finish(pos.coords.latitude, pos.coords.longitude); },
+      () => { clearTimeout(timer); finish(WEATHER_FALLBACK_LAT, WEATHER_FALLBACK_LON); },
+      { timeout: 5000 }
+    );
+  });
+}
+
+// 抓 7 天天氣預報並存快取；3 小時內有新鮮快取就直接跳過不重抓。抓到新資料後呼叫
+// render() 讓畫面補上天氣；任何一步失敗都靜默吞掉，最多 console.warn 一次。
+async function fetchWeather() {
+  try {
+    if (isWeatherFresh(getStoredWeather())) return;
+    const { lat, lon } = await getWeatherGeoPosition();
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTaipei&forecast_days=7`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`weather http ${res.status}`);
+    const data = await res.json();
+    const daily = data && data.daily;
+    if (!daily || !Array.isArray(daily.time)) throw new Error('weather data 格式異常');
+    const days = {};
+    daily.time.forEach((dateKey, i) => {
+      days[dateKey] = {
+        code: daily.weather_code[i],
+        tmax: Math.round(daily.temperature_2m_max[i]),
+        tmin: Math.round(daily.temperature_2m_min[i]),
+        rain: Array.isArray(daily.precipitation_probability_max) ? daily.precipitation_probability_max[i] : null,
+      };
+    });
+    saveJson(WEATHER_KEY, { fetchedAt: Date.now(), lat, lon, days });
+    render();
+  } catch (err) {
+    if (!weatherWarned) {
+      weatherWarned = true;
+      console.warn('[calendar] 天氣資料抓取失敗，不影響本機功能', err);
+    }
+  }
 }
 
 function bindEvents() {
@@ -948,6 +1059,10 @@ function renderTitle() {
   if (currentView === 'month') els.currentTitle.textContent = `${currentDate.getFullYear()} 年 ${currentDate.getMonth() + 1} 月`;
   if (currentView === 'agenda') els.currentTitle.textContent = '未來 30 天';
   els.lunarDayLabel.textContent = (currentView === 'day' && appSettings.showLunar) ? `🌙 農曆 ${lunarFullLabel(currentDate)}` : '';
+  if (els.weatherDayLabel) {
+    const dayWeather = currentView === 'day' ? getWeatherDay(toDateInput(currentDate)) : null;
+    els.weatherDayLabel.innerHTML = dayWeather ? weatherDayHtml(dayWeather) : '';
+  }
   if (els.jumpDateInput) els.jumpDateInput.value = toDateInput(currentDate);
 }
 
@@ -1123,9 +1238,10 @@ function renderWeek(visibleTasks) {
         const key = toDateInput(day);
         const holidayName = getHoliday(key);
         const dayTasks = visibleTasks.filter((task) => occursOnDate(task, key)).sort(compareTasks);
+        const dayWeather = getWeatherDay(key);
         return `
           <div class="week-day ${isToday(day) ? 'today' : ''} ${holidayName ? 'holiday' : ''}" data-drop-date="${key}">
-            <div class="day-head"><span>${weekdayName(day)}</span><span>${formatMonthDay(day)}</span></div>
+            <div class="day-head"><span>${weekdayName(day)}</span><span>${formatMonthDay(day)}${dayWeather ? `<span class="weather-mini">${weatherEmoji(dayWeather.code)}</span>` : ''}</span></div>
             ${appSettings.showLunar ? `<div class="lunar-mini">${escapeHtml(lunarCellLabel(day))}</div>` : ''}
             ${holidayName ? `<div class="holiday-label">${escapeHtml(holidayName)}</div>` : ''}
             ${dayTasks.length ? dayTasks.map((task) => taskCard(task, key)).join('') : '<p class="muted">無行程</p>'}
@@ -1148,9 +1264,10 @@ function renderMonth(visibleTasks) {
         const holidayName = getHoliday(key);
         const allDayTasks = visibleTasks.filter((task) => occursOnDate(task, key));
         const dayTasks = allDayTasks.slice().sort(compareTasks).slice(0, 4);
+        const dayWeather = getWeatherDay(key);
         return `
           <div class="month-day ${heatClass(allDayTasks.length)} ${isToday(day) ? 'today' : ''} ${day.getMonth() !== currentDate.getMonth() ? 'outside' : ''} ${holidayName ? 'holiday' : ''}" data-drop-date="${key}" title="${allDayTasks.length} 筆行程">
-            <div class="day-head"><span>${day.getDate()}</span><button class="small-btn" data-new-date="${key}">＋</button></div>
+            <div class="day-head"><span>${day.getDate()}${dayWeather ? `<span class="weather-mini">${weatherEmoji(dayWeather.code)}</span>` : ''}</span><button class="small-btn" data-new-date="${key}">＋</button></div>
             ${appSettings.showLunar ? `<div class="lunar-mini">${escapeHtml(lunarCellLabel(day))}</div>` : ''}
             ${holidayName ? `<div class="holiday-label">${escapeHtml(holidayName)}</div>` : ''}
             ${dayTasks.map((task) => taskCard(task, key)).join('')}
@@ -1197,12 +1314,14 @@ function renderAgenda(visibleTasks) {
       ${groups.map(({ day, key, dayTasks }) => {
         const holidayName = getHoliday(key);
         const dayLabel = key === todayKey ? '今天　' : (key === tomorrowKey ? '明天　' : '');
+        const dayWeather = getWeatherDay(key);
         return `
           <div class="agenda-group ${isToday(day) ? 'today' : ''}">
             <div class="agenda-date-head">
               <span class="agenda-date-main">${dayLabel}${weekdayName(day)}　${formatMonthDay(day)}</span>
               ${appSettings.showLunar ? `<span class="lunar-mini agenda-lunar">${escapeHtml(lunarCellLabel(day))}</span>` : ''}
               ${holidayName ? `<span class="holiday-label agenda-holiday">${escapeHtml(holidayName)}</span>` : ''}
+              ${dayWeather ? `<span class="weather-mini agenda-weather"><span class="weather-emoji">${weatherEmoji(dayWeather.code)}</span> <span class="weather-temp">↑${dayWeather.tmax}° ↓${dayWeather.tmin}°</span></span>` : ''}
             </div>
             <div class="agenda-day-tasks">${dayTasks.map((task) => taskCard(task, key)).join('')}</div>
           </div>
