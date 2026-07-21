@@ -24,7 +24,7 @@
 | `config.example.js` | 雲端同步設定範例／備份，不會被 index.html 載入 |
 | `schema.sql` | Supabase `sync_state` 表 + RLS 規則，供 CLOUD_SETUP.md 步驟貼到 SQL Editor 執行 |
 | `CLOUD_SETUP.md` | 雲端同步設定教學（建 Supabase 專案、跑 schema、設定 Google 登入） |
-| `manifest.json` / `service-worker.js` / `icons/` / `start-pwa-local.bat` | PWA 安裝與離線快取（需本機伺服器）。`icons/` 內含正式圖示（icon-192/icon-512/icon-maskable-512/apple-touch-icon/favicon-64，皆圓角）與 `icon-master-1024.png` 母檔備用；`service-worker.js` 快取版本 v4。 |
+| `manifest.json` / `service-worker.js` / `icons/` / `start-pwa-local.bat` | PWA 安裝與離線快取（需本機伺服器）。`icons/` 內含正式圖示（icon-192/icon-512/icon-maskable-512/apple-touch-icon/favicon-64，皆圓角）與 `icon-master-1024.png` 母檔備用；`service-worker.js` 快取版本以檔案開頭 `CACHE_NAME` 為準（2026-07-19 查證為 v20，文件內提及的舊版號皆為歷史記錄）。 |
 | `README.md` | 使用說明 |
 | `HANDOFF.md` | 本交接檔 |
 | `ROADMAP.md` | 功能規劃、分工與進度（2026-07 大幅擴充的依據） |
@@ -149,10 +149,10 @@ task 物件新增欄位 `excludedDates`（字串陣列，預設 `[]`）：儲存
 
 ## 後續可製作方向
 
-### PWA 版（已完成，待實測）
+### PWA 版（✅ 已完成並經正式站實測）
 
 `manifest.json` / `service-worker.js` / `icons/` / 離線快取 / README 教學皆已完成。
-仍待做：透過 `start-pwa-local.bat` 本機伺服器實際安裝到手機/電腦跑一輪確認。
+已透過正式站 https://calendar88.pages.dev/ 實際安裝到手機驗證（含修復安裝版 ERR_FAILED bug，見「已知注意事項」）。`start-pwa-local.bat` 僅剩「無對外網路、純區網」情境未測，非必要項。
 
 ### 雲端同步實際上線（✅ 已完成並實測收工，2026-07-16）
 
@@ -189,6 +189,7 @@ task 物件新增欄位 `excludedDates`（字串陣列，預設 `[]`）：儲存
 - 全新安裝（localStorage 無資料）時**保持空白，不再自動塞範例行程**：原本 `init()` 會在 `tasks` 為空時呼叫 `seedSampleTasks()` 塞一筆「規劃今日 3 件重點」每日重複範例，2026-07-16 已整個移除（函式與呼叫都刪了）。原因：範例行程曾在雲端同步實測時被新裝置誤推上雲端、蓋掉正式資料；且對新使用者不必要。
 - **安裝版 PWA 一打開就 ERR_FAILED（已修過的 bug，教訓記錄）**：Cloudflare Pages 會把 `/index.html` **重新導向**到 `/`（pretty URL 行為），而 `manifest.json` 的 `start_url` 原本是 `./index.html`。SW 快取到的 `/index.html` 回應帶著 `redirected: true` 旗標，Chrome 規定「頁面導航」拒收 Service Worker 給的 redirected 回應 → 安裝到主畫面的 PWA 一啟動就 `net::ERR_FAILED`（瀏覽器直接開 `/` 反而正常，所以很難聯想）。修法（雙保險）：(1) `manifest.json` 的 `start_url` 與 `shortcuts[].url` 全改成 `./`／`./?action=...`，不再經過會被重導向的網址；(2) `service-worker.js` 加 `sanitizeResponse()`：任何 `redirected: true` 的回應先重新包成乾淨的 200 Response 再 `cache.put()`／回傳（install 階段因此改用 fetch+put，不用 `cache.add()`）。**注意：start_url 是安裝當下烙進去的，改完 manifest 後已安裝的 PWA 要移除→重新加入主畫面才會生效。**
 - 測試過程曾建立測試行程與每週目標，已手動刪除。
+- **2026-07-19 待辦查證**：ROADMAP 待實作 #1–#11 與第二波 Worker A–D 均已完成、無遺漏。唯二尚未確認的是「使用者自行執行」項目：(1) `schema-history.sql` 是否已在 Supabase 執行（雲端備份版本）；(2) 背景推播是否已部署（Edge Function + VAPID secrets + Cron；`config.js` 已填 `webPushPublicKey`，跡象顯示很可能已部署）。使用者自行驗證方法：開正式站登入雲端同步後，點「🕘 雲端備份版本」有列出快照＝(1) 已完成；勾「📲 背景推播提醒」能訂閱成功＝(2) 鏈路通。
 
 ## 存檔規則
 
