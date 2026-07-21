@@ -1145,6 +1145,16 @@ body.dark .conflict-warning {
   border: 1px solid var(--border);
 }
 
+/* 桌面版工具列動態溢出收合（app.js setupToolbarOverflow()）用的 proxy 群組：
+   跟 .more-tools-body 其餘固定項目視覺一致（同樣的直向排列＋間距），
+   只是獨立管理避免跟手機固定的 proxy 互相覆蓋。 */
+#overflowProxyGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#overflowProxyGroup:empty { display: none; }
+
 /* 懸浮新增按鈕（FAB）：桌面版固定隱藏，只有 @media (max-width:760px) 內才會顯示
    （且需要 JS 在手機時移除 hidden 屬性，兩個條件都成立才真的看得到）。 */
 .fab-add { display: none; }

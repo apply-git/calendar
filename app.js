@@ -399,6 +399,7 @@ function init() {
   if (storedHolidays && storedHolidays.days) dynamicHolidays = storedHolidays.days;
   bindEvents();
   setupMobilePanels();
+  setupToolbarOverflow();
   setupVoiceInput();
   render();
   updatePomodoroDisplay();
@@ -516,6 +517,104 @@ function setupMobilePanels() {
 
   // 工具列「⋯ 更多」按鈕：顯示出來，實際開關與 proxy click 綁定在 bindEvents()。
   if (els.moreToolsBtn) els.moreToolsBtn.hidden = false;
+}
+
+// 桌面版工具列動態溢出收合（跟上面手機版 setupMobilePanels() 並存、互不干擾）：
+// 手機 matchMedia(max-width:760px) 為真時，.toolbar-actions 整組按鈕本來就由 CSS
+// display:none !important 蓋掉、改走 moreToolsDialog，所以下面 adjust() 一開頭
+// 判斷到手機寬度就直接 return，完全不介入。
+// clearDayBtn/deferBtn/shareCardBtn/clearWeekBtn/clearMonthBtn 這幾顆由
+// updateDayModeSwitch() 依目前檢視（日/週/月）自行控制 hidden，为避免互相打架，
+// 這裡的溢出收合刻意排除它們，只處理其餘固定顯示的工具鈕。
+const VIEW_CONTROLLED_TOOLBAR_IDS = new Set(['clearDayBtn', 'deferBtn', 'shareCardBtn', 'clearWeekBtn', 'clearMonthBtn']);
+let overflowHiddenIds = []; // stack：越後面代表越晚被藏，還原時優先還原最近被藏的（LIFO）
+
+function setupToolbarOverflow() {
+  const container = document.querySelector('.toolbar-actions');
+  if (!container || !els.moreToolsBtn) return;
+
+  const isMobile = () => window.matchMedia('(max-width: 760px)').matches;
+  const isOverflowing = () => container.scrollWidth > container.clientWidth + 1;
+  const getCandidates = () => Array.from(container.querySelectorAll(':scope > button')).filter(
+    (btn) => btn !== els.moreToolsBtn && !VIEW_CONTROLLED_TOOLBAR_IDS.has(btn.id) && btn.id
+  );
+
+  function syncOverflowProxies() {
+    if (!els.moreToolsDialog) return;
+    let group = document.getElementById('overflowProxyGroup');
+    if (!group) {
+      group = document.createElement('div');
+      group.id = 'overflowProxyGroup';
+      els.moreToolsDialog.querySelector('.more-tools-body')?.appendChild(group);
+    }
+    const hiddenSet = new Set(overflowHiddenIds);
+    // 移除「本群組內」不再需要的動態 proxy（原本手機固定的 proxy 不在這個群組裡，不會被動到）。
+    Array.from(group.children).forEach((proxy) => {
+      if (!hiddenSet.has(proxy.dataset.proxy)) proxy.remove();
+    });
+    // 補上缺少的 proxy：整個 #moreToolsDialog 內（含手機固定 proxy）已經有的就重複使用、不重建。
+    overflowHiddenIds.forEach((id) => {
+      if (els.moreToolsDialog.querySelector(`[data-proxy="${id}"]`)) return;
+      const original = document.getElementById(id);
+      if (!original) return;
+      const proxy = document.createElement('button');
+      proxy.type = 'button';
+      proxy.className = 'more-tools-item';
+      proxy.dataset.proxy = id;
+      proxy.textContent = original.textContent;
+      proxy.addEventListener('click', () => {
+        els.moreToolsDialog?.close();
+        original.click();
+      });
+      group.appendChild(proxy);
+    });
+  }
+
+  function adjust() {
+    if (isMobile()) return; // 手機模式交給既有 setupMobilePanels() / CSS，這裡不介入
+
+    // 1. 先嘗試還原（優先還原最近被藏的），每還原一顆就重新量測，空間不夠就藏回去並停止。
+    while (overflowHiddenIds.length) {
+      const id = overflowHiddenIds[overflowHiddenIds.length - 1];
+      const btn = document.getElementById(id);
+      if (!btn) { overflowHiddenIds.pop(); continue; }
+      btn.hidden = false;
+      if (isOverflowing()) {
+        btn.hidden = true;
+        break;
+      }
+      overflowHiddenIds.pop();
+    }
+
+    // 2. 若仍溢出，從最右邊的按鈕開始藏（排除 moreToolsBtn），每藏一顆重新量測。
+    const candidates = getCandidates();
+    let guard = candidates.length + 5; // 保險，避免極端狀況造成無窮迴圈
+    while (isOverflowing() && guard-- > 0) {
+      const rightmost = [...candidates].reverse().find((btn) => !btn.hidden);
+      if (!rightmost) break;
+      rightmost.hidden = true;
+      overflowHiddenIds.push(rightmost.id);
+    }
+
+    // 3. moreToolsBtn：只要有任何按鈕因桌面溢出被藏起來，就顯示它；否則維持 hidden。
+    els.moreToolsBtn.hidden = overflowHiddenIds.length === 0;
+
+    syncOverflowProxies();
+  }
+
+  let resizeTimer = null;
+  const debouncedAdjust = () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(adjust, 150);
+  };
+
+  if (window.ResizeObserver) {
+    new ResizeObserver(debouncedAdjust).observe(container);
+  } else {
+    window.addEventListener('resize', debouncedAdjust);
+  }
+
+  adjust(); // 一開始先量測一次
 }
 
 // Android PWA「長按主畫面圖示」快捷選單（manifest.json 的 shortcuts）會導向
