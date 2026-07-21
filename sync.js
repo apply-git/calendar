@@ -16,13 +16,18 @@
 // sync.js 只負責「把這包 JSON 存到雲端 / 從雲端取回」、登入狀態與同步 UI，
 // 不重複實作備份資料結構，避免兩處資料格式各自漂移。
 //
-// 同步策略：last-write-wins（比對 sync_state.updated_at）。
+// 同步策略：pull → merge → push 收斂式雙向合併（取代整包 last-write-wins）。
 //   - 手動「立即同步」與自動同步都會先 cloudPull()：
-//     若雲端 updated_at 比「本機記錄的上次同步時間」新 → 視為其他裝置有更新，
-//     套用雲端資料到本機（並提示使用者）。
-//     否則視為本機較新（或雲端沒有資料）→ cloudPush() 覆蓋雲端。
-//   - 這是個人跨裝置同步，不是多人即時協作；兩台裝置都離線編輯過才同步時，
-//     較晚同步的一方會蓋掉較早的一方，請見 CLOUD_SETUP.md 的說明。
+//     雲端完全沒有資料列（第一次同步）→ 直接 cloudPush() 本機資料，沒有東西可合併。
+//     雲端已有資料 → 一律 local = CalendarApp.buildBackupPayload()、
+//       merged = mergeBackupPayloads(local, cloud)、applyBackupObject(merged) 套回本機、
+//       再 cloudPush(merged) 推回雲端。不再用「時間戳比大小決定單向 pull 或 push」。
+//   - mergeBackupPayloads()（純函式，見下方）：tasks 依 id 取聯集，同 id 整筆取
+//     updatedAt 較大者（缺 = 0，同分取 local）；墓碑（deletedAt）就是整筆的一部分，
+//     所以「刪除較新維持刪除、編輯較新則復活」不用額外邏輯。其餘非 tasks 欄位
+//     （habits/categories/appSettings/...）v1 整區塊取 generatedAt 較新那份。
+//   - 這是個人跨裝置同步，不是多人即時協作；但因為改成逐筆合併，兩台裝置離線期間
+//     各自新增/編輯不同筆行程時不會再互相蓋掉，詳見 CLOUD_SETUP.md 的說明。
 // ============================================================================
 
 (function () {
@@ -358,6 +363,58 @@
     }
   }
 
+  // ---- 合併：pull → merge → push 收斂式同步（純函式，不碰 DOM／網路／localStorage）----
+  //
+  // tasks（核心）：以 task.id 為鍵取聯集；兩邊都有同一個 id 時，整筆取 updatedAt
+  //   較大者（缺 updatedAt 視為 0，同分取 local）。墓碑（deletedAt）本身就是「整筆」
+  //   的一部分，updatedAt 較新的一筆自然勝出：刪除較新就維持刪除，對方較新的編輯
+  //   勝出就等於復活，不需要額外的墓碑特判邏輯。
+  //
+  // 其餘欄位（habits/categories/appSettings/textSettings/dailyMemos/templates/
+  //   weeklyGoals/widgetMode/theme/version/exportedAt…全部非 tasks 欄位）：v1 做法
+  //   是整區塊取 generatedAt 較新那份 payload 的值（沒辦法逐筆合併，可接受）。
+  function mergeBackupPayloads(localObj, cloudObj) {
+    localObj = localObj && typeof localObj === 'object' ? localObj : {};
+    cloudObj = cloudObj && typeof cloudObj === 'object' ? cloudObj : {};
+
+    const localGen = Number(localObj.generatedAt) || 0;
+    const cloudGen = Number(cloudObj.generatedAt) || 0;
+    // 同分取 local（跟下面 tasks 合併的同分規則一致）。
+    const newerBlock = cloudGen > localGen ? cloudObj : localObj;
+
+    const taskMap = new Map();
+    const putTask = (task) => {
+      if (!task || !task.id) return;
+      const existing = taskMap.get(task.id);
+      if (!existing) {
+        taskMap.set(task.id, task);
+        return;
+      }
+      const existingUpdated = Number(existing.updatedAt) || 0;
+      const incomingUpdated = Number(task.updatedAt) || 0;
+      // 嚴格大於才覆蓋：local 先跑一輪放進 map，同分（含都缺 = 0）時 cloud 那輪
+      // 不會覆蓋掉已存在的 local 那筆，天然達成「同分取 local」。
+      if (incomingUpdated > existingUpdated) taskMap.set(task.id, task);
+    };
+    (Array.isArray(localObj.tasks) ? localObj.tasks : []).forEach(putTask);
+    (Array.isArray(cloudObj.tasks) ? cloudObj.tasks : []).forEach(putTask);
+
+    return {
+      ...newerBlock,
+      tasks: Array.from(taskMap.values()),
+      generatedAt: Math.max(localGen, cloudGen) || Date.now(),
+    };
+  }
+
+  // buildBackupPayload()（app.js）刻意完全不動，不加 generatedAt 欄位（會讓既有
+  // 備份 roundtrip 測試在兩次呼叫間比較出時間戳差異而變脆弱）。改在這裡、合併／
+  // 推送前補上；已經有值（例如合併後的 payload 再次經過這裡）就不覆寫。
+  function withGeneratedAt(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    if (payload.generatedAt) return payload;
+    return { ...payload, generatedAt: Date.now() };
+  }
+
   // ---- 疑難排解：手機無法開發者工具時，用 alert() 直接把同步狀態顯示出來 ----
 
   async function showDebugStatus() {
@@ -372,6 +429,8 @@
     if (localTasks && localTasks.length) {
       lines.push('本機第一筆標題：' + (localTasks[0].title || '（無標題）') + '　id：' + localTasks[0].id);
     }
+    lines.push('本機墓碑數：' + (localTasks ? localTasks.filter((t) => t.deletedAt).length : '（無法讀取）'));
+    lines.push('合併模式：逐筆（pull → merge → push）');
 
     if (!SYNC_ENABLED) {
       alert(lines.join('\n'));
@@ -635,25 +694,29 @@
     updateUI();
     try {
       const remote = await cloudPull();
-      const meta = loadSyncMeta();
-      const lastSyncedAt = Number(meta.lastSyncedAt) || 0;
-      const remoteUpdatedAtMs = remote?.updated_at ? new Date(remote.updated_at).getTime() : 0;
 
-      if (remote && remoteUpdatedAtMs > lastSyncedAt) {
-        // 雲端比本機記錄的上次同步時間新：視為其他裝置已更新過，套用雲端資料（last-write-wins）。
-        window.CalendarApp.applyBackupObject(remote.payload || {});
-        saveSyncMeta({ lastSyncedAt: remoteUpdatedAtMs });
-        toast('已從雲端取得較新的資料並更新本機');
-      } else {
-        // 本機較新（或雲端還沒有資料）：把本機資料覆蓋上去。
-        // lastSyncedAt 必須用「伺服器」寫入的 updated_at，不能用裝置本機 Date.now()：
-        // 裝置時鐘不準時，之後跟其他裝置的 remoteUpdatedAtMs 比較會永遠判斷錯誤。
-        const payload = window.CalendarApp.buildBackupPayload();
+      // 不再用「本機記錄的上次同步時間 vs 雲端 updated_at」比大小決定單向 pull 或
+      // push（原本的 last-write-wins 整包覆蓋邏輯，已移除）。改成每次同步都雙向
+      // 收斂：雲端完全沒有資料列時沒東西可合併才直接 push；否則一律 merge。
+      if (!remote) {
+        // 雲端還沒有這個帳號的資料列（第一次同步）：直接把本機資料整包推上去。
+        const payload = withGeneratedAt(window.CalendarApp.buildBackupPayload());
         const serverUpdatedAt = await cloudPush(payload);
+        // lastSyncedAt 必須用「伺服器」寫入的 updated_at，不能用裝置本機 Date.now()：
+        // 裝置時鐘不準時，之後跟其他裝置比較會永遠判斷錯誤。
         saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
         saveHistorySnapshot(payload).catch(() => {});
         if (!silent) toast('已同步到雲端');
+        return true;
       }
+
+      const local = withGeneratedAt(window.CalendarApp.buildBackupPayload());
+      const merged = mergeBackupPayloads(local, remote.payload || {});
+      window.CalendarApp.applyBackupObject(merged);
+      const serverUpdatedAt = await cloudPush(merged);
+      saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
+      saveHistorySnapshot(merged).catch(() => {});
+      if (!silent) toast('已雙向合併同步');
       return true;
     } catch (err) {
       console.warn('[sync] 同步失敗', err);
@@ -723,5 +786,7 @@
     // 供 push.js（背景推播 scaffold）讀取目前登入狀態用，回傳淺拷貝避免外部程式改到內部狀態。
     // 不做 token 刷新；push.js 只在使用者於對話框內操作時呼叫，沿用當下已知的登入狀態即可。
     getAuthState: () => (authState ? { ...authState, user: authState.user ? { ...authState.user } : null } : null),
+    // 純函式，供 node 腳本直接測試合併邏輯用，不依賴登入狀態或網路。
+    _mergeBackupPayloads: mergeBackupPayloads,
   };
 })();
