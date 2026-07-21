@@ -1435,3 +1435,87 @@ textarea:focus-visible,
 }
 body.dark .app-footer { color: #fff; }
 @media print { .app-footer { display: none !important; } }
+
+/* 掛牆看板模式：不是 <dialog>，用 :not([hidden]) 蓋掉預設 display:none（同 .sw-update-banner 那招），
+   避免作者樣式優先權蓋掉 HTML 的 hidden 屬性。跟隨現有主題變數，深色模式自動深底。 */
+.kiosk-overlay { display: none; }
+.kiosk-overlay:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg);
+  color: var(--text);
+  padding: 4vh 4vw;
+  overflow: hidden;
+}
+.kiosk-close-btn {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+.kiosk-clock {
+  font-size: 15vw;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
+}
+.kiosk-date-line {
+  margin-top: 10px;
+  font-size: clamp(16px, 1.6vw, 26px);
+  color: var(--muted, var(--text));
+  opacity: .85;
+}
+.kiosk-task-list {
+  margin-top: 4vh;
+  width: min(900px, 92vw);
+  flex: 1;
+  overflow-y: auto;
+}
+.kiosk-empty {
+  text-align: center;
+  font-size: clamp(18px, 2.5vw, 40px);
+  opacity: .7;
+  margin-top: 6vh;
+}
+.kiosk-task-item {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 14px 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: clamp(18px, 2.5vw, 40px);
+}
+.kiosk-task-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex: none;
+  align-self: center;
+}
+.kiosk-task-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  min-width: 4.5em;
+}
+.kiosk-task-title {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+.kiosk-task-item.done { opacity: .5; }
+.kiosk-task-item.done .kiosk-task-title { text-decoration: line-through; }
+
+@media (max-width: 760px) {
+  .kiosk-clock { font-size: 20vw; }
+}

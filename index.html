@@ -605,6 +605,7 @@
       <button type="button" class="more-tools-item" data-proxy="batchAddBtn">📋 批量新增</button>
       <button type="button" class="more-tools-item" data-proxy="deferBtn">⏭ 未完成順延</button>
       <button type="button" class="more-tools-item" data-proxy="shareCardBtn">🖼 分享圖卡</button>
+      <button type="button" class="more-tools-item" id="kioskModeBtn">🖥 看板模式</button>
     </div>
   </dialog>
 
@@ -644,6 +645,15 @@
   <div id="swUpdateBanner" class="sw-update-banner" hidden role="status">
     <span>🔄 有新版本</span>
     <button type="button" id="swUpdateBtn">立即更新</button>
+  </div>
+
+  <!-- 掛牆看板模式：家用平板全螢幕今日行程。不是 dialog，用 hidden 屬性 + requestFullscreen()
+       手動控制顯示，開關與 timer 邏輯見 app.js 的 openKioskMode() / closeKioskMode()。 -->
+  <div id="kioskOverlay" class="kiosk-overlay" hidden>
+    <button type="button" id="kioskCloseBtn" class="kiosk-close-btn">✕ 離開</button>
+    <div id="kioskClock" class="kiosk-clock">00:00</div>
+    <div id="kioskDateLine" class="kiosk-date-line"></div>
+    <div id="kioskTaskList" class="kiosk-task-list"></div>
   </div>
 
   <script src="config.js"></script>

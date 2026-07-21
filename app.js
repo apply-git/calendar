@@ -330,6 +330,12 @@ const els = {
   moreToolsDialog: $('moreToolsDialog'),
   closeMoreToolsBtn: $('closeMoreToolsBtn'),
   moreToolsWeeklyReviewBtn: $('moreToolsWeeklyReviewBtn'),
+  kioskModeBtn: $('kioskModeBtn'),
+  kioskOverlay: $('kioskOverlay'),
+  kioskCloseBtn: $('kioskCloseBtn'),
+  kioskClock: $('kioskClock'),
+  kioskDateLine: $('kioskDateLine'),
+  kioskTaskList: $('kioskTaskList'),
   weeklyReviewBtn: $('weeklyReviewBtn'),
   weeklyReviewDialog: $('weeklyReviewDialog'),
   closeWeeklyReviewBtn: $('closeWeeklyReviewBtn'),
@@ -912,6 +918,14 @@ function bindEvents() {
     openWeeklyReviewDialog();
   });
 
+  // 掛牆看板模式：#moreToolsDialog 內的按鈕自己綁 click（不是 data-proxy），因為要接著呼叫
+  // openKioskMode() 進全螢幕，不是單純轉呼叫某顆既有按鈕。桌面工具列不加鈕，避免更擠。
+  els.kioskModeBtn?.addEventListener('click', () => {
+    els.moreToolsDialog?.close();
+    openKioskMode();
+  });
+  els.kioskCloseBtn?.addEventListener('click', closeKioskMode);
+
   // 統計儀表板：手機版走 #moreToolsDialog 的 data-proxy="dashboardBtn"（沿用既有
   // proxy click 迴圈，不需要額外綁定）。逾期清單點擊比照 data-countdown-edit 的
   // 委派寫法，但用 data-dashboard-edit 這組新 dataset key 避免跟既有委派衝突。
@@ -1003,6 +1017,7 @@ const COMMAND_PALETTE_ACTIONS = [
   { label: '資料檢查', run: () => els.dataCheckBtn.click() },
   { label: '備份', run: () => els.backupBtn.click() },
   { label: '今日待辦模式', run: () => els.todayTodoBtn.click() },
+  { label: '看板模式', run: () => els.kioskModeBtn.click() },
 ];
 
 let commandPaletteItems = [];
@@ -1611,6 +1626,76 @@ function toggleWidgetMode() {
   document.body.classList.toggle('widget-mode', widgetMode);
   render();
   showToast(widgetMode ? '已開啟小工具模式' : '已關閉小工具模式');
+}
+
+// 掛牆看板模式：家用平板全螢幕今日行程。#kioskOverlay 是一般 div（非 dialog），開啟時
+// 進全螢幕＋顯示 overlay；時鐘每 30 秒更新、行程清單每分鐘重新渲染（跨日/完成狀態變化會反映）。
+// Esc 監聽只在看板開啟期間掛上，關閉時連同兩個 timer 一起清掉。
+let kioskClockTimer = null;
+let kioskRenderTimer = null;
+
+function openKioskMode() {
+  if (!els.kioskOverlay) return;
+  els.kioskOverlay.hidden = false;
+  document.documentElement.requestFullscreen?.().catch(() => {});
+  renderKioskClock();
+  renderKioskTasks();
+  clearInterval(kioskClockTimer);
+  clearInterval(kioskRenderTimer);
+  kioskClockTimer = setInterval(renderKioskClock, 30000);
+  kioskRenderTimer = setInterval(renderKioskTasks, 60000);
+  document.addEventListener('keydown', handleKioskKeydown);
+}
+
+function closeKioskMode() {
+  if (!els.kioskOverlay) return;
+  els.kioskOverlay.hidden = true;
+  document.exitFullscreen?.().catch(() => {});
+  clearInterval(kioskClockTimer);
+  clearInterval(kioskRenderTimer);
+  kioskClockTimer = null;
+  kioskRenderTimer = null;
+  document.removeEventListener('keydown', handleKioskKeydown);
+}
+
+function handleKioskKeydown(event) {
+  if (event.key === 'Escape') closeKioskMode();
+}
+
+function renderKioskClock() {
+  const now = new Date();
+  if (els.kioskClock) {
+    els.kioskClock.textContent = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }
+  if (els.kioskDateLine) {
+    const dateKey = toDateInput(now);
+    const weekday = new Intl.DateTimeFormat('zh-TW', { weekday: 'short' }).format(now);
+    const holidayName = getHoliday(dateKey);
+    els.kioskDateLine.textContent = `${now.getMonth() + 1}月${now.getDate()}日 ${weekday}　農曆${lunarFullLabel(now)}${holidayName ? '　🟢 ' + holidayName : ''}`;
+  }
+}
+
+function renderKioskTasks() {
+  if (!els.kioskTaskList) return;
+  const dateKey = toDateInput(new Date());
+  const dayTasks = tasks.filter((task) => occursOnDate(task, dateKey)).sort((a, b) => a.start.localeCompare(b.start));
+
+  if (!dayTasks.length) {
+    els.kioskTaskList.innerHTML = '<div class="kiosk-empty">今天沒有行程 🎉</div>';
+    return;
+  }
+
+  els.kioskTaskList.innerHTML = dayTasks.map((task) => {
+    const done = isTaskDone(task, dateKey);
+    const color = getCategoryColor(task.category);
+    return `
+      <div class="kiosk-task-item ${done ? 'done' : ''}">
+        <span class="kiosk-task-dot" style="background:${color}"></span>
+        <span class="kiosk-task-time">${task.start}</span>
+        <span class="kiosk-task-title">${escapeHtml(task.title)}</span>
+      </div>
+    `;
+  }).join('');
 }
 
 function updateModeButtons() {
