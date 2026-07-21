@@ -287,6 +287,7 @@ const els = {
   taskReminder: $('taskReminder'),
   taskPinned: $('taskPinned'),
   taskCountdown: $('taskCountdown'),
+  taskShared: $('taskShared'),
   taskTags: $('taskTags'),
   taskSubtasks: $('taskSubtasks'),
   taskNote: $('taskNote'),
@@ -1686,7 +1687,7 @@ function taskCard(task, dateKey) {
     <article class="task-card ${done ? 'done' : ''} ${overdue ? 'overdue' : ''} ${task.pinned ? 'pinned' : ''}" style="--category-color:${color}" draggable="true" data-task-id="${task.id}" data-task-date="${dateKey}">
       <div class="task-top">
         <input type="checkbox" ${done ? 'checked' : ''} data-toggle-done="${task.id}" data-done-date="${dateKey}" aria-label="完成 ${escapeHtml(task.title)}" />
-        <div class="task-title">${escapeHtml(task.title)}</div>
+        <div class="task-title">${escapeHtml(task.title)}${task.shared ? '<span class="shared-badge" title="家人共享行程" style="font-size:0.8em;">👨‍👩‍👧</span>' : ''}</div>
         <div class="task-actions">
           <button class="small-btn" data-toggle-pin="${task.id}" title="置頂 / 取消置頂">${task.pinned ? '📌' : '📍'}</button>
           <button class="small-btn" data-copy-task="${task.id}" title="複製到明天">⧉</button>
@@ -2695,6 +2696,7 @@ function openTaskDialog(defaults = {}, occurrenceDate = '') {
   els.taskReminder.value = String(defaults.reminder ?? 10);
   els.taskPinned.checked = Boolean(defaults.pinned);
   els.taskCountdown.checked = Boolean(defaults.countdown);
+  els.taskShared.checked = Boolean(defaults.shared);
   els.taskTags.value = (defaults.tags || []).map((tag) => `#${tag}`).join(', ');
   els.taskSubtasks.value = (defaults.subtasks || []).join('\n');
   els.taskNote.value = defaults.note || '';
@@ -2771,6 +2773,7 @@ function saveTaskFromForm(event) {
     reminder: Number(els.taskReminder.value),
     pinned: els.taskPinned.checked,
     countdown: els.taskCountdown.checked,
+    shared: els.taskShared.checked,
     tags: parseTags(els.taskTags.value),
     subtasks: linesFromTextarea(els.taskSubtasks.value),
     note: els.taskNote.value.trim(),
@@ -4173,6 +4176,7 @@ function normalizeStoredData() {
       completedDates,
       pinned: Boolean(task.pinned),
       countdown: Boolean(task.countdown),
+      shared: Boolean(task.shared),
       tags: Array.isArray(task.tags) ? task.tags.filter(Boolean) : [],
       subtasks: Array.isArray(task.subtasks) ? task.subtasks.filter(Boolean) : [],
       excludedDates: Array.isArray(task.excludedDates) ? task.excludedDates.filter(Boolean) : [],
