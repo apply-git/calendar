@@ -21,6 +21,11 @@ const WEATHER_FALLBACK_LAT = 22.63; // 高雄（定位被拒絕/逾時/失敗時
 const WEATHER_FALLBACK_LON = 120.30;
 let weatherWarned = false; // console.warn 最多一次，避免零設定環境洗版
 
+const HOLIDAYS_KEY = 'desktop-schedule-holidays-v1'; // 動態假日快取，刻意不納入 buildBackupPayload()/applyBackupObject()
+const HOLIDAYS_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 天內不重抓
+let holidayWarned = false; // console.warn 最多一次，避免零設定環境洗版
+let dynamicHolidays = {}; // init() 時從 localStorage 載入進記憶體，供 getHoliday() 優先查詢
+
 // 台灣國定假日對照表（2025–2027年，含補假／彈性放假）。資料來源：行政院人事行政總處公告辦公日曆表。
 const TAIWAN_HOLIDAYS = {
   '2025-01-01': '元旦',
@@ -383,6 +388,8 @@ function init() {
   // 全新安裝／無資料時保持空白，不再自動塞範例行程：
   // 範例行程曾在雲端同步時被誤推上雲端蓋掉正式資料，且對新使用者也未必需要。
   normalizeStoredData();
+  const storedHolidays = getStoredHolidays();
+  if (storedHolidays && storedHolidays.days) dynamicHolidays = storedHolidays.days;
   bindEvents();
   setupMobilePanels();
   setupVoiceInput();
@@ -399,6 +406,13 @@ function init() {
   // 不顯示天氣但其他功能不受影響；fetchWeather() 內部已包 try/catch 靜默降級。
   if (location.protocol !== 'file:' && navigator.onLine) {
     fetchWeather();
+  }
+
+  // 台灣假日自動更新（TaiwanCalendar CDN，免金鑰）：零設定零影響，規則同天氣——
+  // file:// 雙擊開啟或離線時完全跳過，繼續使用內建 TAIWAN_HOLIDAYS 靜態表；
+  // fetchHolidayUpdates() 內部已包 try/catch 靜默降級，且 30 天內不重抓。
+  if (location.protocol !== 'file:' && navigator.onLine) {
+    fetchHolidayUpdates();
   }
 }
 
@@ -642,6 +656,53 @@ function getStoredWeather() {
 
 function isWeatherFresh(w) {
   return Boolean(w && w.fetchedAt && (Date.now() - w.fetchedAt) < WEATHER_TTL_MS && w.days);
+}
+
+// ============================================================================
+// 台灣假日自動更新（TaiwanCalendar CDN，免金鑰）。零設定零影響：init() 只在非 file:// 且
+// navigator.onLine 時才呼叫 fetchHolidayUpdates()；30 天內不重抓（HOLIDAYS_TTL_MS）；
+// 任何失敗（無網路、CDN 掛掉、格式異常）都靜默降級，繼續使用 TAIWAN_HOLIDAYS 靜態表，
+// console 最多 warn 一次（見 holidayWarned）。HOLIDAYS_KEY 只是快取，刻意不納入
+// buildBackupPayload()/applyBackupObject()。getHoliday() 會先查 dynamicHolidays，查無再查靜態表。
+// ============================================================================
+
+function getStoredHolidays() {
+  return loadJson(HOLIDAYS_KEY, null);
+}
+
+function isHolidaysFresh(h) {
+  return Boolean(h && h.fetchedAt && (Date.now() - h.fetchedAt) < HOLIDAYS_TTL_MS && h.days);
+}
+
+async function fetchHolidayUpdates() {
+  try {
+    if (isHolidaysFresh(getStoredHolidays())) return;
+    const thisYear = new Date().getFullYear();
+    const years = [thisYear, thisYear + 1];
+    const results = await Promise.all(years.map(async (year) => {
+      const res = await fetch(`https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`holidays http ${res.status}`);
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error('holidays data 格式異常');
+      return data;
+    }));
+    const days = {};
+    results.flat().forEach((item) => {
+      if (!item || item.isHoliday !== true || !item.description) return;
+      const raw = String(item.date || '');
+      if (!/^\d{8}$/.test(raw)) return;
+      const dateKey = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+      days[dateKey] = item.description;
+    });
+    saveJson(HOLIDAYS_KEY, { fetchedAt: Date.now(), days });
+    dynamicHolidays = days;
+    render();
+  } catch (err) {
+    if (!holidayWarned) {
+      holidayWarned = true;
+      console.warn('[calendar] 假日資料更新失敗，改用內建靜態表', err);
+    }
+  }
 }
 
 // 取某天（'YYYY-MM-DD'）的天氣資料，沒有快取或該天不在 7 天預報內時回傳 null。
@@ -3495,7 +3556,7 @@ function repeatDisplayLabel(task) {
 }
 
 function getHoliday(dateKey) {
-  return TAIWAN_HOLIDAYS[dateKey] || '';
+  return dynamicHolidays[dateKey] || TAIWAN_HOLIDAYS[dateKey] || '';
 }
 
 function holidayBanner(name) {
