@@ -108,6 +108,7 @@ const repeatLabel = {
   interval: '每隔 N 天',
   weekdays: '只工作日',
   monthlyNth: '每月第 N 個週幾',
+  'lunar-yearly': '農曆每年',
 };
 const WEEKDAY_ICS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 const WEEKDAY_FULL_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
@@ -2926,6 +2927,9 @@ function buildRRule(task) {
       const weekday = WEEKDAY_ICS[Number(task.repeatWeekday) || 0];
       return `FREQ=MONTHLY;BYDAY=${nth}${weekday}`;
     }
+    // 'lunar-yearly'：標準 RRULE 無法表達「依農曆日期每年重複」，故不產生 RRULE，
+    // 匯出時降級為單次事件（.ics 只會有 DTSTART 那天，即首次日期）。
+    case 'lunar-yearly': return '';
     default: return '';
   }
 }
@@ -3344,6 +3348,15 @@ function occursOnDate(task, dateKey) {
     if (nth === -1) return target.getDate() + 7 > daysInMonth(target);
     return nthWeekdayInMonth(target) === nth;
   }
+  if (task.repeat === 'lunar-yearly') {
+    // 農曆每年：把首次日期與目標日期都換算成農曆（月, 日），比對月日是否相同。
+    // 目標日期若落在閏月，一律視為不匹配，避免閏月年同一農曆月日出現兩次。
+    const baseLunar = solarToLunarInfo(base);
+    const targetLunar = solarToLunarInfo(target);
+    if (!baseLunar || !targetLunar) return false;
+    if (targetLunar.isLeap) return false;
+    return baseLunar.month === targetLunar.month && baseLunar.day === targetLunar.day;
+  }
   return false;
 }
 
@@ -3500,7 +3513,7 @@ function renderErrorLogSummary() {
 // 資料檢查／修復工具：純檢查 tasks 陣列的常見壞資料型態，不主動修改資料，
 // 由呼叫端（openDataCheckDialog()）決定何時顯示；真正修改資料的是 fixDataIssues()。
 // ============================================================================
-const VALID_REPEAT_VALUES = new Set(['none', 'daily', 'weekly', 'monthly', 'interval', 'weekdays', 'monthlyNth']);
+const VALID_REPEAT_VALUES = new Set(['none', 'daily', 'weekly', 'monthly', 'interval', 'weekdays', 'monthlyNth', 'lunar-yearly']);
 const DATE_FIELD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function runDataCheck() {
