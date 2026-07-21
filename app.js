@@ -160,6 +160,8 @@ let timelineDragMoved = false;
 // saveTaskFromForm() 送出前的保險解析只在欄位仍等於這份快照（=使用者沒手動改過）時才套用，
 // 避免蓋掉使用者手動調整過的日期/時間。
 let taskDialogDefaults = { date: '', start: '', end: '' };
+// 編輯重複行程時，保留使用者點選的實際出現日；系列本身的 task.date 仍是起始日。
+let editingOccurrenceDate = '';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -235,6 +237,9 @@ const els = {
   taskRepeatNth: $('taskRepeatNth'),
   repeatWeekdayField: $('repeatWeekdayField'),
   taskRepeatWeekday: $('taskRepeatWeekday'),
+  taskScopeField: $('taskScopeField'),
+  taskScope: $('taskScope'),
+  taskScopeHint: $('taskScopeHint'),
   taskReminder: $('taskReminder'),
   taskPinned: $('taskPinned'),
   taskCountdown: $('taskCountdown'),
@@ -563,6 +568,7 @@ function bindEvents() {
   els.taskForm.addEventListener('submit', saveTaskFromForm);
   [els.taskDate, els.taskStart, els.taskEnd].forEach((el) => el.addEventListener('input', updateConflictWarning));
   els.taskRepeat.addEventListener('change', updateRepeatFieldsVisibility);
+  els.taskScope.addEventListener('change', handleTaskScopeChange);
   // 自然語言快速新增：標題欄位失焦時嘗試解析中文日期/時間語彙，見 parseNaturalDateTime()。
   els.taskTitle.addEventListener('blur', applyNaturalLanguageParse);
 
@@ -975,7 +981,7 @@ function renderCountdownPanel() {
         const daysLabel = days <= 0 ? '就是今天！' : `還有 ${days} 天`;
         const md = formatMonthDay(new Date(`${dateKey}T00:00:00`));
         return `
-          <div class="countdown-item" data-countdown-edit="${task.id}">
+          <div class="countdown-item" data-countdown-edit="${task.id}" data-countdown-date="${dateKey}">
             <span class="countdown-days ${days <= 0 ? 'countdown-today' : ''}">${daysLabel}</span>
             <span class="countdown-title">${escapeHtml(task.title)}</span>
             <span class="muted">${md}</span>
@@ -1473,22 +1479,29 @@ function closeWeeklyReviewDialog() {
   els.weeklyReviewDialog.close();
 }
 
-function openTaskDialog(defaults = {}) {
+function openTaskDialog(defaults = {}, occurrenceDate = '') {
   renderCategoryOptions();
   const isEdit = Boolean(defaults.id);
-  els.dialogTitle.textContent = isEdit ? '編輯行程' : '新增行程';
+  const isRecurringOccurrence = isEdit && defaults.repeat !== 'none' && Boolean(occurrenceDate);
+  editingOccurrenceDate = isRecurringOccurrence ? occurrenceDate : '';
+  els.dialogTitle.textContent = isRecurringOccurrence ? '編輯重複行程' : (isEdit ? '編輯行程' : '新增行程');
   els.taskId.value = defaults.id || '';
   els.taskTitle.value = defaults.title || '';
-  els.taskDate.value = defaults.date || toDateInput(currentDate);
+  els.taskDate.value = editingOccurrenceDate || defaults.date || toDateInput(currentDate);
   els.taskStart.value = defaults.start || '09:00';
   els.taskEnd.value = defaults.end || '10:00';
   els.taskPriority.value = defaults.priority || 'medium';
   els.taskCategory.value = defaults.category || '工作';
   els.taskRepeat.value = defaults.repeat || 'none';
   const repeatBaseDate = defaults.date ? new Date(`${defaults.date}T00:00:00`) : currentDate;
-  els.taskRepeatInterval.value = String(defaults.repeatInterval || 2);
-  els.taskRepeatNth.value = String(defaults.repeatNth ?? nthWeekdayInMonth(repeatBaseDate));
-  els.taskRepeatWeekday.value = String(defaults.repeatWeekday ?? repeatBaseDate.getDay());
+  els.taskRepeatInterval.value = String(Math.min(365, Math.max(2, Number(defaults.repeatInterval) || 2)));
+  els.taskRepeatNth.value = String([1, 2, 3, 4, -1].includes(Number(defaults.repeatNth)) ? Number(defaults.repeatNth) : nthWeekdayInMonth(repeatBaseDate));
+  els.taskRepeatWeekday.value = String(typeof defaults.repeatWeekday === 'number' ? defaults.repeatWeekday : repeatBaseDate.getDay());
+  els.taskScopeField.hidden = !isRecurringOccurrence;
+  els.taskScope.value = isRecurringOccurrence ? 'once' : 'series';
+  if (isRecurringOccurrence) {
+    els.taskScopeHint.textContent = `其他重複日期不會受影響（${formatMonthDay(new Date(`${occurrenceDate}T00:00:00`))}）`;
+  }
   updateRepeatFieldsVisibility();
   els.taskReminder.value = String(defaults.reminder ?? 10);
   els.taskPinned.checked = Boolean(defaults.pinned);
@@ -1508,15 +1521,44 @@ function openTaskDialog(defaults = {}) {
 function closeTaskDialog() {
   els.taskDialog.close();
   els.taskForm.reset();
+  els.taskScopeField.hidden = true;
+  editingOccurrenceDate = '';
   els.conflictWarning.hidden = true;
 }
 
 function updateRepeatFieldsVisibility() {
   const repeat = els.taskRepeat.value;
-  els.repeatIntervalField.hidden = repeat !== 'interval';
+  const isInterval = repeat === 'interval';
   const isNth = repeat === 'monthlyNth';
+
+  els.repeatIntervalField.hidden = !isInterval;
+  els.taskRepeatInterval.disabled = !isInterval;
+
   els.repeatNthField.hidden = !isNth;
+  els.taskRepeatNth.disabled = !isNth;
+
   els.repeatWeekdayField.hidden = !isNth;
+  els.taskRepeatWeekday.disabled = !isNth;
+}
+
+function handleTaskScopeChange() {
+  if (!editingOccurrenceDate) return;
+  const existingTask = tasks.find((item) => item.id === els.taskId.value);
+
+  if (els.taskScope.value === 'series') {
+    if (existingTask && existingTask.date) {
+      els.taskDate.value = existingTask.date;
+    }
+    els.taskScopeHint.textContent = '這會修改整個重複系列，以此日期為系列起始日。';
+  } else if (els.taskScope.value === 'future') {
+    els.taskDate.value = editingOccurrenceDate;
+    els.taskScopeHint.textContent = `這會修改此日期及之後所有重複日期，之前的日期不受影響。`;
+  } else {
+    els.taskDate.value = editingOccurrenceDate;
+    els.taskScopeHint.textContent = `其他重複日期不會受影響（${formatMonthDay(new Date(`${editingOccurrenceDate}T00:00:00`))}）`;
+  }
+
+  updateConflictWarning();
 }
 
 function saveTaskFromForm(event) {
@@ -1545,6 +1587,7 @@ function saveTaskFromForm(event) {
     note: els.taskNote.value.trim(),
     completedDates: existingTask?.completedDates || [],
     excludedDates: existingTask?.excludedDates || [],
+    repeatUntil: existingTask?.repeatUntil || '',
     sortOrder: existingTask?.sortOrder || Date.now(),
     createdAt: existingTask?.createdAt || new Date().toISOString(),
   };
@@ -1552,14 +1595,57 @@ function saveTaskFromForm(event) {
   if (!task.title) return showToast('請輸入事項名稱');
   if (task.end <= task.start) return showToast('結束時間需晚於開始時間');
 
-  const index = tasks.findIndex((item) => item.id === task.id);
-  if (index >= 0) tasks[index] = task;
-  else tasks.push(task);
+  const editOnce = Boolean(existingTask && editingOccurrenceDate && existingTask.repeat !== 'none' && els.taskScope.value === 'once');
+  const editFuture = Boolean(existingTask && editingOccurrenceDate && existingTask.repeat !== 'none' && els.taskScope.value === 'future');
+  if (editOnce) {
+    existingTask.excludedDates = [...new Set([...(existingTask.excludedDates || []), editingOccurrenceDate])];
+    tasks.push({
+      ...task,
+      id: crypto.randomUUID(),
+      date: task.date,
+      repeat: 'none',
+      completedDates: (existingTask.completedDates || []).includes(editingOccurrenceDate) ? [task.date] : [],
+      excludedDates: [],
+      originalSeriesId: existingTask.id,
+      originalOccurrenceDate: editingOccurrenceDate,
+      sortOrder: Date.now(),
+      createdAt: new Date().toISOString(),
+    });
+  } else if (editFuture) {
+    if (existingTask.date === editingOccurrenceDate) {
+      const index = tasks.findIndex((item) => item.id === task.id);
+      if (index >= 0) tasks[index] = task;
+      else tasks.push(task);
+    } else {
+      const splitDate = editingOccurrenceDate;
+      const splitUntil = toDateInput(addDays(new Date(`${splitDate}T00:00:00`), -1));
+      const oldExcludedDates = Array.isArray(existingTask.excludedDates) ? existingTask.excludedDates : [];
+      const preservedExcludedDates = oldExcludedDates.filter((date) => date >= splitDate);
+      existingTask.excludedDates = oldExcludedDates.filter((date) => date < splitDate);
+      existingTask.repeatUntil = splitUntil;
+      const originalCompleted = Array.isArray(existingTask.completedDates) ? existingTask.completedDates : [];
+      tasks.push({
+        ...task,
+        id: crypto.randomUUID(),
+        date: splitDate,
+        excludedDates: preservedExcludedDates,
+        completedDates: originalCompleted.filter((date) => date >= splitDate),
+        originalSeriesId: existingTask.id,
+        originalOccurrenceDate: splitDate,
+        sortOrder: Date.now(),
+        createdAt: new Date().toISOString(),
+      });
+    }
+  } else {
+    const index = tasks.findIndex((item) => item.id === task.id);
+    if (index >= 0) tasks[index] = task;
+    else tasks.push(task);
+  }
 
   saveJson(STORAGE_KEY, tasks);
   closeTaskDialog();
   render();
-  showToast('行程已儲存');
+  showToast(editOnce ? '已修改這次行程' : '行程已儲存');
 }
 
 // ----------------------------------------------------------------------------
@@ -1655,11 +1741,17 @@ function setupVoiceInput() {
 function deleteCurrentTask() {
   const id = els.taskId.value;
   if (!id) return;
-  tasks = tasks.filter((task) => task.id !== id);
+  const task = tasks.find((item) => item.id === id);
+  const deleteOnce = Boolean(task && editingOccurrenceDate && task.repeat !== 'none' && els.taskScope.value === 'once');
+  if (deleteOnce) {
+    task.excludedDates = [...new Set([...(task.excludedDates || []), editingOccurrenceDate])];
+  } else {
+    tasks = tasks.filter((item) => item.id !== id);
+  }
   saveJson(STORAGE_KEY, tasks);
   closeTaskDialog();
   render();
-  showToast('行程已刪除');
+  showToast(deleteOnce ? '已刪除這次行程' : '行程已刪除');
 }
 
 function copyTaskToTomorrow(id) {
@@ -1704,8 +1796,9 @@ function handleCalendarClick(event) {
   const countdownEditId = event.target.closest('[data-countdown-edit]')?.dataset.countdownEdit;
 
   if (countdownEditId) {
+    const countdownItem = event.target.closest('[data-countdown-edit]');
     const task = tasks.find((item) => item.id === countdownEditId);
-    if (task) openTaskDialog(task);
+    if (task) openTaskDialog(task, countdownItem?.dataset.countdownDate || '');
   }
   if (applyTemplateId) applyTemplate(applyTemplateId);
   if (deleteTemplateId) deleteTemplate(deleteTemplateId);
@@ -1713,7 +1806,8 @@ function handleCalendarClick(event) {
   if (copyId) copyTaskToTomorrow(copyId);
   if (editId) {
     const task = tasks.find((item) => item.id === editId);
-    if (task) openTaskDialog(task);
+    const occurrenceDate = event.target.closest('[data-task-date]')?.dataset.taskDate || '';
+    if (task) openTaskDialog(task, occurrenceDate);
   }
   if (deleteId) {
     tasks = tasks.filter((task) => task.id !== deleteId);
@@ -1741,7 +1835,7 @@ function handleCalendarClick(event) {
   const timelineBlock = event.target.closest('.timeline-block');
   if (!timelineHandle && !timelineCheck && timelineBlock && !timelineDragMoved) {
     const task = tasks.find((item) => item.id === timelineBlock.dataset.taskId);
-    if (task) openTaskDialog(task);
+    if (task) openTaskDialog(task, timelineBlock.dataset.taskDate || '');
   }
   if (timelineDragMoved) timelineDragMoved = false;
 }
@@ -1900,7 +1994,7 @@ function updateConflictWarning() {
   const conflicts = tasks.filter((task) => task.id !== currentId && occursOnDate(task, date) && timeOverlaps(start, end, task.start, task.end));
   if (conflicts.length) {
     els.conflictWarning.hidden = false;
-    els.conflictWarning.textContent = `⚠️ 時間可能衝突：${conflicts.map((task) => task.title).join('、')}`;
+    els.conflictWarning.textContent = `⚠️ 與下列行程時間重疊：${conflicts.map((task) => `${task.start}–${task.end} ${task.title}（${task.category}）`).join('、')}。請調整時間或儲存後手動確認。`;
   } else {
     els.conflictWarning.hidden = true;
   }
@@ -2442,6 +2536,9 @@ function normalizeStoredData() {
       repeatWeekday: Number.isFinite(Number(task.repeatWeekday)) ? Math.min(6, Math.max(0, Math.floor(Number(task.repeatWeekday)))) : new Date(`${task.date}T00:00:00`).getDay(),
       repeatNth: [1, 2, 3, 4, -1].includes(Number(task.repeatNth)) ? Number(task.repeatNth) : 1,
       reminder: Number.isFinite(Number(task.reminder)) ? Number(task.reminder) : 10,
+      originalSeriesId: typeof task.originalSeriesId === 'string' ? task.originalSeriesId : '',
+      originalOccurrenceDate: typeof task.originalOccurrenceDate === 'string' ? task.originalOccurrenceDate : '',
+      repeatUntil: typeof task.repeatUntil === 'string' ? task.repeatUntil : '',
       sortOrder: Number(task.sortOrder || 0),
     };
   });
@@ -2469,6 +2566,10 @@ function occursOnDate(task, dateKey) {
   const base = startOfDay(new Date(`${task.date}T00:00:00`));
   const target = startOfDay(new Date(`${dateKey}T00:00:00`));
   if (target < base) return false;
+  if (task.repeatUntil) {
+    const until = startOfDay(new Date(`${task.repeatUntil}T00:00:00`));
+    if (target > until) return false;
+  }
 
   if (task.repeat === 'daily') return true;
   if (task.repeat === 'weekly') return base.getDay() === target.getDay();

@@ -212,6 +212,7 @@ button:active { transform: translateY(0); }
   flex-direction: column;
   gap: 7px;
 }
+.field[hidden] { display: none; }
 .field.full { grid-column: 1 / -1; }
 /* 事項名稱欄位：輸入框＋語音輸入鈕同列（voiceInputBtn 不支援的瀏覽器會被 JS 整顆 remove，
    這裡的 flex 版型在按鈕不存在時 input 自然佔滿整列，不會跑版）。 */
@@ -1075,3 +1076,15 @@ body.widget-mode .task-card { font-size: 14px; }
   .panel { box-shadow: none; border: 1px solid #ddd; }
   .calendar-view { min-height: auto; }
 }
+
+/* 頁尾版權宣告 */
+.app-footer {
+  text-align: center;
+  padding: 6px 0 18px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #000;
+  font-family: "Yuanti TC", "YouYuan", "幼圓", "Microsoft JhengHei", "PingFang TC", sans-serif;
+}
+body.dark .app-footer { color: #fff; }
+@media print { .app-footer { display: none !important; } }

@@ -10,6 +10,7 @@
 
 - 行程搜尋（`searchInput` + `getFilteredTasks`）
 - 行程衝突提醒（`conflictWarning` + `timeOverlaps`）
+- 重複行程單次編輯與「這次及之後」編輯已上線
 - 習慣追蹤（`HABIT_KEY` + `renderHabits`，非半成品）
 - 本週 / 本月完成統計（數字）
 - PWA 基礎檔案已存在（`manifest.json`、`service-worker.js`、`icons/`、`start-pwa-local.bat`）

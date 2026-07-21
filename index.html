@@ -179,6 +179,8 @@
     </main>
   </div>
 
+  <footer class="app-footer">© 2026 行事曆0.001版</footer>
+
   <button id="fabAddBtn" class="fab-add" hidden aria-label="新增行程">＋</button>
 
   <dialog id="taskDialog" class="task-dialog">
@@ -256,6 +258,15 @@
             <option value="4">第 4 個</option>
             <option value="-1">最後一個</option>
           </select>
+        </div>
+        <div class="field full" id="taskScopeField" hidden>
+          <label for="taskScope">套用範圍</label>
+          <select id="taskScope">
+            <option value="once">僅修改這次</option>
+            <option value="future">修改這次及之後</option>
+            <option value="series">修改整個重複系列</option>
+          </select>
+          <p class="muted" id="taskScopeHint">其他重複日期不會受影響</p>
         </div>
         <div class="field" id="repeatWeekdayField" hidden>
           <label for="taskRepeatWeekday">星期</label>
