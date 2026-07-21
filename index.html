@@ -109,32 +109,58 @@
             <button class="view-btn day-mode-btn active" data-day-mode="list">清單</button>
             <button class="view-btn day-mode-btn" data-day-mode="timeline">時間軸</button>
           </div>
-          <button id="clearDayBtn" class="ghost-btn" hidden>🗑 清空當日</button>
-          <button id="deferBtn" class="ghost-btn" hidden>⏭ 未完成順延</button>
-          <button id="shareCardBtn" class="ghost-btn" hidden>🖼 分享圖卡</button>
-          <button id="clearWeekBtn" class="ghost-btn" hidden>🗑 清空本週</button>
-          <button id="clearMonthBtn" class="ghost-btn" hidden>🗑 清空本月</button>
+          <button id="clearDayBtn" class="ghost-btn grouped-tool" hidden>🗑 清空當日</button>
+          <button id="deferBtn" class="ghost-btn grouped-tool" hidden>⏭ 未完成順延</button>
+          <button id="shareCardBtn" class="ghost-btn grouped-tool" hidden>🖼 分享圖卡</button>
+          <button id="clearWeekBtn" class="ghost-btn grouped-tool" hidden>🗑 清空本週</button>
+          <button id="clearMonthBtn" class="ghost-btn grouped-tool" hidden>🗑 清空本月</button>
+
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="viewActionsMenuBtn" class="ghost-btn toolbar-menu-btn">⚡ 檢視動作 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="modesMenuBtn" class="ghost-btn toolbar-menu-btn">🖥 模式 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="toolsMenuBtn" class="ghost-btn toolbar-menu-btn">🧰 工具 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="analyticsMenuBtn" class="ghost-btn toolbar-menu-btn">📊 分析 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="exportMenuBtn" class="ghost-btn toolbar-menu-btn">📤 匯出入 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="settingsMenuBtn" class="ghost-btn toolbar-menu-btn">⚙ 設定 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+
           <button id="commandPaletteBtn" class="ghost-btn" title="命令面板 (Ctrl+K)" aria-label="命令面板">🔍</button>
           <button id="themeBtn" class="ghost-btn">🌙</button>
-          <button id="enableNotificationsBtn" class="ghost-btn">🔔 開啟通知</button>
+          <button id="enableNotificationsBtn" class="ghost-btn grouped-tool">🔔 開啟通知</button>
           <button id="cloudSyncBtn" class="ghost-btn">☁️ 雲端同步</button>
-          <button id="backupBtn" class="ghost-btn">備份</button>
-          <button id="restoreBtn" class="ghost-btn">還原</button>
+          <button id="backupBtn" class="ghost-btn grouped-tool">備份</button>
+          <button id="restoreBtn" class="ghost-btn grouped-tool">還原</button>
           <input id="restoreFileInput" type="file" accept="application/json,.json" hidden />
-          <button id="settingsBtn" class="ghost-btn">文字設定</button>
-          <button id="pomodoroBtn" class="ghost-btn">🍅 番茄鐘</button>
-          <button id="todayTodoBtn" class="ghost-btn">今日待辦</button>
-          <button id="weeklyReviewBtn" class="ghost-btn">📊 週回顧</button>
-          <button id="dashboardBtn" class="ghost-btn">📈 統計</button>
-          <button id="dataCheckBtn" class="ghost-btn" title="檢查行程資料是否有壞資料並可一鍵修復">🩺 資料檢查</button>
-          <button id="widgetModeBtn" class="ghost-btn">小工具模式</button>
-          <button id="cleanupBtn" class="ghost-btn">清理舊行程</button>
-          <button id="exportCsvBtn" class="ghost-btn">匯出 Excel</button>
-          <button id="printBtn" class="ghost-btn">匯出 PDF</button>
-          <button id="exportIcsBtn" class="ghost-btn">匯出 .ics</button>
-          <button id="importIcsBtn" class="ghost-btn">匯入 .ics</button>
+          <button id="settingsBtn" class="ghost-btn grouped-tool">文字設定</button>
+          <button id="pomodoroBtn" class="ghost-btn grouped-tool">🍅 番茄鐘</button>
+          <button id="todayTodoBtn" class="ghost-btn grouped-tool">今日待辦</button>
+          <button id="weeklyReviewBtn" class="ghost-btn grouped-tool">📊 週回顧</button>
+          <button id="dashboardBtn" class="ghost-btn grouped-tool">📈 統計</button>
+          <button id="dataCheckBtn" class="ghost-btn grouped-tool" title="檢查行程資料是否有壞資料並可一鍵修復">🩺 資料檢查</button>
+          <button id="widgetModeBtn" class="ghost-btn grouped-tool">小工具模式</button>
+          <button id="cleanupBtn" class="ghost-btn grouped-tool">清理舊行程</button>
+          <button id="exportCsvBtn" class="ghost-btn grouped-tool">匯出 Excel</button>
+          <button id="printBtn" class="ghost-btn grouped-tool">匯出 PDF</button>
+          <button id="exportIcsBtn" class="ghost-btn grouped-tool">匯出 .ics</button>
+          <button id="importIcsBtn" class="ghost-btn grouped-tool">匯入 .ics</button>
           <input id="importIcsFileInput" type="file" accept=".ics,text/calendar" hidden />
-          <button id="batchAddBtn" class="ghost-btn">📋 批量新增</button>
+          <button id="batchAddBtn" class="ghost-btn grouped-tool">📋 批量新增</button>
           <button id="moreToolsBtn" class="ghost-btn" hidden>⋯ 更多</button>
         </div>
       </header>

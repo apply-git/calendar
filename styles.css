@@ -204,6 +204,53 @@ button:active { transform: translateY(0); }
   background: var(--primary);
 }
 
+/* 桌面工具列六組下拉選單（app.js setupToolbarMenus()）：proxy 模式，原按鈕不搬不刪，
+   只在桌面寬度用 .grouped-tool 隱藏原按鈕本體，選單項目由 JS 動態重建。 */
+@media (min-width: 761px) {
+  .toolbar-actions .grouped-tool { display: none !important; }
+}
+.toolbar-menu-wrap { position: relative; }
+.toolbar-menu-btn.active {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-strong));
+  border-color: var(--primary);
+}
+.toolbar-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 24px rgba(44, 64, 105, .16), 0 2px 8px rgba(44, 64, 105, .08);
+  animation: dialog-pop-in .16s ease-out;
+}
+body.dark .toolbar-menu {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .45), 0 2px 8px rgba(0, 0, 0, .3);
+}
+.toolbar-menu[hidden] { display: none; }
+.toolbar-menu-item {
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  white-space: nowrap;
+}
+.toolbar-menu-item:hover {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+@media (max-width: 760px) {
+  .toolbar-menu-wrap { display: none !important; }
+}
+
 .controls {
   display: grid;
   grid-template-columns: 1fr 170px 160px 150px;

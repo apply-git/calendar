@@ -382,6 +382,64 @@ setupErrorLogging();
 const VIEW_CONTROLLED_TOOLBAR_IDS = new Set(['clearDayBtn', 'deferBtn', 'shareCardBtn', 'clearWeekBtn', 'clearMonthBtn']);
 let overflowHiddenIds = []; // stack：越後面代表越晚被藏，還原時優先還原最近被藏的（LIFO）
 
+// 桌面工具列六組下拉選單（setupToolbarMenus()）設定表：同樣的教訓，必須宣告在 init() 呼叫【之前】。
+// items 成員為 {proxyId}（點擊時代原按鈕 .click()，文字/隱藏狀態都取自原按鈕）或
+// {label, onClick}（沒有對應原按鈕、直接執行函式，例如看板模式）。
+const TOOLBAR_MENU_GROUPS = [
+  {
+    btnId: 'viewActionsMenuBtn',
+    items: [
+      { proxyId: 'clearDayBtn' },
+      { proxyId: 'clearWeekBtn' },
+      { proxyId: 'clearMonthBtn' },
+      { proxyId: 'deferBtn' },
+      { proxyId: 'shareCardBtn' },
+    ],
+  },
+  {
+    btnId: 'modesMenuBtn',
+    items: [
+      { proxyId: 'todayTodoBtn' },
+      { proxyId: 'widgetModeBtn' },
+      { label: '🖥 看板模式', onClick: () => openKioskMode() },
+    ],
+  },
+  {
+    btnId: 'toolsMenuBtn',
+    items: [
+      { proxyId: 'pomodoroBtn' },
+      { proxyId: 'batchAddBtn' },
+      { proxyId: 'dataCheckBtn' },
+      { proxyId: 'cleanupBtn' },
+    ],
+  },
+  {
+    btnId: 'analyticsMenuBtn',
+    items: [
+      { proxyId: 'dashboardBtn' },
+      { proxyId: 'weeklyReviewBtn' },
+    ],
+  },
+  {
+    btnId: 'exportMenuBtn',
+    items: [
+      { proxyId: 'backupBtn' },
+      { proxyId: 'restoreBtn' },
+      { proxyId: 'exportCsvBtn' },
+      { proxyId: 'printBtn' },
+      { proxyId: 'exportIcsBtn' },
+      { proxyId: 'importIcsBtn' },
+    ],
+  },
+  {
+    btnId: 'settingsMenuBtn',
+    items: [
+      { proxyId: 'enableNotificationsBtn' },
+      { proxyId: 'settingsBtn' },
+    ],
+  },
+];
+
 // init() 包一層 try/catch：正常情況（index.html 有完整 DOM）不會走到 catch，
 // 但 tests.html 只載入 app.js、沒有任何畫面元素時 init() 一定會因為存取 null
 // 的 DOM 節點而丟出例外——沒有這層保護，例外會中斷整支 app.js 的執行，導致
@@ -406,6 +464,7 @@ function init() {
   if (storedHolidays && storedHolidays.days) dynamicHolidays = storedHolidays.days;
   bindEvents();
   setupMobilePanels();
+  setupToolbarMenus();
   setupToolbarOverflow();
   setupVoiceInput();
   render();
@@ -524,6 +583,94 @@ function setupMobilePanels() {
 
   // 工具列「⋯ 更多」按鈕：顯示出來，實際開關與 proxy click 綁定在 bindEvents()。
   if (els.moreToolsBtn) els.moreToolsBtn.hidden = false;
+}
+
+// 桌面工具列六組下拉選單：TOOLBAR_MENU_GROUPS 設定表驅動，proxy 模式（零改既有綁定）。
+// 開啟選單時動態重建項目——文字/隱藏狀態當下即時取自原按鈕，原按鈕 hidden 的項目跳過不生成。
+function closeAllToolbarMenus() {
+  document.querySelectorAll('.toolbar-menu-wrap').forEach((wrap) => {
+    const menu = wrap.querySelector('.toolbar-menu');
+    const btn = wrap.querySelector('.toolbar-menu-btn');
+    if (menu) menu.hidden = true;
+    if (btn) btn.classList.remove('active');
+  });
+}
+
+function renderToolbarMenuItems(group, menu) {
+  menu.innerHTML = '';
+  group.items.forEach((item) => {
+    let label;
+    let activate;
+    if (item.proxyId) {
+      const original = document.getElementById(item.proxyId);
+      if (!original || original.hidden) return; // 原按鈕 hidden → 跳過不生成
+      label = original.textContent;
+      activate = () => original.click();
+    } else {
+      label = item.label;
+      activate = item.onClick;
+    }
+    const itemBtn = document.createElement('button');
+    itemBtn.type = 'button';
+    itemBtn.className = 'toolbar-menu-item';
+    itemBtn.textContent = label;
+    itemBtn.addEventListener('click', () => {
+      closeAllToolbarMenus(); // 選完自動消失
+      activate();
+    });
+    menu.appendChild(itemBtn);
+  });
+}
+
+// 依 TOOLBAR_MENU_GROUPS 同步各群組鈕的 hidden：全部成員都 hidden 時群組鈕本身也 hidden。
+// 由 updateDayModeSwitch() 尾端呼叫（檢視切換會改變 clearDayBtn 等的 hidden，需即時同步）。
+function updateToolbarMenuButtons() {
+  TOOLBAR_MENU_GROUPS.forEach((group) => {
+    const btn = document.getElementById(group.btnId);
+    if (!btn) return;
+    const anyVisible = group.items.some((item) => {
+      if (!item.proxyId) return true; // 非 proxy 項目（如看板模式）永遠視為可用
+      const original = document.getElementById(item.proxyId);
+      return original && !original.hidden;
+    });
+    btn.hidden = !anyVisible;
+    if (!anyVisible) {
+      const wrap = btn.closest('.toolbar-menu-wrap');
+      const menu = wrap?.querySelector('.toolbar-menu');
+      if (menu) menu.hidden = true;
+      btn.classList.remove('active');
+    }
+  });
+}
+
+function setupToolbarMenus() {
+  TOOLBAR_MENU_GROUPS.forEach((group) => {
+    const btn = document.getElementById(group.btnId);
+    const wrap = btn?.closest('.toolbar-menu-wrap');
+    const menu = wrap?.querySelector('.toolbar-menu');
+    if (!btn || !wrap || !menu) return;
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const wasOpen = !menu.hidden;
+      closeAllToolbarMenus(); // 互斥：開一個關其他
+      if (!wasOpen) {
+        renderToolbarMenuItems(group, menu);
+        menu.hidden = false;
+        btn.classList.add('active');
+      }
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('.toolbar-menu-wrap')) return; // 點在選單/群組鈕內部不處理
+    closeAllToolbarMenus();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeAllToolbarMenus();
+  });
+
+  updateToolbarMenuButtons();
 }
 
 // 桌面版工具列動態溢出收合（跟上面手機版 setupMobilePanels() 並存、互不干擾）：
@@ -1821,6 +1968,7 @@ function updateDayModeSwitch() {
   document.querySelectorAll('.day-mode-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.dayMode === appSettings.dayViewMode);
   });
+  updateToolbarMenuButtons();
 }
 
 function openPomodoroDialog() {
