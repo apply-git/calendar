@@ -207,6 +207,16 @@ const els = {
   exportIcsBtn: $('exportIcsBtn'),
   importIcsBtn: $('importIcsBtn'),
   importIcsFileInput: $('importIcsFileInput'),
+  batchAddBtn: $('batchAddBtn'),
+  batchAddDialog: $('batchAddDialog'),
+  closeBatchAddBtn: $('closeBatchAddBtn'),
+  batchAddInput: $('batchAddInput'),
+  batchAddHint: $('batchAddHint'),
+  batchAddPreviewWrap: $('batchAddPreviewWrap'),
+  batchAddPreviewBody: $('batchAddPreviewBody'),
+  batchAddPreviewBtn: $('batchAddPreviewBtn'),
+  batchAddCancelBtn: $('batchAddCancelBtn'),
+  batchAddImportBtn: $('batchAddImportBtn'),
   searchLabel: $('searchLabel'),
   searchInput: $('searchInput'),
   filterCategory: $('filterCategory'),
@@ -238,6 +248,7 @@ const els = {
   taskDate: $('taskDate'),
   taskStart: $('taskStart'),
   taskEnd: $('taskEnd'),
+  findSlotBtn: $('findSlotBtn'),
   taskPriority: $('taskPriority'),
   taskCategory: $('taskCategory'),
   taskRepeat: $('taskRepeat'),
@@ -613,6 +624,13 @@ function bindEvents() {
   els.importIcsBtn.addEventListener('click', () => els.importIcsFileInput.click());
   els.importIcsFileInput.addEventListener('change', importIcs);
 
+  // 批量貼上匯入：見 openBatchAddDialog() 等函式（自然語言區塊下方）。
+  els.batchAddBtn?.addEventListener('click', openBatchAddDialog);
+  els.closeBatchAddBtn?.addEventListener('click', closeBatchAddDialog);
+  els.batchAddCancelBtn?.addEventListener('click', closeBatchAddDialog);
+  els.batchAddPreviewBtn?.addEventListener('click', renderBatchAddPreview);
+  els.batchAddImportBtn?.addEventListener('click', importBatchAddRows);
+
   // 手機版「⋯ 更多」工具視窗：桌面版 moreToolsBtn 一直是 hidden（setupMobilePanels()
   // 只在手機才移除 hidden），所以這段綁定即使一律執行也不影響桌面行為。dialog 內每顆
   // 按鈕都是 proxy：先關 dialog，再對原本的按鈕呼叫 .click()，不用搬動任何原按鈕。
@@ -659,6 +677,8 @@ function bindEvents() {
   els.taskScope.addEventListener('change', handleTaskScopeChange);
   // 自然語言快速新增：標題欄位失焦時嘗試解析中文日期/時間語彙，見 parseNaturalDateTime()。
   els.taskTitle.addEventListener('blur', applyNaturalLanguageParse);
+  // 找空檔：見 handleFindSlotClick() / findNextFreeSlot()（日期工具區）。
+  els.findSlotBtn?.addEventListener('click', handleFindSlotClick);
 
   // 每週回顧：桌面工具列鈕與「⋯ 更多」視窗內的按鈕都直接開啟 weeklyReviewDialog
   // （更多視窗這顆不是 proxy click，是自己的 click handler）。
@@ -1748,6 +1768,100 @@ function saveTaskFromForm(event) {
 }
 
 // ----------------------------------------------------------------------------
+// 批量貼上匯入：textarea 每行一筆，逐行丟給 parseNaturalDateTime() 解析日期/時間，
+// 解析不到的欄位用今天/全天。新增的 task 物件欄位形狀比照 saveTaskFromForm() 的預設值
+// （priority: medium、category: 分類清單第一項、repeat: none...），只是跳過表單 UI。
+// ----------------------------------------------------------------------------
+const BATCH_ADD_MAX_LINES = 50;
+let batchAddParsedRows = [];
+
+function openBatchAddDialog() {
+  els.batchAddInput.value = '';
+  els.batchAddHint.hidden = true;
+  els.batchAddPreviewWrap.hidden = true;
+  els.batchAddPreviewBody.innerHTML = '';
+  els.batchAddImportBtn.disabled = true;
+  batchAddParsedRows = [];
+  els.batchAddDialog.showModal();
+  els.batchAddInput.focus();
+}
+
+function closeBatchAddDialog() {
+  els.batchAddDialog.close();
+}
+
+function batchAddParseLines() {
+  const rawLines = els.batchAddInput.value.split('\n').map((line) => line.trim()).filter(Boolean);
+  let lines = rawLines;
+  if (rawLines.length > BATCH_ADD_MAX_LINES) {
+    lines = rawLines.slice(0, BATCH_ADD_MAX_LINES);
+    els.batchAddHint.textContent = `⚠️ 超過 ${BATCH_ADD_MAX_LINES} 行，僅解析前 ${BATCH_ADD_MAX_LINES} 筆（原始共 ${rawLines.length} 行）。`;
+    els.batchAddHint.hidden = false;
+  } else {
+    els.batchAddHint.hidden = true;
+  }
+
+  return lines.map((line) => {
+    const parsed = parseNaturalDateTime(line, new Date());
+    const title = (parsed.title || '').trim() || line;
+    return { title, date: parsed.date || '', start: parsed.start || '', end: parsed.end || '' };
+  });
+}
+
+function renderBatchAddPreview() {
+  const rows = batchAddParseLines();
+  batchAddParsedRows = rows;
+
+  els.batchAddPreviewBody.innerHTML = rows.map((row) => {
+    const dateLabel = row.date ? formatMonthDay(new Date(`${row.date}T00:00:00`)) : '今天';
+    const timeLabel = row.start ? `${row.start}–${row.end || row.start}` : '全天';
+    return `<tr><td>${escapeHtml(row.title)}</td><td>${escapeHtml(dateLabel)}</td><td>${escapeHtml(timeLabel)}</td></tr>`;
+  }).join('');
+  els.batchAddPreviewWrap.hidden = rows.length === 0;
+  els.batchAddImportBtn.disabled = rows.length === 0;
+  if (!rows.length) showToast('沒有可解析的行程，請確認貼上的內容');
+}
+
+function importBatchAddRows() {
+  const rows = batchAddParsedRows.length ? batchAddParsedRows : batchAddParseLines();
+  const validRows = rows.filter((row) => row.title);
+  if (!validRows.length) return showToast('沒有可匯入的行程');
+
+  const todayKey = toDateInput(new Date());
+  validRows.forEach((row) => {
+    tasks.push({
+      id: crypto.randomUUID(),
+      title: row.title,
+      date: row.date || todayKey,
+      start: row.start || '',
+      end: row.end || '',
+      priority: 'medium',
+      category: categories[0]?.name || '工作',
+      repeat: 'none',
+      repeatInterval: 2,
+      repeatWeekday: 0,
+      repeatNth: 1,
+      reminder: 10,
+      pinned: false,
+      countdown: false,
+      tags: [],
+      subtasks: [],
+      note: '',
+      completedDates: [],
+      excludedDates: [],
+      repeatUntil: '',
+      sortOrder: Date.now(),
+      createdAt: new Date().toISOString(),
+    });
+  });
+
+  saveJson(STORAGE_KEY, tasks);
+  closeBatchAddDialog();
+  render();
+  showToast(`已新增 ${validRows.length} 筆`);
+}
+
+// ----------------------------------------------------------------------------
 // 自然語言快速新增：DOM 掛接層。實際解析邏輯是不依賴 DOM 的純函式 parseNaturalDateTime()
 // （定義在檔案底部日期工具區），這裡只負責讀 #taskTitle、套用解析結果到表單欄位、
 // 顯示 toast。解析不到任何日期/時間語彙時完全不動作。
@@ -2097,6 +2211,63 @@ function updateConflictWarning() {
   } else {
     els.conflictWarning.hidden = true;
   }
+}
+
+// ----------------------------------------------------------------------------
+// 找空檔：純函式 findNextFreeSlot() 在「該日工作時間範圍」（appSettings.workStart~workEnd，
+// 設定 dialog 可調整，預設 7~21 點）內，找第一個長度足夠塞下 durationMinutes 的空隙。
+// 只看當天有 start/end 的行程（occursOnDate 判斷含重複行程），忽略全天（無時間）行程。
+// 找不到回傳 null；handleFindSlotClick() 負責串表單欄位、往後最多找 7 天、跳日期＋toast。
+// ----------------------------------------------------------------------------
+function findNextFreeSlot(dateKey, durationMinutes) {
+  const duration = Math.max(1, Math.round(Number(durationMinutes)) || 60);
+  const dayStartMin = clampHour(appSettings.workStart, 0, 23) * 60;
+  const dayEndMin = Math.max(dayStartMin, clampHour(appSettings.workEnd, 1, 24) * 60);
+
+  const busy = tasks
+    .filter((task) => task.start && task.end && occursOnDate(task, dateKey))
+    .map((task) => ({ start: timeToMinutes(task.start), end: timeToMinutes(task.end) }))
+    .filter((block) => block.end > block.start)
+    .sort((a, b) => a.start - b.start);
+
+  let cursor = dayStartMin;
+  for (const block of busy) {
+    if (block.start > cursor && block.start - cursor >= duration) {
+      return { start: minutesToTime(cursor), end: minutesToTime(cursor + duration) };
+    }
+    if (block.end > cursor) cursor = block.end;
+  }
+  if (dayEndMin - cursor >= duration) {
+    return { start: minutesToTime(cursor), end: minutesToTime(cursor + duration) };
+  }
+  return null;
+}
+
+function handleFindSlotClick() {
+  const startVal = els.taskStart.value;
+  const endVal = els.taskEnd.value;
+  const duration = (startVal && endVal && timeToMinutes(endVal) > timeToMinutes(startVal))
+    ? timeToMinutes(endVal) - timeToMinutes(startVal)
+    : 60;
+
+  let searchBase = els.taskDate.value ? new Date(`${els.taskDate.value}T00:00:00`) : new Date(currentDate);
+  if (Number.isNaN(searchBase.getTime())) searchBase = new Date(currentDate);
+
+  for (let i = 0; i < 7; i++) {
+    const dateKey = toDateInput(addDays(searchBase, i));
+    const slot = findNextFreeSlot(dateKey, duration);
+    if (slot) {
+      els.taskDate.value = dateKey;
+      els.taskStart.value = slot.start;
+      els.taskEnd.value = slot.end;
+      updateConflictWarning();
+      showToast(i === 0
+        ? `已填入 ${slot.start}–${slot.end}`
+        : `${formatMonthDay(new Date(`${dateKey}T00:00:00`))} 有空檔，已填入 ${slot.start}–${slot.end}`);
+      return;
+    }
+  }
+  showToast('未來 7 天都沒有足夠空檔');
 }
 
 function checkReminders() {

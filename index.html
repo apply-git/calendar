@@ -129,6 +129,7 @@
           <button id="exportIcsBtn" class="ghost-btn">匯出 .ics</button>
           <button id="importIcsBtn" class="ghost-btn">匯入 .ics</button>
           <input id="importIcsFileInput" type="file" accept=".ics,text/calendar" hidden />
+          <button id="batchAddBtn" class="ghost-btn">📋 批量新增</button>
           <button id="moreToolsBtn" class="ghost-btn" hidden>⋯ 更多</button>
         </div>
       </header>
@@ -213,7 +214,10 @@
         </div>
         <div class="field">
           <label for="taskEnd">結束</label>
-          <input id="taskEnd" type="time" required />
+          <div class="time-input-row">
+            <input id="taskEnd" type="time" required />
+            <button type="button" id="findSlotBtn" class="icon-btn" title="找空檔">⚡</button>
+          </div>
         </div>
         <div class="field">
           <label for="taskPriority">優先順序</label>
@@ -560,6 +564,33 @@
       <button type="button" class="more-tools-item" data-proxy="printBtn">匯出 PDF</button>
       <button type="button" class="more-tools-item" data-proxy="exportIcsBtn">匯出 .ics</button>
       <button type="button" class="more-tools-item" data-proxy="importIcsBtn">匯入 .ics</button>
+      <button type="button" class="more-tools-item" data-proxy="batchAddBtn">📋 批量新增</button>
+    </div>
+  </dialog>
+
+  <dialog id="batchAddDialog" class="task-dialog batch-add-dialog">
+    <div class="dialog-header">
+      <h2>📋 批量新增</h2>
+      <button type="button" id="closeBatchAddBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="field full">
+      <label for="batchAddInput">貼上多行行程，每行一筆</label>
+      <textarea id="batchAddInput" rows="8" placeholder="例如：&#10;明天下午3點 帶媽媽回診&#10;7/25 10:00 團隊會議&#10;買牛奶"></textarea>
+    </div>
+    <p id="batchAddHint" class="muted" hidden></p>
+
+    <div id="batchAddPreviewWrap" class="batch-add-preview-wrap" hidden>
+      <table class="batch-add-table">
+        <thead><tr><th>標題</th><th>日期</th><th>時間</th></tr></thead>
+        <tbody id="batchAddPreviewBody"></tbody>
+      </table>
+    </div>
+
+    <div class="batch-add-actions">
+      <button type="button" id="batchAddCancelBtn" class="ghost-btn">取消</button>
+      <button type="button" id="batchAddPreviewBtn" class="ghost-btn">解析預覽</button>
+      <button type="button" id="batchAddImportBtn" class="primary-btn" disabled>全部匯入</button>
     </div>
   </dialog>
 

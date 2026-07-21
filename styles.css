@@ -228,6 +228,48 @@ button:active { transform: translateY(0); }
   border: 1px solid var(--border);
 }
 .nl-hint { margin: 2px 0 0; font-size: 12px; }
+/* 結束時間欄位旁的「⚡ 找空檔」鈕：版型比照 title-input-row（輸入框＋圖示鈕同列）。 */
+.time-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.time-input-row input { flex: 1; min-width: 0; }
+.time-input-row .icon-btn {
+  flex-shrink: 0;
+  width: auto;
+  padding: 0 10px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+}
+
+/* 批量新增 dialog：textarea＋解析預覽表格＋動作列，沿用 task-dialog 外觀（含手機底部彈出）。 */
+.batch-add-preview-wrap {
+  margin: 4px 0 14px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.batch-add-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.batch-add-table th, .batch-add-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.batch-add-table th { color: var(--muted); font-weight: 700; background: var(--surface); }
+.batch-add-table tr:last-child td { border-bottom: 0; }
+.batch-add-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
 .checkbox-field { justify-content: end; }
 .checkbox-field label {
   display: flex;
@@ -1114,7 +1156,8 @@ body.widget-mode .task-card { font-size: 14px; }
   #exportIcsBtn,
   #importIcsBtn,
   #weeklyReviewBtn,
-  #dataCheckBtn {
+  #dataCheckBtn,
+  #batchAddBtn {
     display: none !important;
   }
 
