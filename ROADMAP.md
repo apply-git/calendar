@@ -126,3 +126,47 @@
 
 ### 剩餘另案項目
 Google Calendar 整合、時區旅行模式、專案任務依賴、錯誤紀錄自動上報、無障礙全面審查、通知 snooze 雲端化
+
+## 十一、第五波：行事曆-002（2026-07-22 晚間開工，總指揮 Fable 5）
+
+002 範圍＝另案六項全數銷案＋新功能 16 項＋體質強化。全速大批、小包快攻（1–2 功能/包）、循序施工（共用檔不並行）、逐包 `node --check`＋具名 commit；UI 異動先本機預覽確認才 push。模型限 Opus 4.8／Sonnet 5／Haiku 4.5。
+
+### W0 體質（先行，行為零變更）
+- [ ] R1（Opus）：app.js（5239 行）依頂層宣告邊界「純搬移」拆為循序載入多檔（app-01-*.js…），依序 cat 串回 diff 必須等於原檔；index.html script 順序、SW APP_SHELL、tests.html 同步更新；CACHE_NAME 升版 → 使用者本機 smoke 確認
+
+### W1 資料層
+- [ ] D1（Sonnet）：task.color 單筆自訂色彩＋task.location 地點欄位（Google Maps 連結）
+- [ ] D2（Sonnet）：多日曆本（calendars 清單、task.calendarId、疊加/單本切換）
+- [ ] D3（Sonnet）：專案任務依賴（task.dependsOn[]、前置未完擋勾選、鏈結 badge）
+- [ ] D4（Sonnet）：時區旅行模式（task.timezone、旅行模式換算顯示）
+
+### W2 檢視
+- [ ] V1（Sonnet）：年檢視＋全年熱力圖（點月跳轉）
+- [ ] V2（Sonnet）：甘特圖／專案時間軸（顯示 D3 依賴）
+- [ ] V3（Sonnet）：列印／PDF 月曆與議程（@media print）
+
+### W3 手機（UI 預覽檢查點）
+- [ ] M1（Sonnet）：手勢（滑動切月/週、行程左右滑完成/延後、長按快建）
+- [ ] M2（Sonnet）：手機底部導航列
+- [ ] M3（Haiku）：快速新增列＋震動回饋
+
+### W4 智慧與雲端
+- [ ] S1（Sonnet）：空檔智慧建議（依習慣時段）
+- [ ] S2（Sonnet）：週報＋早／晚摘要推播（Edge Function＋排程，使用者部署）
+- [ ] S3（Sonnet）：snooze 雲端化（併入 sync payload）
+- [ ] S4（Sonnet）：錯誤紀錄自動上報（schema-errorlog.sql，使用者執行 SQL）
+
+### W5 個人化
+- [ ] P1（Sonnet）：日記／心情追蹤（月曆疊加＋統計整合）
+- [ ] P2（Haiku）：番茄鐘統計強化（專注時數圖表）
+- [ ] P3（Sonnet）：目標 OKR（月／季目標＋行程貢獻＋進度條）
+
+### W6 整合收斂
+- [ ] G1（Opus）：Google Calendar 唯讀匯入（Supabase OAuth scope＋Calendar API）＋CLOUD_GCAL_SETUP.md
+- [ ] G2（Sonnet）：無障礙全面審查修正（ARIA／鍵盤／焦點／對比）
+- [ ] G3（總指揮）：整合稽核、tests.html 補案例、CACHE_NAME、文件統整 → 使用者驗收 → 存新版 002
+
+### 使用者需自行執行（屆時逐項提醒）
+1. S2：部署更新後的 Edge Function＋排程
+2. S4：Supabase SQL Editor 執行 schema-errorlog.sql
+3. G1：Google Cloud Console 啟用 Calendar API＋OAuth 同意畫面加 scope
