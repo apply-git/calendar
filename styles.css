@@ -1839,7 +1839,7 @@ body.dark .app-footer { color: #fff; }
   .bottom-nav-btn span { font-size: 10px; }
   .bottom-nav-btn.active { color: var(--primary); font-weight: 700; }
   body.has-bottom-nav { padding-bottom: 62px; }
-  body.has-bottom-nav .fab-add:not([hidden]) { bottom: 74px; }
+  body.has-bottom-nav .fab-add:not([hidden]) { bottom: 118px; }
 }
 /* M3 手機快速新增列 */
 .quick-add-bar { display: none; }
@@ -1871,4 +1871,16 @@ body.dark .app-footer { color: #fff; }
     font-size: 14px;
   }
   body.has-bottom-nav { padding-bottom: 108px; }
+}
+
+/* M-fix1: FAB 避開快速新增列；手機儲存列 sticky 常顯 */
+@media (max-width: 760px) {
+  .task-dialog .dialog-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--surface-strong);
+    padding-top: 8px;
+    padding-bottom: 8px;
+    z-index: 5;
+  }
 }
