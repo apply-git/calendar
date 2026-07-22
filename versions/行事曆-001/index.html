@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#4568f0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="桌面行程表" />
+  <title>桌面行程表</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="icons/favicon-64.png" type="image/png" sizes="64x64" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">📅</div>
+        <div>
+          <h1 id="brandTitle">桌面行程表</h1>
+          <p id="todayLabel">今日</p>
+        </div>
+      </div>
+
+      <button class="primary-btn" id="quickAddBtn">＋ 新增行程</button>
+
+      <section class="panel compact">
+        <h2 id="topThreeHeading">今日重點</h2>
+        <ol id="topThreeList" class="top-three empty-list"></ol>
+      </section>
+
+      <section class="panel compact">
+        <h2>⏳ 倒數日</h2>
+        <div id="countdownList" class="countdown-list"></div>
+      </section>
+
+      <section class="panel compact">
+        <h2 id="completionHeading">完成率</h2>
+        <div class="progress-ring" aria-label="今日完成率">
+          <span id="completionRate">0%</span>
+        </div>
+        <p id="completionSummary" class="muted center">尚無今日任務</p>
+        <p id="statsSummary" class="muted center"></p>
+        <p class="muted chart-title">近 7 天完成統計</p>
+        <div id="weeklyChart" class="weekly-chart" role="img" aria-label="最近 7 天完成統計長條圖"></div>
+      </section>
+
+      <section class="panel compact">
+        <h2 id="weeklyGoalHeading">每週目標</h2>
+        <div id="weeklyGoalList" class="habit-list"></div>
+        <div class="habit-actions">
+          <input id="weeklyGoalInput" type="text" placeholder="新增本週目標" />
+          <button id="addWeeklyGoalBtn" title="新增每週目標">＋</button>
+        </div>
+      </section>
+
+      <section class="panel compact">
+        <h2 id="habitHeading">習慣追蹤</h2>
+        <div id="habitList" class="habit-list"></div>
+        <div class="habit-actions">
+          <input id="habitInput" type="text" placeholder="新增習慣，例如：運動" />
+          <button id="addHabitBtn" title="新增習慣">＋</button>
+        </div>
+      </section>
+
+      <section class="panel compact">
+        <h2 id="categoryHeading">自訂分類</h2>
+        <div id="categoryList" class="category-list"></div>
+        <div class="category-actions">
+          <input id="categoryNameInput" type="text" placeholder="分類名稱" />
+          <input id="categoryColorInput" type="color" value="#4568f0" title="分類顏色" />
+          <button id="addCategoryBtn" title="新增分類">＋</button>
+        </div>
+      </section>
+
+      <section class="panel compact">
+        <h2>快速範本</h2>
+        <div id="templateList" class="template-list"></div>
+        <div class="category-actions">
+          <input id="templateNameInput" type="text" placeholder="範本名稱，例如：晨會" />
+          <button id="addTemplateBtn" title="將目前新增視窗設定存為範本">＋</button>
+        </div>
+      </section>
+    </aside>
+
+    <main class="main">
+      <header class="toolbar">
+        <div class="calendar-nav">
+          <button id="prevBtn" class="ghost-btn">‹</button>
+          <button id="todayBtn" class="ghost-btn">今天</button>
+          <button id="nextBtn" class="ghost-btn">›</button>
+          <button id="jumpDateBtn" class="ghost-btn" title="選擇年月日" aria-label="選擇年月日">📅</button>
+          <input id="jumpDateInput" type="date" class="date-jump" title="跳到指定年月日" aria-label="跳到指定年月日" />
+          <h2 id="currentTitle" title="點一下選擇年月日">行程</h2>
+          <span id="lunarDayLabel" class="lunar-text"></span>
+          <span id="weatherDayLabel" class="weather-day-text"></span>
+        </div>
+
+        <div class="toolbar-actions">
+          <div class="view-switch" role="tablist" aria-label="切換檢視">
+            <button class="view-btn active" data-view="day">日</button>
+            <button class="view-btn" data-view="week">週</button>
+            <button class="view-btn" data-view="month">月</button>
+            <button class="view-btn" data-view="agenda">列表</button>
+          </div>
+          <div class="view-switch" id="dayModeSwitch" role="tablist" aria-label="切換日檢視模式" hidden>
+            <button class="view-btn day-mode-btn active" data-day-mode="list">清單</button>
+            <button class="view-btn day-mode-btn" data-day-mode="timeline">時間軸</button>
+          </div>
+          <button id="clearDayBtn" class="ghost-btn grouped-tool" hidden>🗑 清空當日</button>
+          <button id="deferBtn" class="ghost-btn grouped-tool" hidden>⏭ 未完成順延</button>
+          <button id="shareCardBtn" class="ghost-btn grouped-tool" hidden>🖼 分享圖卡</button>
+          <button id="clearWeekBtn" class="ghost-btn grouped-tool" hidden>🗑 清空本週</button>
+          <button id="clearMonthBtn" class="ghost-btn grouped-tool" hidden>🗑 清空本月</button>
+
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="viewActionsMenuBtn" class="ghost-btn toolbar-menu-btn">⚡ 檢視動作 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="modesMenuBtn" class="ghost-btn toolbar-menu-btn">🖥 模式 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="toolsMenuBtn" class="ghost-btn toolbar-menu-btn">🧰 工具 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="analyticsMenuBtn" class="ghost-btn toolbar-menu-btn">📊 分析 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="exportMenuBtn" class="ghost-btn toolbar-menu-btn">📤 匯出入 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+          <div class="toolbar-menu-wrap">
+            <button type="button" id="settingsMenuBtn" class="ghost-btn toolbar-menu-btn">⚙ 設定 ▾</button>
+            <div class="toolbar-menu" hidden></div>
+          </div>
+
+          <button id="commandPaletteBtn" class="ghost-btn" title="命令面板 (Ctrl+K)" aria-label="命令面板">🔍</button>
+          <button id="themeBtn" class="ghost-btn">🌙</button>
+          <button id="enableNotificationsBtn" class="ghost-btn grouped-tool">🔔 開啟通知</button>
+          <button id="cloudSyncBtn" class="ghost-btn">☁️ 雲端同步</button>
+          <button id="backupBtn" class="ghost-btn grouped-tool">備份</button>
+          <button id="restoreBtn" class="ghost-btn grouped-tool">還原</button>
+          <input id="restoreFileInput" type="file" accept="application/json,.json" hidden />
+          <button id="settingsBtn" class="ghost-btn grouped-tool">文字設定</button>
+          <button id="pomodoroBtn" class="ghost-btn grouped-tool">🍅 番茄鐘</button>
+          <button id="todayTodoBtn" class="ghost-btn grouped-tool">今日待辦</button>
+          <button id="weeklyReviewBtn" class="ghost-btn grouped-tool">📊 週回顧</button>
+          <button id="dashboardBtn" class="ghost-btn grouped-tool">📈 統計</button>
+          <button id="dataCheckBtn" class="ghost-btn grouped-tool" title="檢查行程資料是否有壞資料並可一鍵修復">🩺 資料檢查</button>
+          <button id="widgetModeBtn" class="ghost-btn grouped-tool">小工具模式</button>
+          <button id="cleanupBtn" class="ghost-btn grouped-tool">清理舊行程</button>
+          <button id="exportCsvBtn" class="ghost-btn grouped-tool">匯出 Excel</button>
+          <button id="printBtn" class="ghost-btn grouped-tool">匯出 PDF</button>
+          <button id="exportIcsBtn" class="ghost-btn grouped-tool">匯出 .ics</button>
+          <button id="importIcsBtn" class="ghost-btn grouped-tool">匯入 .ics</button>
+          <input id="importIcsFileInput" type="file" accept=".ics,text/calendar" hidden />
+          <button id="batchAddBtn" class="ghost-btn grouped-tool">📋 批量新增</button>
+          <button id="moreToolsBtn" class="ghost-btn" hidden>⋯ 更多</button>
+        </div>
+      </header>
+
+      <section class="controls panel">
+        <div class="field search-field">
+          <label id="searchLabel" for="searchInput">搜尋</label>
+          <input id="searchInput" type="search" placeholder="搜尋行程、備註、分類..." />
+        </div>
+        <div class="field">
+          <label for="filterCategory">分類</label>
+          <select id="filterCategory">
+            <option value="all">全部</option>
+            <option value="工作">工作</option>
+            <option value="家庭">家庭</option>
+            <option value="學習">學習</option>
+            <option value="運動">運動</option>
+            <option value="重要事項">重要事項</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filterStatus">狀態</label>
+          <select id="filterStatus">
+            <option value="all">全部</option>
+            <option value="todo">未完成</option>
+            <option value="done">已完成</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filterPriority">重要度</label>
+          <select id="filterPriority">
+            <option value="all">全部</option>
+            <option value="high">高</option>
+            <option value="medium">中</option>
+            <option value="low">低</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="daily-memo panel">
+        <div class="daily-memo-head">
+          <h3>每日備忘錄</h3>
+          <span id="dailyMemoStatus" class="muted">自動儲存</span>
+        </div>
+        <textarea id="dailyMemo" rows="3" placeholder="寫下今天要記得的事..."></textarea>
+      </section>
+
+      <section id="calendarView" class="calendar-view panel"></section>
+    </main>
+  </div>
+
+  <footer class="app-footer">© 2026 行事曆0.001版</footer>
+
+  <button id="fabAddBtn" class="fab-add" hidden aria-label="新增行程">＋</button>
+
+  <dialog id="taskDialog" class="task-dialog">
+    <form id="taskForm" method="dialog">
+      <div class="dialog-header">
+        <h2 id="dialogTitle">新增行程</h2>
+        <button type="button" id="closeDialogBtn" class="icon-btn">✕</button>
+      </div>
+
+      <input type="hidden" id="taskId" />
+
+      <div class="form-grid">
+        <div class="field full">
+          <label id="taskNameLabel" for="taskTitle">事項名稱</label>
+          <div class="title-input-row">
+            <input id="taskTitle" type="text" required placeholder="例如：拜訪客戶、讀書、運動" />
+            <button type="button" id="voiceInputBtn" class="icon-btn" title="語音輸入">🎤</button>
+          </div>
+          <p class="muted nl-hint">小技巧：輸入「明天下午3點 開會」會自動帶入日期時間</p>
+        </div>
+
+        <div class="field">
+          <label for="taskDate">日期</label>
+          <input id="taskDate" type="date" required />
+        </div>
+        <div class="field">
+          <label for="taskStart">開始</label>
+          <input id="taskStart" type="time" required />
+        </div>
+        <div class="field">
+          <label for="taskEnd">結束</label>
+          <div class="time-input-row">
+            <input id="taskEnd" type="time" required />
+            <button type="button" id="findSlotBtn" class="icon-btn" title="找空檔">⚡</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="taskPriority">優先順序</label>
+          <select id="taskPriority">
+            <option value="high">高</option>
+            <option value="medium" selected>中</option>
+            <option value="low">低</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="taskCategory">分類</label>
+          <select id="taskCategory">
+            <option value="工作">工作</option>
+            <option value="家庭">家庭</option>
+            <option value="學習">學習</option>
+            <option value="運動">運動</option>
+            <option value="重要事項">重要事項</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="taskRepeat">重複</label>
+          <select id="taskRepeat">
+            <option value="none">不重複</option>
+            <option value="daily">每天</option>
+            <option value="weekly">每週</option>
+            <option value="monthly">每月</option>
+            <option value="interval">每隔 N 天</option>
+            <option value="weekdays">只工作日（一～五）</option>
+            <option value="monthlyNth">每月第幾個週幾</option>
+            <option value="lunar-yearly">農曆每年（依農曆日期）</option>
+          </select>
+        </div>
+        <div class="field" id="repeatIntervalField" hidden>
+          <label for="taskRepeatInterval">間隔天數</label>
+          <input id="taskRepeatInterval" type="number" min="2" max="365" value="2" />
+        </div>
+        <div class="field" id="repeatNthField" hidden>
+          <label for="taskRepeatNth">第幾個</label>
+          <select id="taskRepeatNth">
+            <option value="1">第 1 個</option>
+            <option value="2">第 2 個</option>
+            <option value="3">第 3 個</option>
+            <option value="4">第 4 個</option>
+            <option value="-1">最後一個</option>
+          </select>
+        </div>
+        <div class="field full" id="taskScopeField" hidden>
+          <label for="taskScope">套用範圍</label>
+          <select id="taskScope">
+            <option value="once">僅修改這次</option>
+            <option value="future">修改這次及之後</option>
+            <option value="series">修改整個重複系列</option>
+          </select>
+          <p class="muted" id="taskScopeHint">其他重複日期不會受影響</p>
+        </div>
+        <div class="field" id="repeatWeekdayField" hidden>
+          <label for="taskRepeatWeekday">星期</label>
+          <select id="taskRepeatWeekday">
+            <option value="0">星期日</option>
+            <option value="1">星期一</option>
+            <option value="2">星期二</option>
+            <option value="3">星期三</option>
+            <option value="4">星期四</option>
+            <option value="5">星期五</option>
+            <option value="6">星期六</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="taskReminder">提醒</label>
+          <select id="taskReminder">
+            <option value="-1">不提醒</option>
+            <option value="0">準時</option>
+            <option value="5">5 分鐘前</option>
+            <option value="10">10 分鐘前</option>
+            <option value="30">30 分鐘前</option>
+          </select>
+        </div>
+        <div class="field checkbox-field">
+          <label><input id="taskPinned" type="checkbox" /> 置頂行程</label>
+        </div>
+        <div class="field checkbox-field">
+          <label><input id="taskCountdown" type="checkbox" /> ⏳ 顯示在倒數日</label>
+        </div>
+        <div class="field checkbox-field">
+          <label><input id="taskShared" type="checkbox" /> 👨‍👩‍👧 與家人共享</label>
+          <p class="muted">需先在 ☁️ 雲端同步視窗建立/加入家庭群組，共享才會生效</p>
+        </div>
+
+        <div class="field full">
+          <label for="taskTags">關鍵字標籤</label>
+          <input id="taskTags" type="text" placeholder="#會議, #家事" />
+        </div>
+
+        <div class="field full">
+          <label for="taskSubtasks">子任務清單</label>
+          <textarea id="taskSubtasks" rows="3" placeholder="每行一項，例如：\n準備資料\n聯絡客戶"></textarea>
+        </div>
+
+        <div class="field full">
+          <label for="taskNote">備註</label>
+          <textarea id="taskNote" rows="3" placeholder="補充說明"></textarea>
+        </div>
+
+        <div class="field full" id="attachmentSection">
+          <label>📎 附件</label>
+          <div id="attachmentList" class="attachment-list"></div>
+          <button type="button" id="addAttachmentBtn" class="ghost-btn">＋ 加入附件</button>
+          <input type="file" id="attachmentFileInput" multiple hidden />
+          <p class="muted">附件僅存在本機裝置，不會隨備份與雲端同步轉移</p>
+        </div>
+      </div>
+
+      <div id="conflictWarning" class="conflict-warning" hidden></div>
+
+      <div class="dialog-actions">
+        <button type="button" id="deleteTaskBtn" class="danger-btn" hidden>刪除</button>
+        <span></span>
+        <button type="button" id="cancelTaskBtn" class="ghost-btn">取消</button>
+        <button type="submit" class="primary-btn">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" class="task-dialog">
+    <form id="settingsForm" method="dialog">
+      <div class="dialog-header">
+        <h2>文字設定</h2>
+        <button type="button" id="closeSettingsBtn" class="icon-btn">✕</button>
+      </div>
+
+      <p class="muted">可自行修改畫面上的常用文字，會自動儲存在這台電腦的瀏覽器。</p>
+
+      <div class="form-grid settings-grid">
+        <div class="field full">
+          <label for="settingAppTitle">主標題</label>
+          <input id="settingAppTitle" type="text" placeholder="桌面行程表" />
+        </div>
+        <div class="field">
+          <label for="settingAddTaskText">新增按鈕文字</label>
+          <input id="settingAddTaskText" type="text" placeholder="＋ 新增行程" />
+        </div>
+        <div class="field">
+          <label for="settingTopThreeTitle">重點區標題</label>
+          <input id="settingTopThreeTitle" type="text" placeholder="今日重點" />
+        </div>
+        <div class="field">
+          <label for="settingCompletionTitle">完成率標題</label>
+          <input id="settingCompletionTitle" type="text" placeholder="完成率" />
+        </div>
+        <div class="field">
+          <label for="settingHabitTitle">習慣區標題</label>
+          <input id="settingHabitTitle" type="text" placeholder="習慣追蹤" />
+        </div>
+        <div class="field">
+          <label for="settingCategoryTitle">分類區標題</label>
+          <input id="settingCategoryTitle" type="text" placeholder="自訂分類" />
+        </div>
+        <div class="field">
+          <label for="settingSearchLabel">搜尋標籤</label>
+          <input id="settingSearchLabel" type="text" placeholder="搜尋" />
+        </div>
+        <div class="field">
+          <label for="settingTaskNameLabel">事項欄位名稱</label>
+          <input id="settingTaskNameLabel" type="text" placeholder="事項名稱" />
+        </div>
+        <div class="field">
+          <label for="settingDefaultTaskPlaceholder">事項輸入提示</label>
+          <input id="settingDefaultTaskPlaceholder" type="text" placeholder="例如：拜訪客戶、讀書、運動" />
+        </div>
+        <div class="field">
+          <label for="settingWorkStart">顯示開始時間</label>
+          <input id="settingWorkStart" type="number" min="0" max="23" placeholder="7" />
+        </div>
+        <div class="field">
+          <label for="settingWorkEnd">顯示結束時間</label>
+          <input id="settingWorkEnd" type="number" min="1" max="24" placeholder="21" />
+        </div>
+        <div class="field checkbox-field">
+          <label><input id="settingShowLunar" type="checkbox" /> 顯示農曆</label>
+        </div>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" id="resetSettingsBtn" class="danger-btn">恢復預設文字</button>
+        <span></span>
+        <button type="button" id="cancelSettingsBtn" class="ghost-btn">取消</button>
+        <button type="submit" class="primary-btn">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="pomodoroDialog" class="task-dialog pomodoro-dialog">
+    <div class="dialog-header">
+      <h2>🍅 番茄鐘</h2>
+      <button type="button" id="closePomodoroBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="pomodoro-body">
+      <div class="field">
+        <label for="pomodoroTaskSelect">綁定今日行程（可不選）</label>
+        <select id="pomodoroTaskSelect">
+          <option value="">不綁定行程</option>
+        </select>
+      </div>
+
+      <div class="pomodoro-settings">
+        <div class="field">
+          <label for="pomodoroFocusInput">專注分鐘</label>
+          <input id="pomodoroFocusInput" type="number" min="1" max="120" value="25" />
+        </div>
+        <div class="field">
+          <label for="pomodoroBreakInput">休息分鐘</label>
+          <input id="pomodoroBreakInput" type="number" min="1" max="60" value="5" />
+        </div>
+      </div>
+
+      <p id="pomodoroModeLabel" class="pomodoro-mode">專注時間</p>
+      <div id="pomodoroDisplay" class="pomodoro-display">25:00</div>
+
+      <div class="pomodoro-actions">
+        <button type="button" id="pomodoroStartBtn" class="primary-btn">開始</button>
+        <button type="button" id="pomodoroPauseBtn" class="ghost-btn" disabled>暫停</button>
+        <button type="button" id="pomodoroResetBtn" class="ghost-btn">重設</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="cloudSyncDialog" class="task-dialog cloud-sync-dialog">
+    <div class="dialog-header">
+      <h2>☁️ 雲端同步</h2>
+      <button type="button" id="closeCloudSyncBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="cloud-sync-body">
+      <p id="cloudSyncStatus" class="muted">雲端同步未設定。</p>
+      <p id="cloudSyncSetupHint" class="muted" hidden>尚未設定 Supabase。請參考專案內的 <code>CLOUD_SETUP.md</code>，設定好 <code>config.js</code> 後重新整理頁面即可使用。</p>
+
+      <button type="button" id="cloudSyncLoginBtn" class="primary-btn" hidden>使用 Google 登入</button>
+
+      <div id="cloudSyncLoggedInBox" hidden>
+        <p id="cloudSyncUserEmail" class="muted"></p>
+        <div class="field checkbox-field">
+          <label><input id="cloudAutoSyncToggle" type="checkbox" /> 自動同步（存檔時自動同步到雲端）</label>
+        </div>
+        <div class="pomodoro-actions">
+          <button type="button" id="cloudSyncNowBtn" class="primary-btn">立即同步</button>
+          <button type="button" id="cloudSyncLogoutBtn" class="ghost-btn">登出</button>
+        </div>
+        <div class="pomodoro-actions">
+          <button type="button" id="cloudSyncDebugBtn" class="ghost-btn">🔍 疑難排解（顯示同步狀態）</button>
+        </div>
+        <div class="pomodoro-actions">
+          <button type="button" id="cloudHistoryBtn" class="ghost-btn">🕘 雲端備份版本</button>
+        </div>
+        <div class="pomodoro-actions">
+          <button type="button" id="cloudSyncForcePullBtn" class="ghost-btn">⬇️ 強制拉取雲端資料覆蓋本機</button>
+        </div>
+        <div class="pomodoro-actions">
+          <button type="button" id="cloudSyncForcePushBtn" class="ghost-btn">⬆️ 強制推送本機資料覆蓋雲端</button>
+        </div>
+
+        <div class="push-block">
+          <h3 class="push-heading">👨‍👩‍👧 家庭共享</h3>
+          <div id="shareGroupBody" class="share-group-body">
+            <p class="muted">載入中…</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="cloudHistoryDialog" class="task-dialog cloud-history-dialog">
+    <div class="dialog-header">
+      <h2>🕘 雲端備份版本</h2>
+      <button type="button" id="closeCloudHistoryBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="cloud-history-body">
+      <p class="muted">每次同步到雲端會自動留存快照，最多保留 10 份。還原會把選定版本套用到本機並重新上傳。</p>
+      <div id="cloudHistoryList"></div>
+    </div>
+  </dialog>
+
+  <dialog id="weeklyReviewDialog" class="task-dialog weekly-review-dialog">
+    <div class="dialog-header">
+      <h2>📊 本週回顧</h2>
+      <button type="button" id="closeWeeklyReviewBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="weekly-review-body">
+      <section class="weekly-review-section">
+        <h3>本週完成率</h3>
+        <div class="weekly-review-rate">
+          <span id="weeklyReviewRateValue" class="weekly-review-rate-value">0%</span>
+          <p id="weeklyReviewCountsLabel" class="muted">總行程 0 件｜已完成 0 件</p>
+        </div>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>與上週比較</h3>
+        <p id="weeklyReviewCompare" class="muted"></p>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>分類統計</h3>
+        <div id="weeklyReviewCategories" class="weekly-review-categories"></div>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>下週預覽</h3>
+        <p id="weeklyReviewNextWeekSummary" class="muted"></p>
+        <ul id="weeklyReviewNextWeekList" class="weekly-review-next-list"></ul>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>每週目標</h3>
+        <p id="weeklyReviewGoals" class="muted"></p>
+      </section>
+    </div>
+  </dialog>
+
+  <dialog id="dashboardDialog" class="task-dialog dashboard-dialog">
+    <div class="dialog-header">
+      <h2>📈 統計儀表板</h2>
+      <button type="button" id="closeDashboardBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="dashboard-body">
+      <section class="weekly-review-section">
+        <h3>分類工時（近 30 天）</h3>
+        <div id="dashboardCategoryHours" class="dashboard-bar-list"></div>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>近 8 週完成率趨勢</h3>
+        <div id="dashboardWeeklyTrend"></div>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>逾期未完成（近 30 天）</h3>
+        <p id="dashboardOverdueSummary" class="muted"></p>
+        <ul id="dashboardOverdueList" class="dashboard-overdue-list"></ul>
+      </section>
+
+      <section class="weekly-review-section">
+        <h3>時段分布（近 30 天）</h3>
+        <div id="dashboardTimeDistribution" class="dashboard-bar-list"></div>
+      </section>
+    </div>
+  </dialog>
+
+  <dialog id="dataCheckDialog" class="task-dialog data-check-dialog">
+    <div class="dialog-header">
+      <h2>🩺 資料檢查</h2>
+      <button type="button" id="closeDataCheckBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="data-check-body">
+      <p class="muted">檢查項目：id 重複／日期欄位不合法／重複規則不合法／開始時間需早於結束時間／completedDates·excludedDates 非陣列／分類引用不存在。</p>
+      <p id="dataCheckSummary" class="muted">檢查中…</p>
+      <div id="dataCheckList" class="data-check-list"></div>
+      <div class="pomodoro-actions">
+        <button type="button" id="dataCheckFixBtn" class="danger-btn" hidden>一鍵修復（先自動下載備份）</button>
+      </div>
+
+      <hr />
+      <p class="muted">錯誤紀錄：本機自動收集程式錯誤（不含行程內容或帳號資訊），供回報問題時參考。</p>
+      <p id="dataCheckErrorLogSummary" class="muted">目前沒有錯誤紀錄</p>
+      <div class="pomodoro-actions">
+        <button type="button" id="exportErrorLogBtn" class="ghost-btn">匯出錯誤紀錄</button>
+        <button type="button" id="clearErrorLogBtn" class="ghost-btn">清空紀錄</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="moreToolsDialog" class="task-dialog more-tools-dialog">
+    <div class="dialog-header">
+      <h2>⋯ 更多工具</h2>
+      <button type="button" id="closeMoreToolsBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="more-tools-body">
+      <button type="button" class="more-tools-item" id="moreToolsWeeklyReviewBtn">📊 本週回顧</button>
+      <button type="button" class="more-tools-item" data-proxy="dashboardBtn">📈 統計</button>
+      <button type="button" class="more-tools-item" data-proxy="commandPaletteBtn">🔍 命令面板</button>
+      <button type="button" class="more-tools-item" data-proxy="dataCheckBtn">🩺 資料檢查</button>
+      <button type="button" class="more-tools-item" data-proxy="enableNotificationsBtn">🔔 開啟通知</button>
+      <button type="button" class="more-tools-item" data-proxy="backupBtn">備份</button>
+      <button type="button" class="more-tools-item" data-proxy="restoreBtn">還原</button>
+      <button type="button" class="more-tools-item" data-proxy="settingsBtn">文字設定</button>
+      <button type="button" class="more-tools-item" data-proxy="pomodoroBtn">🍅 番茄鐘</button>
+      <button type="button" class="more-tools-item" data-proxy="widgetModeBtn">小工具模式</button>
+      <button type="button" class="more-tools-item" data-proxy="cleanupBtn">清理舊行程</button>
+      <button type="button" class="more-tools-item" data-proxy="exportCsvBtn">匯出 Excel</button>
+      <button type="button" class="more-tools-item" data-proxy="printBtn">匯出 PDF</button>
+      <button type="button" class="more-tools-item" data-proxy="exportIcsBtn">匯出 .ics</button>
+      <button type="button" class="more-tools-item" data-proxy="importIcsBtn">匯入 .ics</button>
+      <button type="button" class="more-tools-item" data-proxy="batchAddBtn">📋 批量新增</button>
+      <button type="button" class="more-tools-item" data-proxy="deferBtn">⏭ 未完成順延</button>
+      <button type="button" class="more-tools-item" data-proxy="shareCardBtn">🖼 分享圖卡</button>
+      <button type="button" class="more-tools-item" id="kioskModeBtn">🖥 看板模式</button>
+    </div>
+  </dialog>
+
+  <dialog id="commandPalette" class="command-palette-dialog">
+    <input id="commandPaletteInput" type="text" placeholder="輸入指令，或搜尋行程標題／備註..." autocomplete="off" />
+    <ul id="commandPaletteResults" class="command-palette-results"></ul>
+  </dialog>
+
+  <dialog id="batchAddDialog" class="task-dialog batch-add-dialog">
+    <div class="dialog-header">
+      <h2>📋 批量新增</h2>
+      <button type="button" id="closeBatchAddBtn" class="icon-btn">✕</button>
+    </div>
+
+    <div class="field full">
+      <label for="batchAddInput">貼上多行行程，每行一筆</label>
+      <textarea id="batchAddInput" rows="8" placeholder="例如：&#10;明天下午3點 帶媽媽回診&#10;7/25 10:00 團隊會議&#10;買牛奶"></textarea>
+    </div>
+    <p id="batchAddHint" class="muted" hidden></p>
+
+    <div id="batchAddPreviewWrap" class="batch-add-preview-wrap" hidden>
+      <table class="batch-add-table">
+        <thead><tr><th>標題</th><th>日期</th><th>時間</th></tr></thead>
+        <tbody id="batchAddPreviewBody"></tbody>
+      </table>
+    </div>
+
+    <div class="batch-add-actions">
+      <button type="button" id="batchAddCancelBtn" class="ghost-btn">取消</button>
+      <button type="button" id="batchAddPreviewBtn" class="ghost-btn">解析預覽</button>
+      <button type="button" id="batchAddImportBtn" class="primary-btn" disabled>全部匯入</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="swUpdateBanner" class="sw-update-banner" hidden role="status">
+    <span>🔄 有新版本</span>
+    <button type="button" id="swUpdateBtn">立即更新</button>
+  </div>
+
+  <!-- 掛牆看板模式：家用平板全螢幕今日行程。不是 dialog，用 hidden 屬性 + requestFullscreen()
+       手動控制顯示，開關與 timer 邏輯見 app.js 的 openKioskMode() / closeKioskMode()。 -->
+  <div id="kioskOverlay" class="kiosk-overlay" hidden>
+    <button type="button" id="kioskCloseBtn" class="kiosk-close-btn">✕ 離開</button>
+    <div id="kioskClock" class="kiosk-clock">00:00</div>
+    <div id="kioskDateLine" class="kiosk-date-line"></div>
+    <div id="kioskTaskList" class="kiosk-task-list"></div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script src="sync.js"></script>
+  <script src="push.js"></script>
+</body>
+</html>
