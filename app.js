@@ -162,6 +162,19 @@ const LUNAR_DAY_NAMES = [
   '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十',
 ];
 
+function loadJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
+}
+
+function saveJson(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 let tasks = loadJson(STORAGE_KEY, []);
 let habits = loadJson(HABIT_KEY, []);
 let categories = loadJson(CATEGORY_KEY, defaultCategories);
@@ -381,6 +394,21 @@ const els = {
   commandPaletteResults: $('commandPaletteResults'),
 };
 
+function setupErrorLogging() {
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+  window.addEventListener('error', (event) => {
+    const message = event?.message || (event?.error && event.error.message);
+    const stack = event?.error && event.error.stack;
+    recordError(message, stack);
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event?.reason;
+    const message = reason && reason.message ? reason.message : String(reason);
+    const stack = reason && reason.stack ? reason.stack : '';
+    recordError(message, stack);
+  });
+}
+
 // 全域錯誤紀錄：獨立於 init() 之外、無條件先掛上，這樣即使 init() 因為缺少畫面
 // 元素（例如 tests.html 這種沒有完整 DOM 的頁面）而失敗，錯誤蒐集本身仍然有效。
 setupErrorLogging();
@@ -545,16 +573,6 @@ function initAttachmentFeature() {
 
 function hideAttachmentUI() {
   if (els.attachmentSection) els.attachmentSection.hidden = true;
-}
-
-// init() 包一層 try/catch：正常情況（index.html 有完整 DOM）不會走到 catch，
-// 但 tests.html 只載入 app.js、沒有任何畫面元素時 init() 一定會因為存取 null
-// 的 DOM 節點而丟出例外——沒有這層保護，例外會中斷整支 app.js 的執行，導致
-// 檔案最底部的 window.CalendarApp 匯出永遠跑不到。
-try {
-  init();
-} catch (err) {
-  console.error('[app.js] init() 發生錯誤（若在 tests.html 等無 DOM 頁面屬預期行為）', err);
 }
 
 function init() {
@@ -4634,21 +4652,6 @@ function recordError(message, stack) {
   }
 }
 
-function setupErrorLogging() {
-  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
-  window.addEventListener('error', (event) => {
-    const message = event?.message || (event?.error && event.error.message);
-    const stack = event?.error && event.error.stack;
-    recordError(message, stack);
-  });
-  window.addEventListener('unhandledrejection', (event) => {
-    const reason = event?.reason;
-    const message = reason && reason.message ? reason.message : String(reason);
-    const stack = reason && reason.stack ? reason.stack : '';
-    recordError(message, stack);
-  });
-}
-
 function exportErrorLog() {
   downloadText(`錯誤紀錄-${toDateInput(new Date())}.json`, JSON.stringify(errorLog, null, 2), 'application/json;charset=utf-8;');
   showToast('已匯出錯誤紀錄');
@@ -4811,19 +4814,6 @@ async function handleDataCheckFix() {
   const fixedCount = await fixDataIssues();
   renderDataCheckResults(runDataCheck());
   showToast(fixedCount ? `已修復 ${fixedCount} 筆問題` : '沒有可修復的問題');
-}
-
-function loadJson(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-  catch { return fallback; }
-}
-
-function saveJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function startOfDay(date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function startOfWeek(date) {
@@ -5211,6 +5201,16 @@ function showToast(message) {
   els.toast.classList.add('show');
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => els.toast.classList.remove('show'), 2600);
+}
+
+// init() 包一層 try/catch：正常情況（index.html 有完整 DOM）不會走到 catch，
+// 但 tests.html 只載入 app.js、沒有任何畫面元素時 init() 一定會因為存取 null
+// 的 DOM 節點而丟出例外——沒有這層保護，例外會中斷整支 app.js 的執行，導致
+// 檔案最底部的 window.CalendarApp 匯出永遠跑不到。
+try {
+  init();
+} catch (err) {
+  console.error('[app.js] init() 發生錯誤（若在 tests.html 等無 DOM 頁面屬預期行為）', err);
 }
 
 // ============================================================================
