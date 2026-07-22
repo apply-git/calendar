@@ -146,6 +146,7 @@ function bindEvents() {
   els.prevBtn.addEventListener('click', () => navigate(-1));
   els.todayBtn.addEventListener('click', () => { currentDate = startOfDay(new Date()); render(); });
   els.nextBtn.addEventListener('click', () => navigate(1));
+  setupSwipeNavigation();
   // 年月日直選跳轉：改變日期選擇器就跳到那一天（週/月檢視會跳到含該日的那一週/月）。
   els.jumpDateInput?.addEventListener('change', () => {
     if (!els.jumpDateInput.value) return;
@@ -497,3 +498,25 @@ function jumpToTaskAndEdit(task) {
   openTaskDialog(task, task.repeat && task.repeat !== 'none' ? task.date : '');
 }
 
+
+function setupSwipeNavigation() {
+  const view = document.getElementById('calendarView');
+  if (!view) return;
+  let startX = 0, startY = 0, tracking = false;
+  view.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { tracking = false; return; }
+    tracking = true;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  view.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    if (Math.abs(dx) >= 60 && Math.abs(dx) > 2 * Math.abs(dy)) {
+      navigate(dx < 0 ? 1 : -1);
+    }
+  }, { passive: true });
+}
