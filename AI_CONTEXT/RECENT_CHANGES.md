@@ -1,5 +1,10 @@
 # Recent Changes
 
+## 2026-07-22 第五波 002：W0–W3 完工（本機 commit、未 push、CACHE_NAME 未動）
+- W0 R1：app.js 拆 9 檔循序載入（app-01-core～app-09-entry，純搬移）；CACHE_NAME → v32
+- W1 資料層：D1 自訂色彩+地點、D2 多日曆本、D3 任務依賴、D4 時區旅行模式；W2 檢視：V1 年熱力圖、V3 列印、V2 甘特圖
+- W3 手機：M1 手勢（滑動切月週、行程卡左滑完成/右滑順延、長按快建）、M2 底部導航列、M3 快速新增列+震動。HEAD 63abb57，待手機預覽後續作 W4
+
 ## 2026-07-22 記憶瘦身
 `HANDOFF.md`（51KB，單行常破千字）拆分為 `PROJECT_BRIEF.md`/`NOTES.md`/`RECENT_CHANGES.md`，`CLAUDE.md`/`AGENTS.md` 精簡到只留紅線+指標。全文備份於 `HANDOFF.md.full.bak`（未進 git，本機保留），原檔已刪除；更早的歷史一律以 `git log` 與 `ROADMAP.md` 為準。
 
