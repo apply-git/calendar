@@ -1781,3 +1781,24 @@ body.dark .app-footer { color: #fff; }
 @media (max-width: 760px) {
   .kiosk-clock { font-size: 20vw; }
 }
+
+/* ── 甘特檢視（V2）── */
+.gantt-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.gantt-inner { min-width: max-content; }
+.gantt-head-row { display: flex; border-bottom: 1px solid var(--border); }
+.gantt-name { flex: 0 0 140px; position: sticky; left: 0; z-index: 2; background: var(--surface); display: flex; align-items: center; gap: 6px; padding: 0 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.gantt-head-name { font-weight: 600; padding: 4px 8px; z-index: 3; cursor: default; }
+.gantt-head-cell { display: inline-block; width: 26px; font-size: 10px; text-align: center; color: var(--muted); padding: 4px 0; }
+.gantt-head-cell.weekend { background: color-mix(in srgb, var(--muted) 12%, transparent); }
+.gantt-head-cell.today { color: var(--primary); font-weight: 700; }
+.gantt-body { position: relative; }
+.gantt-row { display: flex; height: 30px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.gantt-cells { position: relative; flex: 0 0 auto; background-image: repeating-linear-gradient(to right, transparent 0, transparent 130px, color-mix(in srgb, var(--muted) 10%, transparent) 130px, color-mix(in srgb, var(--muted) 10%, transparent) 182px); }
+.gantt-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; }
+.gantt-bar { position: absolute; top: 4px; width: 22px; height: 22px; border-radius: 6px; color: #fff; font-size: 12px; line-height: 22px; text-align: center; cursor: pointer; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+.gantt-bar.done { opacity: 0.45; }
+.gantt-today-col { position: absolute; top: 0; bottom: 0; width: 26px; background: color-mix(in srgb, var(--primary) 14%, transparent); pointer-events: none; }
+.gantt-links { position: absolute; top: 0; pointer-events: none; }
+.gantt-links path { fill: none; stroke: var(--primary); stroke-width: 1.5; opacity: 0.75; }
+.gantt-links path.blocked { stroke: var(--danger); stroke-dasharray: 4 3; }
+.gantt-more { margin-top: 8px; font-size: 12px; color: var(--muted); text-align: center; }

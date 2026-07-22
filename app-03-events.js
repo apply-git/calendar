@@ -411,6 +411,7 @@ const COMMAND_PALETTE_ACTIONS = [
   { label: '週檢視', run: () => document.querySelector('.view-btn[data-view="week"]')?.click() },
   { label: '月檢視', run: () => document.querySelector('.view-btn[data-view="month"]')?.click() },
   { label: '年檢視', run: () => document.querySelector('.view-btn[data-view="year"]')?.click() },
+  { label: '甘特檢視', run: () => document.querySelector('.view-btn[data-view="gantt"]')?.click() },
   { label: '列表檢視', run: () => document.querySelector('.view-btn[data-view="agenda"]')?.click() },
   { label: '深色模式切換', run: () => els.themeBtn.click() },
   { label: '番茄鐘', run: () => els.pomodoroBtn.click() },

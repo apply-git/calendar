@@ -42,6 +42,10 @@ function renderTitle() {
   }
   if (currentView === 'month') els.currentTitle.textContent = `${currentDate.getFullYear()} 年 ${currentDate.getMonth() + 1} 月`;
   if (currentView === 'year') els.currentTitle.textContent = `${currentDate.getFullYear()} 年`;
+  if (currentView === 'gantt') {
+    const ganttStart = startOfWeek(currentDate);
+    els.currentTitle.textContent = `${formatMonthDay(ganttStart)} – ${formatMonthDay(addDays(ganttStart, 55))} 甘特`;
+  }
   if (currentView === 'agenda') els.currentTitle.textContent = '未來 30 天';
   els.lunarDayLabel.textContent = (currentView === 'day' && appSettings.showLunar) ? `🌙 農曆 ${lunarFullLabel(currentDate)}` : '';
   if (els.weatherDayLabel) {
@@ -69,6 +73,7 @@ function renderCalendar(visibleTasks) {
   if (currentView === 'week') renderWeek(visibleTasks);
   if (currentView === 'month') renderMonth(visibleTasks);
   if (currentView === 'year') renderYear(visibleTasks);
+  if (currentView === 'gantt') renderGantt(visibleTasks);
   if (currentView === 'agenda') renderAgenda(visibleTasks);
 }
 
@@ -868,5 +873,89 @@ function deferUnfinishedTasks() {
   saveJson(STORAGE_KEY, tasks);
   render();
   showToast(`已順延 ${targets.length} 筆到 ${formatMonthDay(nextDate)}`);
+}
+
+// ── 甘特檢視（V2）──────────────────────────────────────────────────
+// 8 週橫向時間軸：列＝範圍內至少出現一次的可見行程（重複行程以 occursOnDate 展開，
+// 每個命中日一格 bar）；單次行程間的 dependsOn 以 SVG L 形連線表示，前置未完成時
+// 連線用警示色虛線。點列名或 bar 走既有 data-edit-task 委派開編輯視窗。
+const GANTT_COL = 26;
+const GANTT_ROW = 30;
+const GANTT_NAME_W = 140;
+const GANTT_MAX_ROWS = 60;
+
+function renderGantt(visibleTasks) {
+  const start = startOfWeek(currentDate);
+  const days = Array.from({ length: 56 }, (_, i) => addDays(start, i));
+  const dayKeys = days.map((day) => toDateInput(day));
+  const todayKey = toDateInput(new Date());
+  const width = dayKeys.length * GANTT_COL;
+
+  const rows = [];
+  for (const task of visibleTasks) {
+    const hitIdx = [];
+    dayKeys.forEach((key, idx) => { if (occursOnDate(task, key)) hitIdx.push(idx); });
+    if (hitIdx.length) rows.push({ task, hitIdx });
+  }
+  rows.sort((a, b) => a.hitIdx[0] - b.hitIdx[0] || String(a.task.start || '').localeCompare(String(b.task.start || '')));
+  const hidden = Math.max(0, rows.length - GANTT_MAX_ROWS);
+  const shown = rows.slice(0, GANTT_MAX_ROWS);
+
+  if (!shown.length) {
+    els.calendarView.innerHTML = '<div class="empty-state"><div><strong>此 8 週內沒有行程</strong><p>調整篩選，或按「今天」回到本週。</p></div></div>';
+    return;
+  }
+
+  const todayIdx = dayKeys.indexOf(todayKey);
+  const headCells = days.map((day, idx) => {
+    const wd = day.getDay();
+    const label = (idx === 0 || day.getDate() === 1) ? `${day.getMonth() + 1}/${day.getDate()}` : String(day.getDate());
+    return `<span class="gantt-head-cell${wd === 0 || wd === 6 ? ' weekend' : ''}${idx === todayIdx ? ' today' : ''}" title="${dayKeys[idx]}">${label}</span>`;
+  }).join('');
+
+  const rowHtml = shown.map(({ task, hitIdx }) => {
+    const color = getTaskColor(task);
+    const bars = hitIdx.map((idx) => {
+      const key = dayKeys[idx];
+      const done = isTaskDone(task, key);
+      return `<span class="gantt-bar${done ? ' done' : ''}" style="left:${idx * GANTT_COL + 2}px;background:${color}" data-edit-task="${task.id}" title="${task.title}　${key}${done ? '（已完成）' : ''}">${done ? '✓' : ''}</span>`;
+    }).join('');
+    const todayLine = todayIdx >= 0 ? `<span class="gantt-today-col" style="left:${todayIdx * GANTT_COL}px"></span>` : '';
+    return `<div class="gantt-row"><div class="gantt-name" data-edit-task="${task.id}" title="${task.title}"><span class="gantt-dot" style="background:${color}"></span>${task.title}</div><div class="gantt-cells" style="width:${width}px">${todayLine}${bars}</div></div>`;
+  }).join('');
+
+  const pos = new Map();
+  shown.forEach(({ task, hitIdx }, rowIdx) => {
+    if (task.repeat === 'none') pos.set(task.id, { rowIdx, colIdx: hitIdx[0] });
+  });
+  const links = [];
+  shown.forEach(({ task }) => {
+    if (task.repeat !== 'none' || !Array.isArray(task.dependsOn) || !task.dependsOn.length) return;
+    const to = pos.get(task.id);
+    if (!to) return;
+    const incompleteIds = new Set(getIncompleteDependencies(task).map((dep) => dep.id));
+    task.dependsOn.forEach((depId) => {
+      const from = pos.get(depId);
+      if (!from) return;
+      const x1 = (from.colIdx + 1) * GANTT_COL - 2;
+      const y1 = from.rowIdx * GANTT_ROW + GANTT_ROW / 2;
+      const x2 = to.colIdx * GANTT_COL + 2;
+      const y2 = to.rowIdx * GANTT_ROW + GANTT_ROW / 2;
+      const xm = Math.max(x1 + 6, x2 - 6);
+      links.push(`<path d="M ${x1} ${y1} H ${xm} V ${y2} H ${x2}"${incompleteIds.has(depId) ? ' class="blocked"' : ''}></path>`);
+    });
+  });
+  const svg = links.length
+    ? `<svg class="gantt-links" style="left:${GANTT_NAME_W}px" width="${width}" height="${shown.length * GANTT_ROW}" xmlns="http://www.w3.org/2000/svg">${links.join('')}</svg>`
+    : '';
+
+  els.calendarView.innerHTML = `
+    <div class="gantt-scroll">
+      <div class="gantt-inner">
+        <div class="gantt-head-row"><div class="gantt-name gantt-head-name">行程</div><div class="gantt-cells" style="width:${width}px">${headCells}</div></div>
+        <div class="gantt-body">${rowHtml}${svg}</div>
+      </div>
+    </div>
+    ${hidden ? `<div class="gantt-more">還有 ${hidden} 筆行程未顯示（縮小篩選範圍可見）</div>` : ''}`;
 }
 

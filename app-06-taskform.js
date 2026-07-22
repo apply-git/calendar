@@ -769,6 +769,7 @@ function navigate(direction) {
   if (currentView === 'week') currentDate = addDays(currentDate, direction * 7);
   if (currentView === 'month') currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + direction, 1);
   if (currentView === 'year') currentDate = new Date(currentDate.getFullYear() + direction, currentDate.getMonth(), 1);
+  if (currentView === 'gantt') currentDate = addDays(currentDate, direction * 28);
   if (currentView === 'agenda') currentDate = addDays(currentDate, direction * 30);
   render();
 }
