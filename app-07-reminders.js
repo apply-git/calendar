@@ -40,11 +40,12 @@ function handleFindSlotClick() {
 
   for (let i = 0; i < 7; i++) {
     const dateKey = toDateInput(addDays(searchBase, i));
-    const slot = findNextFreeSlot(dateKey, duration);
+    const slot = findBestSlot(dateKey, duration);
     if (slot) {
       els.taskDate.value = dateKey;
       els.taskStart.value = slot.start;
       els.taskEnd.value = slot.end;
+      if (slot.habitHits > 0) showToast(`⚡ 已建議你的常用時段 ${slot.start}`);
       updateConflictWarning();
       showToast(i === 0
         ? `已填入 ${slot.start}–${slot.end}`
@@ -686,3 +687,59 @@ function addMinutesToTime(time, minutes) {
   return `${hh}:${mm}`;
 }
 
+
+// S1 空檔智慧建議：統計近 8 週「有開始時間」行程的開始小時分佈（平日/週末分開），
+// 供 findBestSlot() 在多個可行空檔中挑「使用者最常排事的時段」。純函式無副作用。
+function computeHabitHourWeights(refDate) {
+  const weights = { weekday: new Array(24).fill(0), weekend: new Array(24).fill(0) };
+  const end = refDate instanceof Date ? new Date(refDate) : new Date();
+  const start = addDays(end, -56);
+  for (let day = new Date(start); day <= end; day = addDays(day, 1)) {
+    const key = toDateInput(day);
+    const isWknd = day.getDay() === 0 || day.getDay() === 6;
+    tasks.forEach((task) => {
+      if (!task.start || !occursOnDate(task, key)) return;
+      const hour = Math.floor(timeToMinutes(task.start) / 60);
+      if (hour >= 0 && hour < 24) weights[isWknd ? 'weekend' : 'weekday'][hour] += 1;
+    });
+  }
+  return weights;
+}
+
+// S1：列出當日工作時間內所有塞得下 duration 的空檔，依習慣時段權重挑最佳開始點。
+// 回傳 {start,end,habitHits}（格式相容 findNextFreeSlot）或 null。權重同分取最早。
+function findBestSlot(dateKey, durationMinutes) {
+  const duration = Math.max(1, Math.round(Number(durationMinutes)) || 60);
+  const dayStartMin = clampHour(appSettings.workStart, 0, 23) * 60;
+  const dayEndMin = Math.max(dayStartMin, clampHour(appSettings.workEnd, 1, 24) * 60);
+  const busy = tasks
+    .filter((task) => task.start && task.end && occursOnDate(task, dateKey))
+    .map((task) => ({ start: timeToMinutes(task.start), end: timeToMinutes(task.end) }))
+    .filter((block) => block.end > block.start)
+    .sort((a, b) => a.start - b.start);
+  const gaps = [];
+  let cursor = dayStartMin;
+  for (const block of busy) {
+    if (block.start > cursor && block.start - cursor >= duration) gaps.push({ start: cursor, end: block.start });
+    cursor = Math.max(cursor, block.end);
+  }
+  if (dayEndMin > cursor && dayEndMin - cursor >= duration) gaps.push({ start: cursor, end: dayEndMin });
+  if (!gaps.length) return null;
+  const date = new Date(dateKey + 'T00:00:00');
+  const isWknd = date.getDay() === 0 || date.getDay() === 6;
+  const hourWeights = computeHabitHourWeights(new Date())[isWknd ? 'weekend' : 'weekday'];
+  const candidates = [];
+  gaps.forEach((gap) => {
+    candidates.push(gap.start);
+    for (let h = Math.ceil(gap.start / 60); h * 60 + duration <= gap.end; h += 1) {
+      if (h * 60 > gap.start) candidates.push(h * 60);
+    }
+  });
+  let best = candidates[0];
+  let bestScore = -1;
+  candidates.forEach((startMin) => {
+    const score = hourWeights[Math.floor(startMin / 60)] || 0;
+    if (score > bestScore) { best = startMin; bestScore = score; }
+  });
+  return { start: minutesToTime(best), end: minutesToTime(best + duration), habitHits: bestScore };
+}
