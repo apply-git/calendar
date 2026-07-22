@@ -233,6 +233,7 @@ function saveTaskFromForm(event) {
     calendarId: els.taskCalendar ? els.taskCalendar.value : 'default',
     color: els.taskColorUseCategory.checked ? null : els.taskColor.value,
     location: els.taskLocation.value.trim(),
+    timezone: els.taskTimezone ? (els.taskTimezone.value || null) : null,
     repeat: els.taskRepeat.value,
     repeatInterval: Math.min(365, Math.max(2, Number(els.taskRepeatInterval.value) || 2)),
     repeatWeekday: Math.min(6, Math.max(0, Number(els.taskRepeatWeekday.value) || 0)),

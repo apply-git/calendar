@@ -657,6 +657,7 @@ textarea { resize: vertical; }
 .overdue-badge { color: #dc2626; }
 .tag-badge { color: var(--primary-strong); }
 .depends-badge { color: var(--primary-strong); }
+.tz-badge { color: var(--primary-strong); }
 .active-mode {
   color: #fff;
   background: var(--primary) !important;

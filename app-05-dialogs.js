@@ -1,3 +1,54 @@
+// D4 行程時區：時區 select 的 <option> HTML 只需組一次（COMMON_TIMEZONES + Intl.supportedValuesOf()
+// 全量清單可能上百筆），第一次要用到時才建、建好快取，供 taskDialog 與旅行模式對話框共用。
+let cachedTimezoneOptionsHtml = null;
+let taskTimezoneOptionsBuilt = false;
+let travelTimezoneOptionsBuilt = false;
+
+function getTimezoneOptionsHtml() {
+  if (cachedTimezoneOptionsHtml !== null) return cachedTimezoneOptionsHtml;
+  let html = COMMON_TIMEZONES.map((tz) => `<option value="${tz.value}">${escapeHtml(tz.label)}（${tz.value}）</option>`).join('');
+  if (typeof Intl.supportedValuesOf === 'function') {
+    try {
+      const commonSet = new Set(COMMON_TIMEZONES.map((tz) => tz.value));
+      const all = Intl.supportedValuesOf('timeZone').filter((tz) => !commonSet.has(tz));
+      if (all.length) {
+        html += `<optgroup label="更多…">${all.map((tz) => `<option value="${escapeHtml(tz)}">${escapeHtml(tz)}</option>`).join('')}</optgroup>`;
+      }
+    } catch (err) {
+      // Intl.supportedValuesOf 不可用或拋錯（少數瀏覽器）：忽略，只提供常用清單
+    }
+  }
+  cachedTimezoneOptionsHtml = html;
+  return html;
+}
+
+// 行程表單「時區」select：本地（預設，value 空字串）+ 常用清單 + 更多。一次性填充，
+// 開表單（openTaskDialog）才建，不在頂層執行；後續開表單直接沿用已建好的 options。
+function ensureTaskTimezoneOptions() {
+  if (taskTimezoneOptionsBuilt || !els.taskTimezone) return;
+  taskTimezoneOptionsBuilt = true;
+  els.taskTimezone.innerHTML = '<option value="">本地（預設）</option>' + getTimezoneOptionsHtml();
+}
+
+// D4 旅行模式設定：⚙ 設定下拉「🌏 旅行模式」開啟的小對話框。開關 + 顯示時區 select，
+// 兩者 change 時即時存 appSettings.travelTimezone 並重繪（見 app-03-events.js 綁定），
+// 沒有另外的儲存按鈕，跟日曆本可見度對話框同一種「即改即存」模式。
+function openTravelModeDialog() {
+  if (!els.travelModeDialog) return;
+  if (!travelTimezoneOptionsBuilt && els.travelModeTimezone) {
+    travelTimezoneOptionsBuilt = true;
+    els.travelModeTimezone.innerHTML = getTimezoneOptionsHtml();
+  }
+  const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  els.travelModeEnabled.checked = Boolean(appSettings.travelTimezone);
+  if (els.travelModeTimezone) {
+    els.travelModeTimezone.value = appSettings.travelTimezone || deviceTimezone;
+    // 保險：極少數情況目前值不在清單內（理論上 Intl.supportedValuesOf 應涵蓋裝置時區），
+    // value 設定失敗會變回清單第一項，這裡不特別處理，讓使用者自行從清單重選即可。
+  }
+  els.travelModeDialog.showModal();
+}
+
 // 當日行程分享圖卡：離屏 canvas 畫出當天行程清單，輸出 PNG 供分享或下載。
 // 配色固定亮色系（不跟深色模式連動），字體、留白皆寫死，只服務「分享出去要好看」這件事。
 function generateShareCard() {
@@ -594,6 +645,8 @@ function openTaskDialog(defaults = {}, occurrenceDate = '') {
   els.taskColor.value = defaults.color || getCategoryColor(defaults.category || '工作');
   updateTaskColorFieldState();
   els.taskLocation.value = defaults.location || '';
+  ensureTaskTimezoneOptions();
+  if (els.taskTimezone) els.taskTimezone.value = defaults.timezone || '';
   els.taskRepeat.value = defaults.repeat || 'none';
   const repeatBaseDate = defaults.date ? new Date(`${defaults.date}T00:00:00`) : currentDate;
   els.taskRepeatInterval.value = String(Math.min(365, Math.max(2, Number(defaults.repeatInterval) || 2)));

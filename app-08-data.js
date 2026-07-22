@@ -1,3 +1,50 @@
+// D4 行程時區換算 helper：wallTimeToEpoch(日期字串, 時間字串, IANA 時區) 反推「該時區牆上時間」
+// 對應的實際時間戳（epoch ms）。標準做法：先假設目標牆上時間就是 UTC 時間戳當初始猜測，
+// 用 Intl.DateTimeFormat 把猜測值格式化到目標時區、量出當下時區 offset，再用 offset 修正猜測值，
+// 兩次疊代即可收斂（含 DST 換日邊界）。tz 為空／未傳時視為瀏覽器本地時區，直接用 Date 建構子。
+function wallTimeToEpoch(dateStr, timeStr, tz) {
+  if (!dateStr || !timeStr) return NaN;
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const [h, mi] = timeStr.split(':').map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d) || !Number.isFinite(h) || !Number.isFinite(mi)) return NaN;
+  if (!tz) return new Date(y, mo - 1, d, h, mi, 0, 0).getTime();
+  const target = Date.UTC(y, mo - 1, d, h, mi, 0);
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const asUtcNumber = (epoch) => {
+    const parts = dtf.formatToParts(new Date(epoch));
+    const map = {};
+    parts.forEach((part) => { if (part.type !== 'literal') map[part.type] = part.value; });
+    // Intl 24 小時制邊界某些環境會回傳 "24" 代表隔天 00 點，這裡收斂成 0 避免 Date.UTC 誤算成下一天。
+    const hour = map.hour === '24' ? 0 : Number(map.hour);
+    return Date.UTC(Number(map.year), Number(map.month) - 1, Number(map.day), hour, Number(map.minute), Number(map.second));
+  };
+  let guess = target;
+  for (let i = 0; i < 2; i++) {
+    const offset = asUtcNumber(guess) - guess;
+    guess = target - offset;
+  }
+  return guess;
+}
+
+// D4：把一個 epoch 時間戳格式化成指定時區的牆上日期/時間，供換算 badge 顯示與跨日判斷用。
+// tz 為空時使用瀏覽器本地時區（Intl.DateTimeFormat 的 timeZone 傳 undefined 即代表本地）。
+function formatInTz(epochMs, tz) {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz || undefined, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  });
+  const parts = dtf.formatToParts(new Date(epochMs));
+  const map = {};
+  parts.forEach((part) => { if (part.type !== 'literal') map[part.type] = part.value; });
+  const hour = map.hour === '24' ? '00' : map.hour;
+  return { date: `${map.year}-${map.month}-${map.day}`, time: `${hour}:${map.minute}` };
+}
+
 function applyTextSettings() {
   document.title = textSettings.appTitle;
   els.brandTitle.textContent = textSettings.appTitle;
@@ -304,6 +351,8 @@ function normalizeStoredData() {
       excludedDates: Array.isArray(task.excludedDates) ? task.excludedDates.filter(Boolean) : [],
       color: typeof task.color === 'string' && task.color ? task.color : null,
       location: typeof task.location === 'string' ? task.location : '',
+      // D4 行程時區：IANA 字串或 null（=本地時區，不換算顯示）。
+      timezone: typeof task.timezone === 'string' && task.timezone ? task.timezone : null,
       repeat: task.repeat || 'none',
       repeatInterval: Number.isFinite(Number(task.repeatInterval)) && Number(task.repeatInterval) > 0 ? Math.floor(Number(task.repeatInterval)) : 2,
       repeatWeekday: Number.isFinite(Number(task.repeatWeekday)) ? Math.min(6, Math.max(0, Math.floor(Number(task.repeatWeekday)))) : new Date(`${task.date}T00:00:00`).getDay(),
@@ -331,6 +380,8 @@ function normalizeStoredData() {
   appSettings.showLunar = typeof appSettings.showLunar === 'boolean' ? appSettings.showLunar : true;
   appSettings.dayViewMode = appSettings.dayViewMode === 'timeline' ? 'timeline' : 'list';
   appSettings.autoSync = typeof appSettings.autoSync === 'boolean' ? appSettings.autoSync : false;
+  // D4 旅行模式：IANA 字串或 null（=關閉，換算顯示改用裝置時區判斷是否需要 badge）。
+  appSettings.travelTimezone = typeof appSettings.travelTimezone === 'string' && appSettings.travelTimezone ? appSettings.travelTimezone : null;
   // 可見日曆本集合：未設定（非陣列）才補成「全部顯示」；已是陣列（含使用者主動全部取消勾選
   // 的空陣列）一律尊重，只做「移除已刪除日曆本 id」的收斂，不覆寫使用者的選擇。
   const calendarIds = calendars.map((calendar) => calendar.id);

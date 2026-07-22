@@ -88,8 +88,25 @@ const TAIWAN_HOLIDAYS = {
   '2027-12-31': '元旦（補假）',
 };
 
-const defaultAppSettings = { workStart: 7, workEnd: 21, showLunar: true, dayViewMode: 'list', autoSync: false };
+const defaultAppSettings = { workStart: 7, workEnd: 21, showLunar: true, dayViewMode: 'list', autoSync: false, travelTimezone: null };
 const TIMELINE_HOUR_HEIGHT = 60;
+
+// D4 行程時區：任務表單「時區」select 常用清單＋旅行模式顯示時區 select 共用同一份清單。
+// value 用 IANA 字串，label 是中文城市名，兩者都會出現在 select option 文字裡（見 getTimezoneOptionsHtml()）。
+const COMMON_TIMEZONES = [
+  { value: 'Asia/Taipei', label: '台北' },
+  { value: 'Asia/Tokyo', label: '東京' },
+  { value: 'Asia/Seoul', label: '首爾' },
+  { value: 'Asia/Shanghai', label: '上海' },
+  { value: 'Asia/Hong_Kong', label: '香港' },
+  { value: 'Asia/Singapore', label: '新加坡' },
+  { value: 'Asia/Bangkok', label: '曼谷' },
+  { value: 'Australia/Sydney', label: '雪梨' },
+  { value: 'Europe/London', label: '倫敦' },
+  { value: 'Europe/Paris', label: '巴黎' },
+  { value: 'America/New_York', label: '紐約' },
+  { value: 'America/Los_Angeles', label: '洛杉磯' },
+];
 
 const defaultTemplates = [
   { id: 't-morning', name: '晨會', start: '09:00', end: '09:30', category: '工作', priority: 'medium' },
@@ -298,6 +315,7 @@ const els = {
   taskColor: $('taskColor'),
   taskColorUseCategory: $('taskColorUseCategory'),
   taskLocation: $('taskLocation'),
+  taskTimezone: $('taskTimezone'),
   taskRepeat: $('taskRepeat'),
   repeatIntervalField: $('repeatIntervalField'),
   taskRepeatInterval: $('taskRepeatInterval'),
@@ -370,6 +388,10 @@ const els = {
   calendarManageList: $('calendarManageList'),
   calendarNameInput: $('calendarNameInput'),
   addCalendarBtn: $('addCalendarBtn'),
+  travelModeDialog: $('travelModeDialog'),
+  closeTravelModeBtn: $('closeTravelModeBtn'),
+  travelModeEnabled: $('travelModeEnabled'),
+  travelModeTimezone: $('travelModeTimezone'),
   toast: $('toast'),
   fabAddBtn: $('fabAddBtn'),
   moreToolsBtn: $('moreToolsBtn'),
@@ -498,6 +520,7 @@ const TOOLBAR_MENU_GROUPS = [
     items: [
       { proxyId: 'enableNotificationsBtn' },
       { proxyId: 'settingsBtn' },
+      { label: '🌏 旅行模式', onClick: () => openTravelModeDialog() },
     ],
   },
 ];

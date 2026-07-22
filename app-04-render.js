@@ -326,6 +326,24 @@ function dependsOnTitle(task) {
   return names.length ? `前置任務：${names.join('、')}` : '';
 }
 
+// D4 旅行模式換算 badge：只有 task.timezone 存在且跟目前顯示時區不同才顯示，只加顯示用 badge，
+// 不碰行程本身的排序/所屬日期/存檔值（task.date/task.start 本身完全不變）。
+// 目前顯示時區：旅行模式開啟時＝appSettings.travelTimezone，否則＝裝置本地時區。
+function timezoneConversionBadge(task) {
+  if (!task.timezone || !task.start) return ''; // 無時間的全天行程不顯示換算
+  const displayTz = appSettings.travelTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (task.timezone === displayTz) return '';
+  const epoch = wallTimeToEpoch(task.date, task.start, task.timezone);
+  if (!Number.isFinite(epoch)) return '';
+  const converted = formatInTz(epoch, displayTz);
+  const dayDiff = Math.round((new Date(`${converted.date}T00:00:00`) - new Date(`${task.date}T00:00:00`)) / 86400000);
+  const dayLabel = dayDiff > 0 ? ` +${dayDiff}d` : (dayDiff < 0 ? ` ${dayDiff}d` : '');
+  const known = COMMON_TIMEZONES.find((item) => item.value === displayTz);
+  const displayLabel = known ? known.label : displayTz.split('/').pop().replace(/_/g, ' ');
+  const title = `${task.timezone} ${task.start} → ${displayTz} ${converted.time}${dayLabel}`;
+  return `<span class="badge tz-badge" title="${escapeHtml(title)}">→${escapeHtml(displayLabel)} ${converted.time}${dayLabel}</span>`;
+}
+
 function taskCard(task, dateKey) {
   const priorityClass = `priority-${task.priority}`;
   const color = getTaskColor(task);
@@ -345,6 +363,7 @@ function taskCard(task, dateKey) {
       </div>
       <div class="task-meta">
         <span class="badge">${task.start}–${task.end}</span>
+        ${timezoneConversionBadge(task)}
         <span class="badge">${escapeHtml(task.category)}</span>
         <span class="badge ${priorityClass}">優先：${priorityLabel[task.priority]}</span>
         ${task.pinned ? '<span class="badge pinned-badge">置頂</span>' : ''}

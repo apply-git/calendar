@@ -288,6 +288,12 @@
           <input id="taskLocation" type="text" placeholder="例如：台北市信義區市府路1號" />
         </div>
         <div class="field">
+          <label for="taskTimezone">時區</label>
+          <select id="taskTimezone">
+            <option value="">本地（預設）</option>
+          </select>
+        </div>
+        <div class="field">
           <label for="taskRepeat">重複</label>
           <select id="taskRepeat">
             <option value="none">不重複</option>
@@ -648,6 +654,21 @@
       <div class="category-actions">
         <input id="calendarNameInput" type="text" placeholder="日曆本名稱" />
         <button type="button" id="addCalendarBtn" title="新增日曆本">＋</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="travelModeDialog" class="task-dialog travel-mode-dialog">
+    <div class="dialog-header">
+      <h2>🌏 旅行模式</h2>
+      <button type="button" id="closeTravelModeBtn" class="icon-btn">✕</button>
+    </div>
+    <div class="calendar-dialog-body">
+      <p class="muted">開啟後，行程卡上有設定時區的行程會加註換算成這個時區的時間，方便旅行中對照當地時間。</p>
+      <label><input type="checkbox" id="travelModeEnabled" /> 開啟旅行模式</label>
+      <div class="field">
+        <label for="travelModeTimezone">顯示時區</label>
+        <select id="travelModeTimezone"></select>
       </div>
     </div>
   </dialog>

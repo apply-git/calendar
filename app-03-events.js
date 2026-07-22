@@ -343,6 +343,21 @@ function bindEvents() {
     if (event.key === 'Enter' && event.target.matches('[data-rename-calendar]')) event.target.blur();
   });
 
+  // D4 旅行模式：開關/顯示時區 select 即改即存 appSettings.travelTimezone，沒有另外的儲存按鈕。
+  els.closeTravelModeBtn?.addEventListener('click', () => els.travelModeDialog?.close());
+  els.travelModeEnabled?.addEventListener('change', () => {
+    const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    appSettings.travelTimezone = els.travelModeEnabled.checked ? (els.travelModeTimezone?.value || deviceTimezone) : null;
+    saveJson(APP_SETTINGS_KEY, appSettings);
+    render();
+  });
+  els.travelModeTimezone?.addEventListener('change', () => {
+    if (!els.travelModeEnabled?.checked) return;
+    appSettings.travelTimezone = els.travelModeTimezone.value || null;
+    saveJson(APP_SETTINGS_KEY, appSettings);
+    render();
+  });
+
   document.addEventListener('click', handleCalendarClick);
   document.addEventListener('change', handleCalendarChange);
   document.addEventListener('dragstart', handleDragStart);
