@@ -148,6 +148,7 @@ function bindEvents() {
   els.nextBtn.addEventListener('click', () => navigate(1));
   setupSwipeNavigation();
   setupTaskSwipeActions();
+  setupLongPressCreate();
   // 年月日直選跳轉：改變日期選擇器就跳到那一天（週/月檢視會跳到含該日的那一週/月）。
   els.jumpDateInput?.addEventListener('change', () => {
     if (!els.jumpDateInput.value) return;
@@ -585,4 +586,34 @@ function resetCardSwipe(el) {
   if (!el) return;
   el.classList.remove('swiping', 'swiping-left', 'swiping-right');
   el.style.transform = '';
+}
+
+function setupLongPressCreate() {
+  const view = document.getElementById('calendarView');
+  if (!view) return;
+  let timer = null, fired = false, sx = 0, sy = 0;
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  view.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return cancel();
+    const cell = e.target.closest('.month-day');
+    if (!cell || e.target.closest('.task-card, button, input, a')) return cancel();
+    const key = cell.dataset.dropDate;
+    if (!key) return cancel();
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; fired = false;
+    timer = setTimeout(() => {
+      timer = null; fired = true;
+      openTaskDialog({ date: key });
+    }, 500);
+  }, { passive: true });
+  view.addEventListener('touchmove', (e) => {
+    if (!timer) return;
+    const dx = e.touches[0].clientX - sx;
+    const dy = e.touches[0].clientY - sy;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) cancel();
+  }, { passive: true });
+  view.addEventListener('touchend', () => cancel(), { passive: true });
+  view.addEventListener('touchcancel', () => cancel(), { passive: true });
+  view.addEventListener('click', (e) => {
+    if (fired) { fired = false; e.stopPropagation(); e.preventDefault(); }
+  }, true);
 }

@@ -1806,3 +1806,8 @@ body.dark .app-footer { color: #fff; }
 .task-card.swiping { transition: none; }
 .task-card.swiping-left { background: #e8f7ec; }
 .task-card.swiping-right { background: #fff4e0; }
+
+/* M1c 月曆格長按快建 */
+@media (pointer: coarse) {
+  .month-day { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+}
