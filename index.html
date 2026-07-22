@@ -226,6 +226,10 @@
     <button type="button" class="bottom-nav-btn" data-nav-view="agenda">📋<span>列表</span></button>
     <button type="button" class="bottom-nav-btn" data-nav-today="1">🎯<span>今天</span></button>
   </nav>
+  <form id="quickAddBar" class="quick-add-bar" hidden>
+    <input id="quickAddBarInput" type="text" placeholder="快速新增：例 明天15:00 開會" autocomplete="off" />
+    <button type="submit">新增</button>
+  </form>
 
   <dialog id="taskDialog" class="task-dialog">
     <form id="taskForm" method="dialog">

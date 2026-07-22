@@ -1841,3 +1841,34 @@ body.dark .app-footer { color: #fff; }
   body.has-bottom-nav { padding-bottom: 62px; }
   body.has-bottom-nav .fab-add:not([hidden]) { bottom: 74px; }
 }
+/* M3 手機快速新增列 */
+.quick-add-bar { display: none; }
+@media (max-width: 760px) {
+  .quick-add-bar:not([hidden]) {
+    display: flex;
+    position: fixed;
+    left: 0; right: 0;
+    bottom: calc(54px + env(safe-area-inset-bottom));
+    z-index: 59;
+    gap: 6px;
+    padding: 6px 8px;
+    background: var(--surface-strong);
+    border-top: 1px solid var(--border);
+  }
+  .quick-add-bar input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+  .quick-add-bar button {
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+  body.has-bottom-nav { padding-bottom: 108px; }
+}

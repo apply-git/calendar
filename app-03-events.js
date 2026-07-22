@@ -150,6 +150,7 @@ function bindEvents() {
   setupTaskSwipeActions();
   setupLongPressCreate();
   setupBottomNav();
+  setupQuickAddBar();
   // 年月日直選跳轉：改變日期選擇器就跳到那一天（週/月檢視會跳到含該日的那一週/月）。
   els.jumpDateInput?.addEventListener('change', () => {
     if (!els.jumpDateInput.value) return;
@@ -567,6 +568,7 @@ function setupTaskSwipeActions() {
       if (blockers.length) return showToast(`前置任務未完成：${blockers.map((dep) => dep.title).join('、')}`);
       setTaskDone(task, dateKey, true);
       playDoneSound();
+      if (navigator.vibrate) navigator.vibrate(20);
       saveJson(STORAGE_KEY, tasks);
       render();
       showToast('已完成 ✅');
@@ -576,6 +578,7 @@ function setupTaskSwipeActions() {
       const nextDate = nextWorkingDay(new Date(dateKey + 'T00:00:00'));
       task.date = toDateInput(nextDate);
       touchTask(task);
+      if (navigator.vibrate) navigator.vibrate(20);
       saveJson(STORAGE_KEY, tasks);
       render();
       showToast(`已順延到 ${formatMonthDay(nextDate)}`);
@@ -603,6 +606,7 @@ function setupLongPressCreate() {
     sx = e.touches[0].clientX; sy = e.touches[0].clientY; fired = false;
     timer = setTimeout(() => {
       timer = null; fired = true;
+      if (navigator.vibrate) navigator.vibrate(30);
       openTaskDialog({ date: key });
     }, 500);
   }, { passive: true });
@@ -640,4 +644,22 @@ function setupBottomNav() {
     document.body.classList.add('has-bottom-nav');
     updateActive(currentView);
   }
+}
+
+
+
+function setupQuickAddBar() {
+  const bar = document.getElementById('quickAddBar');
+  if (!bar) return;
+  const input = document.getElementById('quickAddBarInput');
+  bar.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = (input.value || '').trim();
+    if (!text) return;
+    if (navigator.vibrate) navigator.vibrate(15);
+    openTaskDialog({ date: toDateInput(currentDate), title: text });
+    input.value = '';
+    input.blur();
+  });
+  if (window.matchMedia('(max-width: 760px)').matches) bar.removeAttribute('hidden');
 }
