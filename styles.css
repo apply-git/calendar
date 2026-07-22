@@ -337,6 +337,25 @@ body.dark .toolbar-menu {
   min-height: 43px;
 }
 .checkbox-field input { width: auto; }
+
+/* D3 任務依賴：前置任務 checkbox 清單，清單過長時容器內捲動。 */
+.task-depends-list {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.task-depends-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+.task-depends-list label span.muted { margin-left: auto; }
 /* 行程表單「自訂色彩」：色彩選擇器＋「使用分類色」核取同列，勾選時色彩選擇器停用變灰。 */
 .task-color-row {
   display: flex;
@@ -637,6 +656,7 @@ textarea { resize: vertical; }
 .pinned-badge { color: #b45309; }
 .overdue-badge { color: #dc2626; }
 .tag-badge { color: var(--primary-strong); }
+.depends-badge { color: var(--primary-strong); }
 .active-mode {
   color: #fff;
   background: var(--primary) !important;

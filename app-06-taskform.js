@@ -138,6 +138,57 @@ function updateRepeatFieldsVisibility() {
 
   els.repeatWeekdayField.hidden = !isNth;
   els.taskRepeatWeekday.disabled = !isNth;
+
+  // D3 任務依賴：前置任務僅單次（非重複）行程可設定，重複行程隱藏此欄
+  // （saveTaskFromForm() 存檔時同步清空 dependsOn，兩處條件都是 repeat === 'none'）。
+  if (els.taskDependsOnField) els.taskDependsOnField.hidden = repeat !== 'none';
+}
+
+// D3 任務依賴：檢查 startId 這筆行程是否會（直接或間接）依賴 targetId，用來在
+// 「前置任務」候選清單排除選了會成環的行程（選了 A 依賴 B，就不准 B 再依賴 A）。
+function dependsOnReachable(startId, targetId) {
+  const visited = new Set();
+  const queue = [startId];
+  while (queue.length) {
+    const id = queue.shift();
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const current = tasks.find((item) => item.id === id);
+    if (!current || !Array.isArray(current.dependsOn)) continue;
+    for (const depId of current.dependsOn) {
+      if (depId === targetId) return true;
+      if (!visited.has(depId)) queue.push(depId);
+    }
+  }
+  return false;
+}
+
+// D3 任務依賴：畫出「前置任務」checkbox 清單。候選項目＝其他單次（repeat==='none'）
+// 且未刪除的行程，排除自己、排除選了會成環者。currentTaskId 新增行程時為空字串，
+// 此時不可能形成環（沒有任何行程能依賴一個還不存在的 id），全部候選項目都會列出。
+function renderDependsOnOptions(currentTaskId, selectedIds) {
+  if (!els.taskDependsOnList) return;
+  const selected = new Set(Array.isArray(selectedIds) ? selectedIds : []);
+  const candidates = tasks
+    .filter((task) => !task.deletedAt && task.repeat === 'none' && task.id !== currentTaskId)
+    .filter((task) => !(currentTaskId && dependsOnReachable(task.id, currentTaskId)))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
+
+  els.taskDependsOnList.innerHTML = candidates.length
+    ? candidates.map((task) => `
+        <label>
+          <input type="checkbox" value="${task.id}" ${selected.has(task.id) ? 'checked' : ''} />
+          <span>${escapeHtml(task.title)}</span>
+          <span class="muted">${formatMonthDay(new Date(`${task.date}T00:00:00`))}</span>
+        </label>
+      `).join('')
+    : '<p class="muted">尚無可設定的單次行程</p>';
+}
+
+// D3 任務依賴：從目前開著的「前置任務」checkbox 清單讀出使用者勾選的 id。
+function getCheckedDependsOnIds() {
+  if (!els.taskDependsOnList) return [];
+  return Array.from(els.taskDependsOnList.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
 }
 
 // 「使用分類色」勾選時停用色彩選色器，避免使用者誤以為調色會生效。
@@ -193,6 +244,10 @@ function saveTaskFromForm(event) {
     tags: parseTags(els.taskTags.value),
     subtasks: linesFromTextarea(els.taskSubtasks.value),
     note: els.taskNote.value.trim(),
+    // D3 任務依賴：僅單次行程可設定前置任務；重複行程存檔時一律清空 dependsOn。
+    dependsOn: els.taskRepeat.value === 'none'
+      ? getCheckedDependsOnIds().filter((depId) => depId !== els.taskId.value)
+      : [],
     completedDates: existingTask?.completedDates || [],
     excludedDates: existingTask?.excludedDates || [],
     repeatUntil: existingTask?.repeatUntil || '',
@@ -577,8 +632,15 @@ function handleCalendarChange(event) {
   if (taskId) {
     const task = tasks.find((item) => item.id === taskId);
     const doneDate = event.target.dataset.doneDate || toDateInput(currentDate);
-    if (task) setTaskDone(task, doneDate, event.target.checked);
-    if (event.target.checked) playDoneSound();
+    // D3 任務依賴：只擋「勾選完成」，取消勾選不受前置任務狀態限制。
+    const blockers = task && event.target.checked ? getIncompleteDependencies(task) : [];
+    if (blockers.length) {
+      event.target.checked = false;
+      showToast(`前置任務未完成：${blockers.map((dep) => dep.title).join('、')}`);
+    } else if (task) {
+      setTaskDone(task, doneDate, event.target.checked);
+      if (event.target.checked) playDoneSound();
+    }
     render();
   }
 

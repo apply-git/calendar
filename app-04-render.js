@@ -315,6 +315,17 @@ function renderAgenda(visibleTasks) {
   `;
 }
 
+// D3 任務依賴：組出 🔗 badge 的 title 文字，列出所有前置任務名稱與完成狀態
+// （完成判定走 getIncompleteDependencies() 同一套 completedDates 含自身 date 邏輯）。
+function dependsOnTitle(task) {
+  const incompleteIds = new Set(getIncompleteDependencies(task).map((dep) => dep.id));
+  const names = (task.dependsOn || [])
+    .map((depId) => tasks.find((item) => item.id === depId && !item.deletedAt))
+    .filter(Boolean)
+    .map((dep) => `${dep.title}（${incompleteIds.has(dep.id) ? '未完成' : '已完成'}）`);
+  return names.length ? `前置任務：${names.join('、')}` : '';
+}
+
 function taskCard(task, dateKey) {
   const priorityClass = `priority-${task.priority}`;
   const color = getTaskColor(task);
@@ -339,6 +350,7 @@ function taskCard(task, dateKey) {
         ${task.pinned ? '<span class="badge pinned-badge">置頂</span>' : ''}
         ${overdue ? '<span class="badge overdue-badge">逾時</span>' : ''}
         ${task.repeat !== 'none' ? `<span class="badge">${escapeHtml(repeatDisplayLabel(task))}</span>` : ''}
+        ${task.dependsOn?.length ? `<span class="badge depends-badge" title="${escapeHtml(dependsOnTitle(task))}">🔗</span>` : ''}
         ${task.attachmentCount > 0 ? `<span class="badge">📎${task.attachmentCount}</span>` : ''}
         ${(task.tags || []).map((tag) => `<span class="badge tag-badge">#${escapeHtml(tag)}</span>`).join('')}
       </div>

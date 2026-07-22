@@ -312,6 +312,8 @@ const els = {
   taskPinned: $('taskPinned'),
   taskCountdown: $('taskCountdown'),
   taskShared: $('taskShared'),
+  taskDependsOnField: $('taskDependsOnField'),
+  taskDependsOnList: $('taskDependsOnList'),
   taskTags: $('taskTags'),
   taskSubtasks: $('taskSubtasks'),
   taskNote: $('taskNote'),

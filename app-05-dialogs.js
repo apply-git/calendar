@@ -604,6 +604,9 @@ function openTaskDialog(defaults = {}, occurrenceDate = '') {
   if (isRecurringOccurrence) {
     els.taskScopeHint.textContent = `其他重複日期不會受影響（${formatMonthDay(new Date(`${occurrenceDate}T00:00:00`))}）`;
   }
+  // D3 任務依賴：候選清單依「目前正在編輯的行程 id + 已存的 dependsOn」畫出，
+  // 要放在 updateRepeatFieldsVisibility() 前後皆可（那裡只管 hidden，這裡管內容）。
+  renderDependsOnOptions(defaults.id || '', Array.isArray(defaults.dependsOn) ? defaults.dependsOn : []);
   updateRepeatFieldsVisibility();
   els.taskReminder.value = String(defaults.reminder ?? 10);
   els.taskPinned.checked = Boolean(defaults.pinned);

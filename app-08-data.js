@@ -203,6 +203,17 @@ function setTaskDone(task, dateKey, done) {
   touchTask(task);
 }
 
+// D3 任務依賴：回傳某筆行程「尚未完成的前置任務」清單（task.dependsOn 內、
+// completedDates 未含自身 date 的行程）。供勾選完成擋下（handleCalendarChange）
+// 與行程卡 🔗 badge（taskCard）共用，唯一判斷入口。
+function getIncompleteDependencies(task) {
+  if (!Array.isArray(task.dependsOn) || !task.dependsOn.length) return [];
+  return task.dependsOn
+    .map((depId) => tasks.find((item) => item.id === depId && !item.deletedAt))
+    .filter(Boolean)
+    .filter((dep) => !(dep.completedDates || []).includes(dep.date));
+}
+
 // 逐筆同步用的中央 helper：任何「使用者動作改變某筆 task 內容」都要呼叫 touchTask()
 // 記錄最後修改時間；「真刪除」一律改叫 tombstoneTask() 留墓碑供之後雲端同步合併判斷，
 // 不從 tasks 陣列真的移除（例外：fixDataIssues 對非法日期壞資料維持真刪除）。
@@ -216,6 +227,13 @@ function tombstoneTask(task) {
   // 中央 helper：所有「使用者刪除行程」路徑（卡片刪除／對話框刪除／清除當天/週/月／
   // 清理舊行程）都經過這裡，一併清掉該行程在 IndexedDB 的附件本體。
   idbDeleteByTask(task.id);
+  // D3 任務依賴：同步把這個已刪除行程的 id 從其他行程的 dependsOn 移除，
+  // 避免依賴一個已刪除的前置任務導致永遠無法勾選完成。
+  tasks.forEach((other) => {
+    if (other.id === task.id || !Array.isArray(other.dependsOn) || !other.dependsOn.includes(task.id)) return;
+    other.dependsOn = other.dependsOn.filter((id) => id !== task.id);
+    touchTask(other);
+  });
 }
 
 function habitStreak(habit) {
@@ -263,6 +281,9 @@ function toggleTheme() {
 function normalizeStoredData() {
   categories = mergeCategories(defaultCategories, categories);
   calendars = mergeCalendars(defaultCalendars, calendars);
+  // D3 任務依賴：先收集目前存在（未被刪除墓碑）的 task id，供下面過濾 dependsOn 用，
+  // 避免依賴一筆已不存在／已刪除的行程導致永遠卡在「前置未完成」。
+  const existingTaskIds = new Set(tasks.filter((task) => !task.deletedAt).map((task) => task.id));
   tasks = tasks.map((task) => {
     const completedDates = Array.isArray(task.completedDates) ? task.completedDates : (task.done ? [task.date] : []);
     const categoryExists = categories.some((category) => category.name === task.category);
@@ -272,6 +293,9 @@ function normalizeStoredData() {
       category: categoryExists ? task.category : categories[0].name,
       calendarId: calendarExists ? task.calendarId : 'default',
       completedDates,
+      dependsOn: Array.isArray(task.dependsOn)
+        ? task.dependsOn.filter((id) => id !== task.id && existingTaskIds.has(id))
+        : [],
       pinned: Boolean(task.pinned),
       countdown: Boolean(task.countdown),
       shared: Boolean(task.shared),
