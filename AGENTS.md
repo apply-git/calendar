@@ -1,58 +1,26 @@
 # Agent / Codex 專案指引
 
-請先讀 `HANDOFF.md`。
+純前端本機桌面行程表（Vanilla HTML/CSS/JS，免安裝，`file://` 雙擊 `index.html` 即可用）。
+正式站：https://calendar88.pages.dev/（Cloudflare Pages，push main 自動部署）。
 
-## 專案
+**先讀** `AI_CONTEXT/PROJECT_BRIEF.md`（事實清單）→ `AI_CONTEXT/NOTES.md`（踩坑鐵則）→
+`AI_CONTEXT/RECENT_CHANGES.md`（最近異動）；功能規劃/施工進度見 `ROADMAP.md`。
 
-`d:\計畫表` 是純前端本機行程表。
+## 紅線
 
-## 技術
-
-- HTML
-- CSS
-- Vanilla JavaScript
-- localStorage
-- 無 npm
-- 無 build step
-
-## 執行方式
-
-直接開啟：
-
-`index.html`
-
-## 開發原則
-
-- 保持簡單，不引入框架或打包工具（PWA / 雲端同步都用原生 API 與 fetch）。
-- 修改前先理解 `app.js` 的全域狀態與 `render()` 流程。
-- 新資料欄位必須相容舊 localStorage。
-- 備份 / 還原功能要同步支援新欄位（走 `buildBackupPayload()` / `applyBackupObject()`）。
-- 文件要同步更新 `README.md`、`HANDOFF.md` 與 `ROADMAP.md`。
-- 使用者說「存檔」時，同步更新 `HANDOFF.md`、`CLAUDE.md`、`AGENTS.md`。
+1. 不引框架、不 npm、不 build。
+2. 新增資料欄位必同步更新 `normalizeStoredData()` / `buildBackupPayload()` / `applyBackupObject()` / `README.md`。
+3. 行程完成用 `completedDates`；重複行程判斷唯一入口 `occursOnDate(task, dateKey)`。
+4. 改動 `service-worker.js` 的 `APP_SHELL` 內任一檔案，必同步升 `CACHE_NAME`。
+5. **UI 版面異動（桌機/手機）絕不隨意更動**：即使下令「實作」，也要先本機預覽/截圖給使用者確認，才可 push、部署。
+6. `git add` 一律具名檔案，不用 `git add -A` / `git add .`。
+7. 回覆繁體中文，簡短直接。
 
 ## 驗證方式
 
-瀏覽器重新整理後手動測：
+瀏覽器重新整理後手動測：新增/編輯行程、完成勾選、日/週/月切換、今日待辦模式、小工具模式、備份/還原。
 
-1. 新增行程
-2. 編輯行程
-3. 完成勾選
-4. 日 / 週 / 月切換
-5. 今日待辦模式
-6. 小工具模式
-7. 備份 / 還原
+## 觸發短語
 
-## 重要檔案
-
-- `HANDOFF.md`：完整交接
-- `ROADMAP.md`：功能規劃、分工與進度
-- `README.md`：使用說明
-- `index.html`：UI 結構
-- `styles.css`：樣式
-- `app.js`：核心邏輯（`window.CalendarApp` 介面供 `sync.js`；備份單一真相 `buildBackupPayload()` / `applyBackupObject()`；逐筆同步時間戳/墓碑 `touchTask()`/`tombstoneTask()`；附件 IndexedDB 存取層）
-- `sync.js`：雲端同步（Supabase，純 fetch，未設定時 no-op），已改為 pull→merge→push 逐筆合併（`mergeBackupPayloads()`），並含家庭共享同步 `syncSharedTasks()`
-- `config.js` / `schema.sql`（個人同步）／`schema-history.sql`（備份版本）／`schema-share.sql`（家庭共享）／`schema-push.sql`＋Edge Function（背景推播）
-- `CLOUD_SETUP.md` / `CLOUD_PUSH_SETUP.md`：雲端功能設定教學
-- `push.js`：背景推播訂閱 UI（選用，零設定零影響）
-- `manifest.json` / `service-worker.js` / `icons/` / `start-pwa-local.bat`：PWA（正式站已上線，本機伺服器僅供無網路情境；改 `APP_SHELL` 內檔案須同步升 `CACHE_NAME`）
-- `tests.html`：測試跑道，48 案例，開發用
+- **存檔**：更新 `AI_CONTEXT/RECENT_CHANGES.md`（必要時 `NOTES.md`/`PROJECT_BRIEF.md`），不 push、不部署。
+- **推送**：`git status` 確認 → 具名 `git add` → commit → push（觸發 Cloudflare 自動部署）。

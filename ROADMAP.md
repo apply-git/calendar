@@ -64,7 +64,7 @@
 
 ## 六、存檔規則
 
-依 HANDOFF.md，完成後同步更新 `HANDOFF.md`、`CLAUDE.md`、`AGENTS.md`（及本 `ROADMAP.md`、`README.md`）。
+依 `CLAUDE.md`/`AGENTS.md`：完成後同步更新 `AI_CONTEXT/RECENT_CHANGES.md`（必要時 `NOTES.md`/`PROJECT_BRIEF.md`），及本 `ROADMAP.md`、`README.md`。`HANDOFF.md` 已於 2026-07-22 拆分至 `AI_CONTEXT/`，不復存在。
 
 ## 七、第二波功能批次（2026-07-16 晚間，總指揮 Fable 5 派工，全部完工）
 
