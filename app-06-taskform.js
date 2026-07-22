@@ -575,12 +575,17 @@ function handleCalendarClick(event) {
   const applyTemplateId = event.target.closest('[data-apply-template]')?.dataset.applyTemplate;
   const deleteTemplateId = event.target.dataset.deleteTemplate;
   const countdownEditId = event.target.closest('[data-countdown-edit]')?.dataset.countdownEdit;
+  // 年檢視互動：點月名切月檢視、點日格切日檢視，見 jumpToMonthView() / jumpToDayView()（app-04-render.js）。
+  const jumpMonthKey = event.target.closest('[data-jump-month]')?.dataset.jumpMonth;
+  const jumpDayKey = event.target.closest('[data-jump-day]')?.dataset.jumpDay;
 
   if (countdownEditId) {
     const countdownItem = event.target.closest('[data-countdown-edit]');
     const task = tasks.find((item) => item.id === countdownEditId);
     if (task) openTaskDialog(task, countdownItem?.dataset.countdownDate || '');
   }
+  if (jumpMonthKey) jumpToMonthView(jumpMonthKey);
+  if (jumpDayKey) jumpToDayView(jumpDayKey);
   if (applyTemplateId) applyTemplate(applyTemplateId);
   if (deleteTemplateId) deleteTemplate(deleteTemplateId);
   if (pinId) toggleTaskPinned(pinId);
@@ -763,6 +768,7 @@ function navigate(direction) {
   if (currentView === 'day') currentDate = addDays(currentDate, direction);
   if (currentView === 'week') currentDate = addDays(currentDate, direction * 7);
   if (currentView === 'month') currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + direction, 1);
+  if (currentView === 'year') currentDate = new Date(currentDate.getFullYear() + direction, currentDate.getMonth(), 1);
   if (currentView === 'agenda') currentDate = addDays(currentDate, direction * 30);
   render();
 }

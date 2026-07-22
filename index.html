@@ -103,6 +103,7 @@
             <button class="view-btn active" data-view="day">日</button>
             <button class="view-btn" data-view="week">週</button>
             <button class="view-btn" data-view="month">月</button>
+            <button class="view-btn" data-view="year">年</button>
             <button class="view-btn" data-view="agenda">列表</button>
           </div>
           <div class="view-switch" id="dayModeSwitch" role="tablist" aria-label="切換日檢視模式" hidden>
@@ -158,6 +159,7 @@
           <button id="cleanupBtn" class="ghost-btn grouped-tool">清理舊行程</button>
           <button id="exportCsvBtn" class="ghost-btn grouped-tool">匯出 Excel</button>
           <button id="printBtn" class="ghost-btn grouped-tool">匯出 PDF</button>
+          <button id="printViewBtn" class="ghost-btn grouped-tool">🖨 列印目前檢視</button>
           <button id="exportIcsBtn" class="ghost-btn grouped-tool">匯出 .ics</button>
           <button id="importIcsBtn" class="ghost-btn grouped-tool">匯入 .ics</button>
           <input id="importIcsFileInput" type="file" accept=".ics,text/calendar" hidden />
@@ -718,6 +720,7 @@
       <button type="button" class="more-tools-item" data-proxy="cleanupBtn">清理舊行程</button>
       <button type="button" class="more-tools-item" data-proxy="exportCsvBtn">匯出 Excel</button>
       <button type="button" class="more-tools-item" data-proxy="printBtn">匯出 PDF</button>
+      <button type="button" class="more-tools-item" data-proxy="printViewBtn">🖨 列印目前檢視</button>
       <button type="button" class="more-tools-item" data-proxy="exportIcsBtn">匯出 .ics</button>
       <button type="button" class="more-tools-item" data-proxy="importIcsBtn">匯入 .ics</button>
       <button type="button" class="more-tools-item" data-proxy="batchAddBtn">📋 批量新增</button>

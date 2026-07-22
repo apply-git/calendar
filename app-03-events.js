@@ -210,6 +210,7 @@ function bindEvents() {
   els.settingsForm.addEventListener('submit', saveTextSettingsFromForm);
   els.exportCsvBtn.addEventListener('click', exportCsv);
   els.printBtn.addEventListener('click', () => window.print());
+  els.printViewBtn?.addEventListener('click', () => window.print());
   els.exportIcsBtn.addEventListener('click', exportIcs);
   els.importIcsBtn.addEventListener('click', () => els.importIcsFileInput.click());
   els.importIcsFileInput.addEventListener('change', importIcs);
@@ -409,6 +410,7 @@ const COMMAND_PALETTE_ACTIONS = [
   { label: '日檢視', run: () => document.querySelector('.view-btn[data-view="day"]')?.click() },
   { label: '週檢視', run: () => document.querySelector('.view-btn[data-view="week"]')?.click() },
   { label: '月檢視', run: () => document.querySelector('.view-btn[data-view="month"]')?.click() },
+  { label: '年檢視', run: () => document.querySelector('.view-btn[data-view="year"]')?.click() },
   { label: '列表檢視', run: () => document.querySelector('.view-btn[data-view="agenda"]')?.click() },
   { label: '深色模式切換', run: () => els.themeBtn.click() },
   { label: '番茄鐘', run: () => els.pomodoroBtn.click() },

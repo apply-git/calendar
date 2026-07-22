@@ -41,6 +41,7 @@ function renderTitle() {
     els.currentTitle.textContent = `${formatMonthDay(start)} – ${formatMonthDay(end)}`;
   }
   if (currentView === 'month') els.currentTitle.textContent = `${currentDate.getFullYear()} 年 ${currentDate.getMonth() + 1} 月`;
+  if (currentView === 'year') els.currentTitle.textContent = `${currentDate.getFullYear()} 年`;
   if (currentView === 'agenda') els.currentTitle.textContent = '未來 30 天';
   els.lunarDayLabel.textContent = (currentView === 'day' && appSettings.showLunar) ? `🌙 農曆 ${lunarFullLabel(currentDate)}` : '';
   if (els.weatherDayLabel) {
@@ -67,6 +68,7 @@ function renderCalendar(visibleTasks) {
   if (currentView === 'day') renderDay(visibleTasks);
   if (currentView === 'week') renderWeek(visibleTasks);
   if (currentView === 'month') renderMonth(visibleTasks);
+  if (currentView === 'year') renderYear(visibleTasks);
   if (currentView === 'agenda') renderAgenda(visibleTasks);
 }
 
@@ -271,6 +273,79 @@ function heatClass(count) {
   if (count >= 3) return 'mh-2';
   if (count >= 1) return 'mh-1';
   return '';
+}
+
+// 年檢視（第五種檢視）：12 個迷你月曆格＋全年行程數熱力圖。行程數統計「一次」建好
+// dateKey → count 的 Map（buildYearDateCountMap），逐格套用時只查表，不對每一格
+// 重新跑 visibleTasks.filter(occursOnDate)。熱力 class 沿用月檢視同一顆 heatClass()。
+function renderYear(visibleTasks) {
+  const year = currentDate.getFullYear();
+  const counts = buildYearDateCountMap(visibleTasks, year);
+  const todayKey = toDateInput(new Date());
+
+  els.calendarView.innerHTML = `
+    <div class="year-grid">
+      ${Array.from({ length: 12 }, (_, month) => renderMiniMonth(year, month, counts, todayKey)).join('')}
+    </div>
+  `;
+}
+
+function buildYearDateCountMap(visibleTasks, year) {
+  const counts = new Map();
+  let cursor = new Date(year, 0, 1);
+  const end = new Date(year, 11, 31);
+  while (cursor <= end) {
+    const key = toDateInput(cursor);
+    let count = 0;
+    for (const task of visibleTasks) {
+      if (occursOnDate(task, key)) count += 1;
+    }
+    counts.set(key, count);
+    cursor = addDays(cursor, 1);
+  }
+  return counts;
+}
+
+const MINI_WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
+
+function renderMiniMonth(year, month, counts, todayKey) {
+  const first = new Date(year, month, 1);
+  const gridStart = startOfWeek(first);
+  const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+  const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+  return `
+    <div class="mini-month">
+      <h3 class="mini-month-title" data-jump-month="${monthKey}" title="點一下切換到月檢視">${month + 1} 月</h3>
+      <div class="mini-weekday-row">${MINI_WEEKDAY_LABELS.map((label) => `<span>${label}</span>`).join('')}</div>
+      <div class="mini-day-grid">
+        ${days.map((day) => {
+          const key = toDateInput(day);
+          const inMonth = day.getMonth() === month;
+          const count = inMonth ? (counts.get(key) || 0) : 0;
+          return `<div class="mini-day ${inMonth ? heatClass(count) : ''} ${key === todayKey ? 'today' : ''} ${!inMonth ? 'outside' : ''}" data-jump-day="${key}" title="${inMonth ? count + ' 筆行程' : ''}">${day.getDate()}</div>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// 年檢視互動：點月名跳到月檢視、點日格跳到日檢視。寫法比照既有 jumpToTaskAndEdit()
+// （app-03-events.js）——先切 currentView、同步 view-switch active 樣式、設定
+// currentDate，最後呼叫 render()，只是這裡不開任務編輯視窗。
+function jumpToMonthView(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  currentView = 'month';
+  document.querySelectorAll('.view-btn:not(.day-mode-btn)').forEach((btn) => btn.classList.toggle('active', btn.dataset.view === 'month'));
+  currentDate = new Date(y, m - 1, 1);
+  render();
+}
+
+function jumpToDayView(dateKey) {
+  currentView = 'day';
+  document.querySelectorAll('.view-btn:not(.day-mode-btn)').forEach((btn) => btn.classList.toggle('active', btn.dataset.view === 'day'));
+  currentDate = startOfDay(new Date(`${dateKey}T00:00:00`));
+  render();
 }
 
 // Agenda 列表檢視（第四種檢視）：從 currentDate 起算 30 天，依日期分組，

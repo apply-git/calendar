@@ -524,6 +524,80 @@ textarea { resize: vertical; }
 }
 .month-day.outside { opacity: .42; }
 
+/* 年檢視（新增檢視，不動既有 .month-grid、.week-grid、.month-day 任何規則）：
+   12 個迷你月曆格，heat class 沿用月檢視同一顆 heatClass()（mh-1/mh-2/mh-3），
+   跟著淺色/深色主題走。點月名切月檢視、點日格切日檢視（見 app-04-render.js
+   renderYear() / jumpToMonthView() / jumpToDayView()。 */
+.year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.mini-month {
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+}
+.mini-month-title {
+  margin: 0 0 8px;
+  padding: 4px 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.mini-month-title:hover {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary-strong);
+}
+.mini-weekday-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+.mini-weekday-row span {
+  display: block;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.mini-day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.mini-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text);
+  cursor: pointer;
+}
+.mini-day:hover { background: color-mix(in srgb, var(--primary) 14%, transparent); }
+.mini-day.outside { opacity: .38; cursor: default; }
+.mini-day.today {
+  box-shadow: inset 0 0 0 1.5px var(--primary);
+  font-weight: 700;
+  color: var(--primary-strong);
+}
+.mini-day.mh-1 { background: color-mix(in srgb, var(--primary) 8%, var(--surface-strong)); }
+.mini-day.mh-2 { background: color-mix(in srgb, var(--primary) 16%, var(--surface-strong)); }
+.mini-day.mh-3 { background: color-mix(in srgb, var(--primary) 26%, var(--surface-strong)); }
+
+@media (max-width: 1080px) {
+  .year-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 760px) {
+  .year-grid { grid-template-columns: 1fr; }
+}
+
 .month-day.holiday, .week-day.holiday {
   border-color: rgba(229, 72, 77, .45);
   background: rgba(229, 72, 77, .06);
@@ -1575,11 +1649,41 @@ textarea:focus-visible,
 }
 
 @media print {
-  body { background: #fff; }
-  .sidebar, .toolbar-actions, .controls, .task-actions, .primary-btn, .ghost-btn { display: none !important; }
+  /* 強制淺色紙本配色＋去陰影，只覆蓋主題結構色（bg/surface/text/muted/border/shadow），
+     不動 --work/--home/--study/--sport/--important 等分類色變數，深色模式列印時
+     也會自動轉回淺色紙本配色；print-color-adjust 確保分類色條/熱力圖底色不被
+     瀏覽器省墨模式濾掉。 */
+  :root, body.dark {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-strong: #ffffff;
+    --text: #000000;
+    --muted: #444444;
+    --border: #999999;
+    --shadow: none;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body { background: #fff; color: #000; }
+
+  /* 隱藏工具列／側欄／篩選列／按鈕／FAB／toast／看板全螢幕層與所有 dialog（任務、設定、命令面板、更多工具…）與日期選擇 input，紙本只留目前檢視本體。 */
+  .sidebar, .toolbar-actions, .controls, .task-actions, .primary-btn, .ghost-btn,
+  .fab-add, .toast, .kiosk-overlay, .date-jump, dialog, dialog::backdrop {
+    display: none !important;
+  }
   .app-shell { display: block; padding: 0; }
-  .panel { box-shadow: none; border: 1px solid #ddd; }
+  .panel { box-shadow: none; border: 1px solid #999; backdrop-filter: none; }
   .calendar-view { min-height: auto; }
+
+  /* 列表／Agenda：逐條避免跨頁攔腰截斷，分隔線靠上面 --border 覆蓋值自動加深。 */
+  .agenda-group, .task-card { break-inside: avoid; }
+
+  /* 年檢視：12 格迷你月曆改 3 欄 4 列，適配 A4 一頁放得下（螢幕上的 2欄/1欄手機
+     RWD 規則只在對應寬度生效，列印走這條。 */
+  .year-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .mini-month { break-inside: avoid; }
 }
 
 /* 頁尾版權宣告 */
