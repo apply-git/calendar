@@ -284,11 +284,12 @@ function exportCsv() {
 // sync.js 的 cloudPush()（雲端同步用）都呼叫這個函式，避免備份格式在兩處各自漂移。
 function buildBackupPayload() {
   return {
-    version: 7,
+    version: 8,
     exportedAt: new Date().toISOString(),
     tasks,
     habits,
     categories,
+    calendars,
     textSettings,
     appSettings,
     dailyMemos,
@@ -380,6 +381,7 @@ function applyBackupObject(data) {
   tasks = Array.isArray(data.tasks) ? data.tasks : [];
   habits = Array.isArray(data.habits) ? data.habits : [];
   categories = Array.isArray(data.categories) && data.categories.length ? data.categories : defaultCategories;
+  calendars = Array.isArray(data.calendars) && data.calendars.length ? data.calendars : defaultCalendars;
   textSettings = { ...defaultTextSettings, ...(data.textSettings || {}) };
   appSettings = { ...defaultAppSettings, ...(data.appSettings || {}) };
   dailyMemos = data.dailyMemos && typeof data.dailyMemos === 'object' ? data.dailyMemos : {};
@@ -393,6 +395,7 @@ function applyBackupObject(data) {
   saveJson(STORAGE_KEY, tasks);
   saveJson(HABIT_KEY, habits);
   saveJson(CATEGORY_KEY, categories);
+  saveJson(CALENDAR_KEY, calendars);
   saveJson(TEXT_KEY, textSettings);
   saveJson(APP_SETTINGS_KEY, appSettings);
   saveJson(MEMO_KEY, dailyMemos);

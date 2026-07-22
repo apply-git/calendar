@@ -239,6 +239,37 @@ function renderCategoryOptions() {
   els.taskCategory.value = categories.some((category) => category.name === currentTaskCategory) ? currentTaskCategory : categories[0]?.name;
 }
 
+// 日曆本下拉（新增／編輯行程表單用）：只有一本（預設）時整欄隱藏，避免多數人用不到的情況下還占畫面。
+function renderCalendarField() {
+  if (!els.taskCalendar || !els.taskCalendarField) return;
+  const current = els.taskCalendar.value;
+  els.taskCalendar.innerHTML = calendars.map((cal) => `<option value="${escapeHtml(cal.id)}">${escapeHtml(cal.name)}</option>`).join('');
+  els.taskCalendar.value = calendars.some((cal) => cal.id === current) ? current : 'default';
+  els.taskCalendarField.hidden = calendars.length <= 1;
+}
+
+// 工具列「📚 日曆本」對話框：每本一個 checkbox，勾選=顯示，可複選疊加。
+function renderCalendarVisibilityList() {
+  if (!els.calendarVisibilityList) return;
+  els.calendarVisibilityList.innerHTML = calendars.map((cal) => `
+    <div class="habit-item">
+      <label><input type="checkbox" ${isCalendarVisible(cal.id) ? 'checked' : ''} data-toggle-calendar-visibility="${escapeHtml(cal.id)}" /> ${escapeHtml(cal.name)}</label>
+    </div>
+  `).join('');
+}
+
+// 「管理日曆本…」對話框：名稱可直接在輸入框內修改（change 時觸發 renameCalendar()），
+// 'default' 本不可刪除（比照分類管理的 system 分類不可刪）。
+function renderCalendarManageList() {
+  if (!els.calendarManageList) return;
+  els.calendarManageList.innerHTML = calendars.map((cal) => `
+    <div class="category-item">
+      <input type="text" class="calendar-rename-input" value="${escapeHtml(cal.name)}" data-rename-calendar="${escapeHtml(cal.id)}" />
+      ${cal.id === 'default' ? '<span class="streak">預設</span>' : `<button class="small-btn" data-delete-calendar="${escapeHtml(cal.id)}">✕</button>`}
+    </div>
+  `).join('');
+}
+
 function renderCategories() {
   els.categoryList.innerHTML = categories.map((category) => `
     <div class="category-item">
@@ -546,6 +577,7 @@ function closeDashboardDialog() {
 function openTaskDialog(defaults = {}, occurrenceDate = '') {
   if (els.taskDialog.open) return;
   renderCategoryOptions();
+  renderCalendarField();
   const isEdit = Boolean(defaults.id);
   const isRecurringOccurrence = isEdit && defaults.repeat !== 'none' && Boolean(occurrenceDate);
   editingOccurrenceDate = isRecurringOccurrence ? occurrenceDate : '';
@@ -557,6 +589,7 @@ function openTaskDialog(defaults = {}, occurrenceDate = '') {
   els.taskEnd.value = defaults.end || '10:00';
   els.taskPriority.value = defaults.priority || 'medium';
   els.taskCategory.value = defaults.category || '工作';
+  if (els.taskCalendar) els.taskCalendar.value = calendars.some((cal) => cal.id === defaults.calendarId) ? defaults.calendarId : 'default';
   els.taskColorUseCategory.checked = !defaults.color;
   els.taskColor.value = defaults.color || getCategoryColor(defaults.category || '工作');
   updateTaskColorFieldState();

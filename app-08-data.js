@@ -113,6 +113,76 @@ function getCategoryColor(name) {
   return categories.find((category) => category.name === name)?.color || '#4568f0';
 }
 
+// 日曆本 CRUD（比照上面分類管理的做法）：'default' 本不可刪除，刪除其他本時
+// 該本所有行程 calendarId 歸回 'default'（走 touchTask 記錄異動時間）。
+function addCalendar() {
+  const name = els.calendarNameInput.value.trim();
+  if (!name) return showToast('請輸入日曆本名稱');
+  if (calendars.some((cal) => cal.name === name)) return showToast('日曆本已存在');
+  const id = crypto.randomUUID();
+  calendars.push({ id, name });
+  appSettings.visibleCalendarIds = Array.isArray(appSettings.visibleCalendarIds)
+    ? [...appSettings.visibleCalendarIds, id]
+    : calendars.map((cal) => cal.id);
+  els.calendarNameInput.value = '';
+  saveJson(CALENDAR_KEY, calendars);
+  saveJson(APP_SETTINGS_KEY, appSettings);
+  renderCalendarManageList();
+  renderCalendarVisibilityList();
+  renderCalendarField();
+  showToast('日曆本已新增');
+}
+
+function renameCalendar(id, name) {
+  const cal = calendars.find((item) => item.id === id);
+  if (!cal) return;
+  const trimmed = (name || '').trim();
+  if (!trimmed) { renderCalendarManageList(); return showToast('名稱不可空白'); }
+  if (calendars.some((item) => item.id !== id && item.name === trimmed)) {
+    renderCalendarManageList();
+    return showToast('日曆本名稱已存在');
+  }
+  if (cal.name === trimmed) return;
+  cal.name = trimmed;
+  saveJson(CALENDAR_KEY, calendars);
+  renderCalendarManageList();
+  renderCalendarVisibilityList();
+  renderCalendarField();
+  render();
+  showToast('日曆本已更名');
+}
+
+function deleteCalendar(id) {
+  if (id === 'default') return showToast('預設日曆本無法刪除');
+  const cal = calendars.find((item) => item.id === id);
+  if (!cal) return;
+  tasks.forEach((task) => {
+    if (task.calendarId === id) {
+      task.calendarId = 'default';
+      touchTask(task);
+    }
+  });
+  calendars = calendars.filter((item) => item.id !== id);
+  if (Array.isArray(appSettings.visibleCalendarIds)) {
+    appSettings.visibleCalendarIds = appSettings.visibleCalendarIds.filter((cid) => cid !== id);
+  }
+  saveJson(STORAGE_KEY, tasks);
+  saveJson(CALENDAR_KEY, calendars);
+  saveJson(APP_SETTINGS_KEY, appSettings);
+  renderCalendarManageList();
+  renderCalendarVisibilityList();
+  renderCalendarField();
+  render();
+  showToast('日曆本已刪除，行程已歸回預設日曆本');
+}
+
+// 過濾用單一入口：appSettings.visibleCalendarIds 未設定（非陣列）時視為全部顯示，
+// 比照 normalizeStoredData() 會補成明確陣列，這裡只是防禦性寫法。
+function isCalendarVisible(calendarId) {
+  const id = calendarId || 'default';
+  return Array.isArray(appSettings.visibleCalendarIds) ? appSettings.visibleCalendarIds.includes(id) : true;
+}
+
 // 單筆行程色彩來源：task.color 有自訂值就優先用，否則退回分類色。所有畫面上「這筆行程要用什麼顏色」
 // 都走這裡，避免各 render 點各自判斷 task.color / 分類色而漂移。
 function getTaskColor(task) {
@@ -192,12 +262,15 @@ function toggleTheme() {
 
 function normalizeStoredData() {
   categories = mergeCategories(defaultCategories, categories);
+  calendars = mergeCalendars(defaultCalendars, calendars);
   tasks = tasks.map((task) => {
     const completedDates = Array.isArray(task.completedDates) ? task.completedDates : (task.done ? [task.date] : []);
     const categoryExists = categories.some((category) => category.name === task.category);
+    const calendarExists = calendars.some((calendar) => calendar.id === task.calendarId);
     return {
       ...task,
       category: categoryExists ? task.category : categories[0].name,
+      calendarId: calendarExists ? task.calendarId : 'default',
       completedDates,
       pinned: Boolean(task.pinned),
       countdown: Boolean(task.countdown),
@@ -234,6 +307,12 @@ function normalizeStoredData() {
   appSettings.showLunar = typeof appSettings.showLunar === 'boolean' ? appSettings.showLunar : true;
   appSettings.dayViewMode = appSettings.dayViewMode === 'timeline' ? 'timeline' : 'list';
   appSettings.autoSync = typeof appSettings.autoSync === 'boolean' ? appSettings.autoSync : false;
+  // 可見日曆本集合：未設定（非陣列）才補成「全部顯示」；已是陣列（含使用者主動全部取消勾選
+  // 的空陣列）一律尊重，只做「移除已刪除日曆本 id」的收斂，不覆寫使用者的選擇。
+  const calendarIds = calendars.map((calendar) => calendar.id);
+  appSettings.visibleCalendarIds = Array.isArray(appSettings.visibleCalendarIds)
+    ? appSettings.visibleCalendarIds.filter((id) => calendarIds.includes(id))
+    : calendarIds.slice();
 }
 
 function mergeCategories(base, saved) {
@@ -241,6 +320,15 @@ function mergeCategories(base, saved) {
   (Array.isArray(saved) ? saved : []).forEach((category) => {
     if (!category?.name || merged.some((item) => item.name === category.name)) return;
     merged.push({ name: category.name, color: category.color || '#4568f0', system: Boolean(category.system) });
+  });
+  return merged;
+}
+
+function mergeCalendars(base, saved) {
+  const merged = [...base];
+  (Array.isArray(saved) ? saved : []).forEach((calendar) => {
+    if (!calendar?.id || merged.some((item) => item.id === calendar.id)) return;
+    merged.push({ id: calendar.id, name: calendar.name || '未命名日曆本' });
   });
   return merged;
 }

@@ -883,6 +883,7 @@ textarea { resize: vertical; }
 .streak { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .streak-badge { display: inline-block; margin-right: 8px; color: #fb923c; font-size: 11px; font-weight: 600; }
 body.dark .streak-badge { color: #fbbf24; }
+.calendar-rename-input { flex: 1; min-width: 0; padding: 6px 10px; }
 
 .task-dialog {
   width: min(720px, calc(100vw - 28px));
@@ -1080,6 +1081,9 @@ body.dark .conflict-warning {
 .cloud-history-row .ghost-btn { flex-shrink: 0; padding: 6px 12px; }
 
 .data-check-dialog { width: min(480px, calc(100vw - 28px)); }
+.calendar-visibility-dialog { width: min(420px, calc(100vw - 28px)); }
+.calendar-manage-dialog { width: min(460px, calc(100vw - 28px)); }
+.calendar-dialog-body { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 4px; }
 .data-check-body {
   display: flex;
   flex-direction: column;

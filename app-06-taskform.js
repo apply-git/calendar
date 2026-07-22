@@ -179,6 +179,7 @@ function saveTaskFromForm(event) {
     end: els.taskEnd.value,
     priority: els.taskPriority.value,
     category: els.taskCategory.value,
+    calendarId: els.taskCalendar ? els.taskCalendar.value : 'default',
     color: els.taskColorUseCategory.checked ? null : els.taskColor.value,
     location: els.taskLocation.value.trim(),
     repeat: els.taskRepeat.value,
@@ -514,6 +515,7 @@ function handleCalendarClick(event) {
   const habitDeleteId = event.target.dataset.deleteHabit;
   const weeklyGoalDeleteId = event.target.dataset.deleteWeeklyGoal;
   const categoryDeleteName = event.target.dataset.deleteCategory;
+  const calendarDeleteId = event.target.dataset.deleteCalendar;
   const applyTemplateId = event.target.closest('[data-apply-template]')?.dataset.applyTemplate;
   const deleteTemplateId = event.target.dataset.deleteTemplate;
   const countdownEditId = event.target.closest('[data-countdown-edit]')?.dataset.countdownEdit;
@@ -553,6 +555,7 @@ function handleCalendarClick(event) {
     showToast('每週目標已刪除');
   }
   if (categoryDeleteName) deleteCategory(categoryDeleteName);
+  if (calendarDeleteId) deleteCalendar(calendarDeleteId);
 
   const timelineHandle = event.target.closest('.timeline-resize-handle');
   const timelineCheck = event.target.closest('.timeline-block-check');
@@ -568,6 +571,8 @@ function handleCalendarChange(event) {
   const taskId = event.target.dataset.toggleDone;
   const habitId = event.target.dataset.toggleHabit;
   const weeklyGoalId = event.target.dataset.toggleWeeklyGoal;
+  const calendarRenameId = event.target.dataset.renameCalendar;
+  const calendarVisibilityId = event.target.dataset.toggleCalendarVisibility;
 
   if (taskId) {
     const task = tasks.find((item) => item.id === taskId);
@@ -593,6 +598,17 @@ function handleCalendarChange(event) {
       ? [...new Set([...habit.records, todayKey])]
       : habit.records.filter((date) => date !== todayKey);
     renderHabits();
+  }
+
+  if (calendarRenameId) renameCalendar(calendarRenameId, event.target.value);
+
+  if (calendarVisibilityId) {
+    const visibleSet = new Set(Array.isArray(appSettings.visibleCalendarIds) ? appSettings.visibleCalendarIds : calendars.map((cal) => cal.id));
+    if (event.target.checked) visibleSet.add(calendarVisibilityId);
+    else visibleSet.delete(calendarVisibilityId);
+    appSettings.visibleCalendarIds = Array.from(visibleSet);
+    saveJson(APP_SETTINGS_KEY, appSettings);
+    render();
   }
 }
 
@@ -703,7 +719,8 @@ function getFilteredTasks(source) {
     const priorityMatch = priority === 'all' || task.priority === priority;
     const done = isTaskDone(task, statusDate);
     const statusMatch = status === 'all' || (status === 'done' ? done : !done);
-    return textMatch && categoryMatch && priorityMatch && statusMatch;
+    const calendarMatch = isCalendarVisible(task.calendarId);
+    return textMatch && categoryMatch && priorityMatch && statusMatch && calendarMatch;
   });
 }
 

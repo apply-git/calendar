@@ -16,6 +16,7 @@ function render() {
   updateAppBadge();
   saveJson(STORAGE_KEY, tasks);
   saveJson(CATEGORY_KEY, categories);
+  saveJson(CALENDAR_KEY, calendars);
   saveJson(APP_SETTINGS_KEY, appSettings);
 
   // 雲端同步 scaffold（sync.js）掛勾：未載入 sync.js 或未設定同步時安全跳過，

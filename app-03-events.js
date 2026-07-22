@@ -322,6 +322,27 @@ function bindEvents() {
     if (event.key === 'Enter') addCategory();
   });
 
+  // 多日曆本：工具列「📚 日曆本」開可見度勾選清單；「管理日曆本…」另開 CRUD 對話框。
+  els.calendarsBtn?.addEventListener('click', () => {
+    renderCalendarVisibilityList();
+    els.calendarVisibilityDialog?.showModal();
+  });
+  els.closeCalendarVisibilityBtn?.addEventListener('click', () => els.calendarVisibilityDialog?.close());
+  els.manageCalendarsBtn?.addEventListener('click', () => {
+    els.calendarVisibilityDialog?.close();
+    renderCalendarManageList();
+    els.calendarManageDialog?.showModal();
+  });
+  els.closeCalendarManageBtn?.addEventListener('click', () => els.calendarManageDialog?.close());
+  els.addCalendarBtn?.addEventListener('click', addCalendar);
+  els.calendarNameInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') addCalendar();
+  });
+  // 重新命名輸入框是動態產生的清單項目，用容器 delegation 接 Enter → blur() 觸發 change 事件存檔。
+  els.calendarManageList?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && event.target.matches('[data-rename-calendar]')) event.target.blur();
+  });
+
   document.addEventListener('click', handleCalendarClick);
   document.addEventListener('change', handleCalendarChange);
   document.addEventListener('dragstart', handleDragStart);

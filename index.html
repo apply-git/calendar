@@ -154,6 +154,7 @@
           <button id="dashboardBtn" class="ghost-btn grouped-tool">📈 統計</button>
           <button id="dataCheckBtn" class="ghost-btn grouped-tool" title="檢查行程資料是否有壞資料並可一鍵修復">🩺 資料檢查</button>
           <button id="widgetModeBtn" class="ghost-btn grouped-tool">小工具模式</button>
+          <button id="calendarsBtn" class="ghost-btn grouped-tool">📚 日曆本</button>
           <button id="cleanupBtn" class="ghost-btn grouped-tool">清理舊行程</button>
           <button id="exportCsvBtn" class="ghost-btn grouped-tool">匯出 Excel</button>
           <button id="printBtn" class="ghost-btn grouped-tool">匯出 PDF</button>
@@ -267,6 +268,12 @@
             <option value="學習">學習</option>
             <option value="運動">運動</option>
             <option value="重要事項">重要事項</option>
+          </select>
+        </div>
+        <div class="field" id="taskCalendarField" hidden>
+          <label for="taskCalendar">日曆本</label>
+          <select id="taskCalendar">
+            <option value="default">預設</option>
           </select>
         </div>
         <div class="field">
@@ -612,6 +619,34 @@
     </div>
   </dialog>
 
+  <dialog id="calendarVisibilityDialog" class="task-dialog calendar-visibility-dialog">
+    <div class="dialog-header">
+      <h2>📚 日曆本</h2>
+      <button type="button" id="closeCalendarVisibilityBtn" class="icon-btn">✕</button>
+    </div>
+    <div class="calendar-dialog-body">
+      <p class="muted">勾選要顯示的日曆本，可複選疊加顯示。</p>
+      <div id="calendarVisibilityList" class="habit-list"></div>
+      <div class="pomodoro-actions">
+        <button type="button" id="manageCalendarsBtn" class="ghost-btn">🗂 管理日曆本…</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="calendarManageDialog" class="task-dialog calendar-manage-dialog">
+    <div class="dialog-header">
+      <h2>🗂 管理日曆本</h2>
+      <button type="button" id="closeCalendarManageBtn" class="icon-btn">✕</button>
+    </div>
+    <div class="calendar-dialog-body">
+      <div id="calendarManageList" class="category-list"></div>
+      <div class="category-actions">
+        <input id="calendarNameInput" type="text" placeholder="日曆本名稱" />
+        <button type="button" id="addCalendarBtn" title="新增日曆本">＋</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="dataCheckDialog" class="task-dialog data-check-dialog">
     <div class="dialog-header">
       <h2>🩺 資料檢查</h2>
@@ -653,6 +688,7 @@
       <button type="button" class="more-tools-item" data-proxy="settingsBtn">文字設定</button>
       <button type="button" class="more-tools-item" data-proxy="pomodoroBtn">🍅 番茄鐘</button>
       <button type="button" class="more-tools-item" data-proxy="widgetModeBtn">小工具模式</button>
+      <button type="button" class="more-tools-item" data-proxy="calendarsBtn">📚 日曆本</button>
       <button type="button" class="more-tools-item" data-proxy="cleanupBtn">清理舊行程</button>
       <button type="button" class="more-tools-item" data-proxy="exportCsvBtn">匯出 Excel</button>
       <button type="button" class="more-tools-item" data-proxy="printBtn">匯出 PDF</button>

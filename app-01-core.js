@@ -2,6 +2,7 @@ const STORAGE_KEY = 'desktop-schedule-v1';
 const HABIT_KEY = 'desktop-schedule-habits-v1';
 const THEME_KEY = 'desktop-schedule-theme-v1';
 const CATEGORY_KEY = 'desktop-schedule-categories-v1';
+const CALENDAR_KEY = 'desktop-schedule-calendars-v1';
 const TEXT_KEY = 'desktop-schedule-text-settings-v1';
 const APP_SETTINGS_KEY = 'desktop-schedule-app-settings-v1';
 const MEMO_KEY = 'desktop-schedule-daily-memos-v1';
@@ -116,6 +117,10 @@ const defaultCategories = [
   { name: '重要事項', color: '#ef4444', system: true },
 ];
 
+const defaultCalendars = [
+  { id: 'default', name: '預設' },
+];
+
 const priorityLabel = { high: '高', medium: '中', low: '低' };
 const priorityWeight = { high: 3, medium: 2, low: 1 };
 const repeatLabel = {
@@ -178,6 +183,7 @@ function startOfDay(date) {
 let tasks = loadJson(STORAGE_KEY, []);
 let habits = loadJson(HABIT_KEY, []);
 let categories = loadJson(CATEGORY_KEY, defaultCategories);
+let calendars = loadJson(CALENDAR_KEY, defaultCalendars);
 let textSettings = { ...defaultTextSettings, ...loadJson(TEXT_KEY, {}) };
 let appSettings = { ...defaultAppSettings, ...loadJson(APP_SETTINGS_KEY, {}) };
 let dailyMemos = loadJson(MEMO_KEY, {});
@@ -287,6 +293,8 @@ const els = {
   findSlotBtn: $('findSlotBtn'),
   taskPriority: $('taskPriority'),
   taskCategory: $('taskCategory'),
+  taskCalendarField: $('taskCalendarField'),
+  taskCalendar: $('taskCalendar'),
   taskColor: $('taskColor'),
   taskColorUseCategory: $('taskColorUseCategory'),
   taskLocation: $('taskLocation'),
@@ -350,6 +358,16 @@ const els = {
   categoryNameInput: $('categoryNameInput'),
   categoryColorInput: $('categoryColorInput'),
   addCategoryBtn: $('addCategoryBtn'),
+  calendarsBtn: $('calendarsBtn'),
+  calendarVisibilityDialog: $('calendarVisibilityDialog'),
+  closeCalendarVisibilityBtn: $('closeCalendarVisibilityBtn'),
+  calendarVisibilityList: $('calendarVisibilityList'),
+  manageCalendarsBtn: $('manageCalendarsBtn'),
+  calendarManageDialog: $('calendarManageDialog'),
+  closeCalendarManageBtn: $('closeCalendarManageBtn'),
+  calendarManageList: $('calendarManageList'),
+  calendarNameInput: $('calendarNameInput'),
+  addCalendarBtn: $('addCalendarBtn'),
   toast: $('toast'),
   fabAddBtn: $('fabAddBtn'),
   moreToolsBtn: $('moreToolsBtn'),
@@ -442,6 +460,7 @@ const TOOLBAR_MENU_GROUPS = [
     items: [
       { proxyId: 'todayTodoBtn' },
       { proxyId: 'widgetModeBtn' },
+      { proxyId: 'calendarsBtn' },
       { label: '🖥 看板模式', onClick: () => openKioskMode() },
     ],
   },
