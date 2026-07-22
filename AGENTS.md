@@ -49,6 +49,10 @@
 - `README.md`：使用說明
 - `index.html`：UI 結構
 - `styles.css`：樣式
-- `app.js`：核心邏輯（`window.CalendarApp` 介面供 `sync.js`；備份單一真相 `buildBackupPayload()` / `applyBackupObject()`）
-- `sync.js` / `config.js` / `schema.sql` / `CLOUD_SETUP.md`：雲端同步 scaffold（Supabase，純 fetch，未設定時 no-op）
-- `manifest.json` / `service-worker.js` / `icons/` / `start-pwa-local.bat`：PWA（需本機伺服器）
+- `app.js`：核心邏輯（`window.CalendarApp` 介面供 `sync.js`；備份單一真相 `buildBackupPayload()` / `applyBackupObject()`；逐筆同步時間戳/墓碑 `touchTask()`/`tombstoneTask()`；附件 IndexedDB 存取層）
+- `sync.js`：雲端同步（Supabase，純 fetch，未設定時 no-op），已改為 pull→merge→push 逐筆合併（`mergeBackupPayloads()`），並含家庭共享同步 `syncSharedTasks()`
+- `config.js` / `schema.sql`（個人同步）／`schema-history.sql`（備份版本）／`schema-share.sql`（家庭共享）／`schema-push.sql`＋Edge Function（背景推播）
+- `CLOUD_SETUP.md` / `CLOUD_PUSH_SETUP.md`：雲端功能設定教學
+- `push.js`：背景推播訂閱 UI（選用，零設定零影響）
+- `manifest.json` / `service-worker.js` / `icons/` / `start-pwa-local.bat`：PWA（正式站已上線，本機伺服器僅供無網路情境；改 `APP_SHELL` 內檔案須同步升 `CACHE_NAME`）
+- `tests.html`：測試跑道，48 案例，開發用
