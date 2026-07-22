@@ -1802,3 +1802,7 @@ body.dark .app-footer { color: #fff; }
 .gantt-links path { fill: none; stroke: var(--primary); stroke-width: 1.5; opacity: 0.75; }
 .gantt-links path.blocked { stroke: var(--danger); stroke-dasharray: 4 3; }
 .gantt-more { margin-top: 8px; font-size: 12px; color: var(--muted); text-align: center; }
+/* M1b 行程卡滑動手勢 */
+.task-card.swiping { transition: none; }
+.task-card.swiping-left { background: #e8f7ec; }
+.task-card.swiping-right { background: #fff4e0; }

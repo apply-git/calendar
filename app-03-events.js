@@ -147,6 +147,7 @@ function bindEvents() {
   els.todayBtn.addEventListener('click', () => { currentDate = startOfDay(new Date()); render(); });
   els.nextBtn.addEventListener('click', () => navigate(1));
   setupSwipeNavigation();
+  setupTaskSwipeActions();
   // 年月日直選跳轉：改變日期選擇器就跳到那一天（週/月檢視會跳到含該日的那一週/月）。
   els.jumpDateInput?.addEventListener('change', () => {
     if (!els.jumpDateInput.value) return;
@@ -505,6 +506,7 @@ function setupSwipeNavigation() {
   let startX = 0, startY = 0, tracking = false;
   view.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) { tracking = false; return; }
+    if (e.target.closest('.task-card')) { tracking = false; return; }
     tracking = true;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
@@ -519,4 +521,68 @@ function setupSwipeNavigation() {
       navigate(dx < 0 ? 1 : -1);
     }
   }, { passive: true });
+}
+
+function setupTaskSwipeActions() {
+  const view = document.getElementById('calendarView');
+  if (!view) return;
+  let card = null, startX = 0, startY = 0, active = false, horizontal = false;
+  view.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { active = false; return; }
+    card = e.target.closest('.task-card');
+    if (!card || e.target.closest('input, button, a, select, textarea')) { card = null; return; }
+    active = true; horizontal = false;
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+  }, { passive: true });
+  view.addEventListener('touchmove', (e) => {
+    if (!active || !card) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (!horizontal) {
+      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { resetCardSwipe(card); active = false; card = null; return; }
+      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) horizontal = true;
+    }
+    if (horizontal) {
+      card.classList.add('swiping');
+      card.classList.toggle('swiping-left', dx < 0);
+      card.classList.toggle('swiping-right', dx > 0);
+      card.style.transform = `translateX(${Math.max(-120, Math.min(120, dx))}px)`;
+    }
+  }, { passive: true });
+  view.addEventListener('touchend', (e) => {
+    if (!active || !card) { active = false; return; }
+    active = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const el = card; card = null;
+    resetCardSwipe(el);
+    if (!horizontal || Math.abs(dx) < 80) return;
+    const task = tasks.find((item) => item.id === el.dataset.taskId && !item.deletedAt);
+    if (!task) return;
+    const dateKey = el.dataset.taskDate || toDateInput(currentDate);
+    if (dx < 0) {
+      if (isTaskDone(task, dateKey)) return showToast('已完成');
+      const blockers = getIncompleteDependencies(task);
+      if (blockers.length) return showToast(`前置任務未完成：${blockers.map((dep) => dep.title).join('、')}`);
+      setTaskDone(task, dateKey, true);
+      playDoneSound();
+      saveJson(STORAGE_KEY, tasks);
+      render();
+      showToast('已完成 ✅');
+    } else {
+      if (task.repeat !== 'none') return showToast('重複行程請用編輯調整日期');
+      if (isTaskDone(task, dateKey)) return showToast('已完成的行程不需順延');
+      const nextDate = nextWorkingDay(new Date(dateKey + 'T00:00:00'));
+      task.date = toDateInput(nextDate);
+      touchTask(task);
+      saveJson(STORAGE_KEY, tasks);
+      render();
+      showToast(`已順延到 ${formatMonthDay(nextDate)}`);
+    }
+  }, { passive: true });
+}
+
+function resetCardSwipe(el) {
+  if (!el) return;
+  el.classList.remove('swiping', 'swiping-left', 'swiping-right');
+  el.style.transform = '';
 }
