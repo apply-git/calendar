@@ -142,7 +142,7 @@ function renderDayTimeline(dayTasks, dateKey, holidayName) {
     const height = Math.max(18, (clampedEnd - clampedStart) / 60 * TIMELINE_HOUR_HEIGHT);
     const widthPct = 100 / totalCols;
     const leftPct = widthPct * col;
-    const color = getCategoryColor(task.category);
+    const color = getTaskColor(task);
     const done = isTaskDone(task, dateKey);
     return `
       <div class="timeline-block ${done ? 'done' : ''} ${conflict ? 'conflict' : ''}" style="top:${top}px;height:${height}px;left:calc(${leftPct}% + 2px);width:calc(${widthPct}% - 4px);--category-color:${color}" data-task-id="${task.id}" data-task-date="${dateKey}" title="${escapeHtml(task.title)} ${task.start}–${task.end}">
@@ -316,7 +316,7 @@ function renderAgenda(visibleTasks) {
 
 function taskCard(task, dateKey) {
   const priorityClass = `priority-${task.priority}`;
-  const color = getCategoryColor(task.category);
+  const color = getTaskColor(task);
   const done = isTaskDone(task, dateKey);
   const overdue = isTaskOverdue(task, dateKey);
   return `
@@ -341,6 +341,7 @@ function taskCard(task, dateKey) {
         ${task.attachmentCount > 0 ? `<span class="badge">📎${task.attachmentCount}</span>` : ''}
         ${(task.tags || []).map((tag) => `<span class="badge tag-badge">#${escapeHtml(tag)}</span>`).join('')}
       </div>
+      ${task.location ? `<p class="task-location"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(task.location)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📍${escapeHtml(task.location)}</a></p>` : ''}
       ${task.subtasks?.length ? `<ul class="subtask-list">${task.subtasks.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
       ${task.note ? `<p class="muted">${escapeHtml(task.note)}</p>` : ''}
     </article>
@@ -475,6 +476,8 @@ function applyTemplate(id) {
     end: tpl.end,
     priority: tpl.priority || 'medium',
     category: tpl.category || categories[0].name,
+    color: null,
+    location: '',
     repeat: 'none',
     reminder: 10,
     pinned: false,
@@ -594,7 +597,7 @@ function renderKioskTasks() {
 
   els.kioskTaskList.innerHTML = dayTasks.map((task) => {
     const done = isTaskDone(task, dateKey);
-    const color = getCategoryColor(task.category);
+    const color = getTaskColor(task);
     return `
       <div class="kiosk-task-item ${done ? 'done' : ''}">
         <span class="kiosk-task-dot" style="background:${color}"></span>

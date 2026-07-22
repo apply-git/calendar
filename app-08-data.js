@@ -113,6 +113,12 @@ function getCategoryColor(name) {
   return categories.find((category) => category.name === name)?.color || '#4568f0';
 }
 
+// 單筆行程色彩來源：task.color 有自訂值就優先用，否則退回分類色。所有畫面上「這筆行程要用什麼顏色」
+// 都走這裡，避免各 render 點各自判斷 task.color / 分類色而漂移。
+function getTaskColor(task) {
+  return task.color || getCategoryColor(task.category);
+}
+
 function isTaskDone(task, dateKey) {
   if (Array.isArray(task.completedDates)) return task.completedDates.includes(dateKey);
   return Boolean(task.done);
@@ -199,6 +205,8 @@ function normalizeStoredData() {
       tags: Array.isArray(task.tags) ? task.tags.filter(Boolean) : [],
       subtasks: Array.isArray(task.subtasks) ? task.subtasks.filter(Boolean) : [],
       excludedDates: Array.isArray(task.excludedDates) ? task.excludedDates.filter(Boolean) : [],
+      color: typeof task.color === 'string' && task.color ? task.color : null,
+      location: typeof task.location === 'string' ? task.location : '',
       repeat: task.repeat || 'none',
       repeatInterval: Number.isFinite(Number(task.repeatInterval)) && Number(task.repeatInterval) > 0 ? Math.floor(Number(task.repeatInterval)) : 2,
       repeatWeekday: Number.isFinite(Number(task.repeatWeekday)) ? Math.min(6, Math.max(0, Math.floor(Number(task.repeatWeekday)))) : new Date(`${task.date}T00:00:00`).getDay(),

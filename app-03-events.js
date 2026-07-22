@@ -267,6 +267,7 @@ function bindEvents() {
   if (els.attachmentList) els.attachmentList.addEventListener('click', handleAttachmentListClick);
   [els.taskDate, els.taskStart, els.taskEnd].forEach((el) => el.addEventListener('input', updateConflictWarning));
   els.taskRepeat.addEventListener('change', updateRepeatFieldsVisibility);
+  els.taskColorUseCategory.addEventListener('change', updateTaskColorFieldState);
   els.taskScope.addEventListener('change', handleTaskScopeChange);
   // 自然語言快速新增：標題欄位失焦時嘗試解析中文日期/時間語彙，見 parseNaturalDateTime()。
   els.taskTitle.addEventListener('blur', applyNaturalLanguageParse);

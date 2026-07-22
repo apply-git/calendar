@@ -140,6 +140,11 @@ function updateRepeatFieldsVisibility() {
   els.taskRepeatWeekday.disabled = !isNth;
 }
 
+// 「使用分類色」勾選時停用色彩選色器，避免使用者誤以為調色會生效。
+function updateTaskColorFieldState() {
+  els.taskColor.disabled = els.taskColorUseCategory.checked;
+}
+
 function handleTaskScopeChange() {
   if (!editingOccurrenceDate) return;
   const existingTask = tasks.find((item) => item.id === els.taskId.value);
@@ -174,6 +179,8 @@ function saveTaskFromForm(event) {
     end: els.taskEnd.value,
     priority: els.taskPriority.value,
     category: els.taskCategory.value,
+    color: els.taskColorUseCategory.checked ? null : els.taskColor.value,
+    location: els.taskLocation.value.trim(),
     repeat: els.taskRepeat.value,
     repeatInterval: Math.min(365, Math.max(2, Number(els.taskRepeatInterval.value) || 2)),
     repeatWeekday: Math.min(6, Math.max(0, Number(els.taskRepeatWeekday.value) || 0)),
@@ -333,6 +340,8 @@ function importBatchAddRows() {
       end: row.end || '',
       priority: 'medium',
       category: categories[0]?.name || '工作',
+      color: null,
+      location: '',
       repeat: 'none',
       repeatInterval: 2,
       repeatWeekday: 0,

@@ -53,7 +53,7 @@ function generateShareCard() {
   const maxTitleWidth = WIDTH - titleX - 56;
   visibleTasks.forEach((task) => {
     const done = isTaskDone(task, dateKey);
-    const color = getCategoryColor(task.category);
+    const color = getTaskColor(task);
 
     ctx.fillStyle = color;
     ctx.fillRect(0, y, 6, ROW_H);
@@ -557,6 +557,10 @@ function openTaskDialog(defaults = {}, occurrenceDate = '') {
   els.taskEnd.value = defaults.end || '10:00';
   els.taskPriority.value = defaults.priority || 'medium';
   els.taskCategory.value = defaults.category || '工作';
+  els.taskColorUseCategory.checked = !defaults.color;
+  els.taskColor.value = defaults.color || getCategoryColor(defaults.category || '工作');
+  updateTaskColorFieldState();
+  els.taskLocation.value = defaults.location || '';
   els.taskRepeat.value = defaults.repeat || 'none';
   const repeatBaseDate = defaults.date ? new Date(`${defaults.date}T00:00:00`) : currentDate;
   els.taskRepeatInterval.value = String(Math.min(365, Math.max(2, Number(defaults.repeatInterval) || 2)));

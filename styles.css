@@ -337,6 +337,28 @@ body.dark .toolbar-menu {
   min-height: 43px;
 }
 .checkbox-field input { width: auto; }
+/* 行程表單「自訂色彩」：色彩選擇器＋「使用分類色」核取同列，勾選時色彩選擇器停用變灰。 */
+.task-color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.task-color-row input[type="color"] {
+  width: 48px;
+  min-width: 48px;
+  padding: 4px;
+}
+.task-color-row input[type="color"]:disabled { opacity: .5; cursor: not-allowed; }
+.task-color-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 700;
+  margin: 0;
+}
+.task-color-inline input { width: auto; }
 label {
   font-size: 13px;
   color: var(--muted);
