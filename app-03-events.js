@@ -149,6 +149,7 @@ function bindEvents() {
   setupSwipeNavigation();
   setupTaskSwipeActions();
   setupLongPressCreate();
+  setupBottomNav();
   // 年月日直選跳轉：改變日期選擇器就跳到那一天（週/月檢視會跳到含該日的那一週/月）。
   els.jumpDateInput?.addEventListener('change', () => {
     if (!els.jumpDateInput.value) return;
@@ -616,4 +617,27 @@ function setupLongPressCreate() {
   view.addEventListener('click', (e) => {
     if (fired) { fired = false; e.stopPropagation(); e.preventDefault(); }
   }, true);
+}
+function setupBottomNav() {
+  const nav = document.getElementById('bottomNav');
+  if (!nav) return;
+  const updateActive = (viewName) => {
+    nav.querySelectorAll('.bottom-nav-btn[data-nav-view]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.navView === viewName);
+    });
+  };
+  nav.querySelectorAll('.bottom-nav-btn[data-nav-view]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelector(`.view-btn[data-view="${btn.dataset.navView}"]`)?.click();
+    });
+  });
+  nav.querySelector('[data-nav-today]')?.addEventListener('click', () => els.todayBtn.click());
+  document.querySelectorAll('.view-btn:not(.day-mode-btn)').forEach((btn) => {
+    btn.addEventListener('click', () => updateActive(btn.dataset.view));
+  });
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    nav.removeAttribute('hidden');
+    document.body.classList.add('has-bottom-nav');
+    updateActive(currentView);
+  }
 }

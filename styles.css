@@ -1811,3 +1811,33 @@ body.dark .app-footer { color: #fff; }
 @media (pointer: coarse) {
   .month-day { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 }
+/* M2 手機底部導航列 */
+.bottom-nav { display: none; }
+@media (max-width: 760px) {
+  .bottom-nav:not([hidden]) {
+    display: flex;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    background: var(--surface-strong);
+    border-top: 1px solid var(--border);
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom)) 4px;
+    justify-content: space-around;
+  }
+  .bottom-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    background: none;
+    border: none;
+    font-size: 17px;
+    padding: 4px 0;
+    color: var(--muted);
+  }
+  .bottom-nav-btn span { font-size: 10px; }
+  .bottom-nav-btn.active { color: var(--primary); font-weight: 700; }
+  body.has-bottom-nav { padding-bottom: 62px; }
+  body.has-bottom-nav .fab-add:not([hidden]) { bottom: 74px; }
+}

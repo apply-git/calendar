@@ -219,6 +219,13 @@
   <footer class="app-footer">© 2026 行事曆0.001版</footer>
 
   <button id="fabAddBtn" class="fab-add" hidden aria-label="新增行程">＋</button>
+  <nav id="bottomNav" class="bottom-nav" hidden aria-label="檢視切換">
+    <button type="button" class="bottom-nav-btn" data-nav-view="day">📅<span>日</span></button>
+    <button type="button" class="bottom-nav-btn" data-nav-view="week">🗓️<span>週</span></button>
+    <button type="button" class="bottom-nav-btn" data-nav-view="month">📆<span>月</span></button>
+    <button type="button" class="bottom-nav-btn" data-nav-view="agenda">📋<span>列表</span></button>
+    <button type="button" class="bottom-nav-btn" data-nav-today="1">🎯<span>今天</span></button>
+  </nav>
 
   <dialog id="taskDialog" class="task-dialog">
     <form id="taskForm" method="dialog">
