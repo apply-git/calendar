@@ -392,6 +392,174 @@ async function sendWebPush(
   });
 }
 
+// ---- addDaysKey()：把 dateKey（YYYY-MM-DD）往前或往後推 n 天，回傳新的 dateKey ----
+// 內部借用 keyToUtcDate 轉成 UTC Date 物件做加減，避免自己重寫一次日期字串運算。
+
+function addDaysKey(dateKey: string, n: number): string {
+  const d = keyToUtcDate(dateKey);
+  d.setUTCDate(d.getUTCDate() + n);
+  const y = String(d.getUTCFullYear()).padStart(4, '0');
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// ---- runDigest()：早報／晚報／週報彙整推播 ----
+// 跟主流程（逐筆行程比對提醒時刻）不同，這裡是「彙整當天/隔天/未來七天有幾筆行程」
+// 濃縮成單一推播摘要通知，用途是讓使用者不用開 App 也能掌握概況：
+//   - morning：早上看「今天」的行程彙整
+//   - evening：晚上看「明天」的行程預告
+//   - weekly：一週一次看「未來 7 天」的整體概況（含最忙的一天）
+// 是否發送完全由使用者在設定裡的開關決定，對應 sync_state.payload.appSettings 底下的
+// digestMorning / digestEvening / digestWeekly 三個布林欄位，預設關閉（未設定 = 不發）。
+// 去重鍵沿用 push_sent_log 的 (user_id, task_id, fire_date) 唯一鍵，但這裡沒有真實
+// task，所以用 `digest:${kind}` 當作佔位的 task_id，同一天同一種 kind 只會佔到一格，
+// 天然達成「同一天不會重複發送同一種摘要」的效果。
+
+async function runDigest(
+  supabase: any,
+  kind: string,
+  tz: string,
+  now: Date,
+  todayKey: string,
+  vapidPublicKey: string,
+  vapidPrivateKey: string,
+  vapidSubject: string
+): Promise<Response> {
+  const { data: stateRows, error: stateError } = await supabase
+    .from('sync_state')
+    .select('user_id, payload');
+  if (stateError) throw stateError;
+
+  const flagKey = kind === 'morning' ? 'digestMorning' : kind === 'evening' ? 'digestEvening' : 'digestWeekly';
+
+  let sentCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
+
+  for (const row of (stateRows ?? []) as SyncStateRow[]) {
+    const userId = row.user_id;
+    const settings = (row.payload as any)?.appSettings || {};
+    if (settings[flagKey] !== true) {
+      skippedCount += 1;
+      continue;
+    }
+
+    const tasks = Array.isArray((row.payload as any)?.tasks) ? ((row.payload as any).tasks as TaskLike[]) : [];
+
+    // 決定這次摘要要看哪些日期：早報看今天、晚報看明天、週報看未來連續 7 天。
+    let dateKeys: string[];
+    if (kind === 'morning') {
+      dateKeys = [todayKey];
+    } else if (kind === 'evening') {
+      dateKeys = [addDaysKey(todayKey, 1)];
+    } else {
+      dateKeys = Array.from({ length: 7 }, (_, i) => addDaysKey(todayKey, i));
+    }
+
+    const perDay: { key: string; items: TaskLike[] }[] = dateKeys.map((key) => ({
+      key,
+      items: tasks.filter((task) => occursOnDate(task, key)),
+    }));
+    const total = perDay.reduce((sum, d) => sum + d.items.length, 0);
+    if (total === 0) {
+      skippedCount += 1;
+      continue;
+    }
+
+    let title: string;
+    let body: string;
+    if (kind === 'weekly') {
+      let busiestKey = perDay[0].key;
+      let busiestCount = perDay[0].items.length;
+      for (const d of perDay) {
+        if (d.items.length > busiestCount) {
+          busiestKey = d.key;
+          busiestCount = d.items.length;
+        }
+      }
+      title = `📅 本週 ${total} 個行程`;
+      body = `${todayKey} ~ ${addDaysKey(todayKey, 6)}｜最忙 ${busiestKey}（${busiestCount} 筆）`;
+    } else {
+      const dayItems = perDay[0].items
+        .slice()
+        .sort((a, b) => (a.start || '99:99').localeCompare(b.start || '99:99'));
+      const preview = dayItems
+        .slice(0, 3)
+        .map((t) => `${t.start || '全天'} ${t.title || '（未命名）'}`)
+        .join('、');
+      const suffix = total > 3 ? `…等 ${total} 筆` : '';
+      body = suffix ? `${preview}、${suffix}` : preview;
+      title = kind === 'morning' ? `☀️ 今日 ${total} 個行程` : `🌙 明天 ${total} 個行程`;
+    }
+
+    // 防重複：借用 push_sent_log 的唯一鍵 (user_id, task_id, fire_date)，用
+    // `digest:${kind}` 當佔位 task_id，衝突就代表今天這種摘要已經發過了。
+    const digestTaskId = `digest:${kind}`;
+    const { error: claimError } = await supabase
+      .from('push_sent_log')
+      .insert({ user_id: userId, task_id: digestTaskId, fire_date: todayKey });
+    if (claimError) {
+      skippedCount += 1;
+      continue;
+    }
+
+    const { data: subs, error: subsError } = await supabase
+      .from('push_subscriptions')
+      .select('endpoint, subscription')
+      .eq('user_id', userId);
+    if (subsError) {
+      console.error('[send-reminders] digest 讀取訂閱清單失敗', userId, subsError);
+      failedCount += 1;
+      await supabase
+        .from('push_sent_log')
+        .delete()
+        .eq('user_id', userId)
+        .eq('task_id', digestTaskId)
+        .eq('fire_date', todayKey);
+      continue;
+    }
+    const subscriptions = (subs ?? []) as PushSubRow[];
+
+    const notificationPayload = { title, body, url: './' };
+
+    let anySent = false;
+    for (const sub of subscriptions) {
+      try {
+        const res = await sendWebPush(sub.subscription, vapidPublicKey, vapidPrivateKey, vapidSubject, notificationPayload);
+        if (res.status === 404 || res.status === 410) {
+          await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+        } else if (!res.ok) {
+          const bodyText = await res.text().catch(() => '');
+          console.error('[send-reminders] digest 發送推播失敗', userId, kind, sub.endpoint, res.status, bodyText);
+        } else {
+          anySent = true;
+        }
+      } catch (err) {
+        console.error('[send-reminders] digest 發送推播例外', userId, kind, sub.endpoint, err);
+      }
+    }
+
+    if (anySent) {
+      sentCount += 1;
+    } else {
+      failedCount += 1;
+      await supabase
+        .from('push_sent_log')
+        .delete()
+        .eq('user_id', userId)
+        .eq('task_id', digestTaskId)
+        .eq('fire_date', todayKey);
+    }
+  }
+
+  return new Response(
+    JSON.stringify({ ok: true, mode: 'digest', kind, todayKey, sent: sentCount, skipped: skippedCount, failed: failedCount }),
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+
 // ---- 主流程 ----
 
 Deno.serve(async (req: Request) => {
@@ -414,6 +582,14 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const mode = new URL(req.url).searchParams.get('mode') || 'reminders';
+    if (mode === 'digest') {
+      const kind = new URL(req.url).searchParams.get('kind') || '';
+      if (kind !== 'morning' && kind !== 'evening' && kind !== 'weekly') {
+        return new Response(JSON.stringify({ ok: false, error: 'kind 必須是 morning / evening / weekly' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+      return await runDigest(supabase, kind, tz, now, todayKey, vapidPublicKey, vapidPrivateKey, vapidSubject);
+    }
 
     const { data: stateRows, error: stateError } = await supabase
       .from('sync_state')
