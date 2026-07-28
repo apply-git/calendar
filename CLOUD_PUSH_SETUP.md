@@ -274,6 +274,27 @@ Edge Function 部署好後不會自己執行，需要定期有人呼叫它。用
 3. 執行成功會回傳一個數字（新建立的排程 job id），代表排程已經生效，之後每 10
    分鐘會自動呼叫一次 `send-reminders`。
 
+## 步驟六之二：早報／晚報／週報（選用）
+
+同一支 `send-reminders` Function 另外支援「摘要推播」模式，用網址參數切換，**不用再建第二支 Function**：
+
+| 用途 | 網址參數 | 建議排程（Asia/Taipei） | cron 寫法（UTC） |
+| --- | --- | --- | --- |
+| 早報：今天的行程摘要 | `?mode=digest&kind=morning` | 每天 07:00 | `0 23 * * *` |
+| 晚報：明天的行程預告 | `?mode=digest&kind=evening` | 每天 21:00 | `0 13 * * *` |
+| 週報：未來七天概況 | `?mode=digest&kind=weekly` | 每週日 20:00 | `0 12 * * 0` |
+
+設定方式跟步驟六完全一樣，只是把呼叫網址換成帶參數的版本，例如：
+
+`https://<你的專案>.supabase.co/functions/v1/send-reminders?mode=digest&kind=morning`
+
+三條排程各建一次即可。要注意的事：
+
+- 這三種摘要**預設是關閉的**，要在 App 的雲端同步設定區把「☀️ 早報／🌙 晚報／📅 週報」勾起來，**並且同步一次**（開關會隨同步上傳到雲端），排程才會真的發送。
+- 當天／當週沒有任何行程時不會發送空摘要。
+- 同一天同一種摘要只會發一次（跟行程提醒共用 `push_sent_log` 去重）。
+- cron 的時間是 UTC，上表已換算成台灣時間對應的 UTC 值；若你的 Function 設定了不同的 `TZ` secret，摘要內容的日期會依那個時區計算。
+
 ### 如果想用滑鼠點擊的圖形介面設定（不寫 SQL）
 
 Supabase Dashboard 也有純點擊版的 Cron 介面，效果跟上面的 SQL 完全一樣，兩種擇一

@@ -75,6 +75,17 @@
       '<div id="pushTestRow" class="push-test-row" hidden>' +
       '<button type="button" id="pushTestBtn" class="ghost-btn">🔔 發送測試通知</button>' +
       '<p class="muted push-test-hint">雲端排程推播需完成 <code>CLOUD_PUSH_SETUP.md</code> 部署後才會運作。</p>' +
+      '</div>' +
+      '<div class="field checkbox-field push-field">' +
+      '<label><input id="digestMorningToggle" type="checkbox" /> ☀️ 早報（每天早上推今天的行程摘要）</label>' +
+      '</div>' +
+      '<div class="field checkbox-field push-field">' +
+      '<label><input id="digestEveningToggle" type="checkbox" /> 🌙 晚報（每天晚上推明天的行程預告）</label>' +
+      '</div>' +
+      '<div class="field checkbox-field push-field">' +
+      '<label><input id="digestWeeklyToggle" type="checkbox" /> 📅 週報（每週一次推未來七天概況）</label>' +
+      '</div>' +
+      '<p class="muted">摘要推播由雲端排程發送，需先開啟上方背景推播並完成同步；排程設定見 <code>CLOUD_PUSH_SETUP.md</code>。</p>' +
       '</div>';
     box.appendChild(wrap);
 
@@ -84,6 +95,33 @@
     els.testBtn = wrap.querySelector('#pushTestBtn');
     els.toggle.addEventListener('change', onToggleChange);
     els.testBtn.addEventListener('click', onTestNotificationClick);
+    bindDigestToggles(wrap);
+  }
+
+
+  // 早報／晚報／週報開關：三個值存在 appSettings（app-01-core.js 的全域變數），
+  // 會隨 buildBackupPayload() 一起同步到 sync_state.payload.appSettings，
+  // 雲端 Edge Function 的 digest 模式再依這三個布林決定要不要發摘要推播。
+  // 這裡刻意不做「未同步就提示」的複雜判斷，只在勾選後存檔，交給既有同步流程帶上去。
+  function bindDigestToggles(wrap) {
+    const map = {
+      digestMorningToggle: 'digestMorning',
+      digestEveningToggle: 'digestEvening',
+      digestWeeklyToggle: 'digestWeekly',
+    };
+    Object.keys(map).forEach((id) => {
+      const el = wrap.querySelector('#' + id);
+      if (!el) return;
+      const key = map[id];
+      el.checked = (typeof appSettings === 'object' && appSettings) ? appSettings[key] === true : false;
+      el.addEventListener('change', () => {
+        if (typeof appSettings !== 'object' || !appSettings) return;
+        appSettings[key] = el.checked;
+        if (typeof saveJson === 'function' && typeof APP_SETTINGS_KEY === 'string') {
+          saveJson(APP_SETTINGS_KEY, appSettings);
+        }
+      });
+    });
   }
 
   function setStatus(text) {
