@@ -256,11 +256,16 @@
           completedDates: [], excludedDates: [], repeatUntil: '', attachmentCount: 0, sortOrder: 0,
           createdAt: '2026-01-01T00:00:00.000Z', originalSeriesId: '', originalOccurrenceDate: '',
           updatedAt: 0,
+          // D1-D4 陸續加的欄位：normalizeStoredData() 一定會補上，fixture 要跟「正規化後」的
+          // 形狀一致，不然 roundtrip 比的是正規化前 vs 正規化後，永遠對不上（2026-07-29 抓到的回歸）。
+          calendarId: 'default', dependsOn: [], color: null, location: '', timezone: null,
         }];
         categories = defaultCategories;
         habits = [];
         textSettings = defaultTextSettings;
-        appSettings = defaultAppSettings;
+        // visibleCalendarIds：未設定時 normalizeStoredData() 會補成全部日曆本 id，
+        // fixture 要先補上，理由同上。
+        appSettings = { ...defaultAppSettings, visibleCalendarIds: ['default'] };
         dailyMemos = {};
         templates = defaultTemplates;
         weeklyGoals = [];
