@@ -1079,6 +1079,10 @@ body.dark .conflict-warning {
   padding: 16px 18px;
   outline: none;
 }
+#commandPaletteInput:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 .command-palette-results {
   list-style: none;
   margin: 0;
