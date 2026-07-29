@@ -455,6 +455,7 @@
     return {
       ...newerBlock,
       tasks: mergeTaskLists(localObj.tasks, cloudObj.tasks),
+      snoozes: (typeof mergeSnoozeTables === 'function') ? mergeSnoozeTables(localObj.snoozes, cloudObj.snoozes) : (newerBlock.snoozes || {}),
       generatedAt: Math.max(localGen, cloudGen) || Date.now(),
     };
   }

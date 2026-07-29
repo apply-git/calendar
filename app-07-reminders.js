@@ -104,6 +104,33 @@ function processSnoozeTable(now) {
   if (changed) saveJson(SNOOZE_KEY, table);
 }
 
+// 從外部（雲端備份／匯入檔）來的 snooze 表可能含髒資料，統一過濾：
+// key 必須是 `taskId|dateKey` 形式的非空字串，value 必須是有限數字（到期時間戳）。
+function sanitizeSnoozeTable(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  Object.keys(raw).forEach((key) => {
+    if (typeof key !== 'string' || key.indexOf('|') === -1) return;
+    const until = Number(raw[key]);
+    if (!Number.isFinite(until)) return;
+    out[key] = until;
+  });
+  return out;
+}
+
+// 合併兩份 snooze 表：同一個 key 取「較晚的到期時間」。
+// 理由：延後是使用者的明確意圖，兩台裝置各自延後過同一筆提醒時，取較晚那個才不會
+// 讓已經被延後的提醒又提早跳出來；單邊才有的 key 直接保留。
+function mergeSnoozeTables(a, b) {
+  const out = sanitizeSnoozeTable(a);
+  const other = sanitizeSnoozeTable(b);
+  Object.keys(other).forEach((key) => {
+    const prev = Number(out[key]);
+    out[key] = Number.isFinite(prev) ? Math.max(prev, other[key]) : other[key];
+  });
+  return out;
+}
+
 function checkReminders() {
   const now = new Date();
   const nowKey = toDateInput(now);
@@ -296,6 +323,7 @@ function buildBackupPayload() {
     dailyMemos,
     templates,
     weeklyGoals,
+    snoozes: loadJson(SNOOZE_KEY, {}),
     widgetMode,
     theme: localStorage.getItem(THEME_KEY) || 'light',
   };
@@ -388,6 +416,9 @@ function applyBackupObject(data) {
   dailyMemos = data.dailyMemos && typeof data.dailyMemos === 'object' ? data.dailyMemos : {};
   templates = Array.isArray(data.templates) && data.templates.length ? data.templates : defaultTemplates;
   weeklyGoals = Array.isArray(data.weeklyGoals) ? data.weeklyGoals : [];
+  if (data.snoozes && typeof data.snoozes === 'object') {
+    saveJson(SNOOZE_KEY, sanitizeSnoozeTable(data.snoozes));
+  }
   widgetMode = Boolean(data.widgetMode);
   // 'auto' 是新增的存值，舊備份沒有這個值也沒關係：不合法值一律不覆寫，交給 applyTheme() 內的
   // getStoredThemeMode() 用既有值或預設 'light' 處理。

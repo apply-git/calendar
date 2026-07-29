@@ -28,7 +28,7 @@ let holidayWarned = false; // console.warn 最多一次，避免零設定環境�
 let dynamicHolidays = {}; // init() 時從 localStorage 載入進記憶體，供 getHoliday() 優先查詢
 
 // 提醒延後（snooze）持久化：key 為 `${taskId}|${dateKey}`（用 '|' 分隔避免與 UUID/日期裡的 '-' 混淆），
-// value 為 snooze 到期時間戳。只是排程用暫存，刻意不納入 buildBackupPayload()/applyBackupObject()。
+// value 為 snooze 到期時間戳。已納入 buildBackupPayload()/applyBackupObject() 一起雲端同步（S3），雲端合併時同 key 取較晚的到期時間（見 sync.js 的 mergeSnoozeTables）；超過 SNOOZE_STALE_MS 的殘留會在讀取時清掉。
 const SNOOZE_KEY = 'desktop-schedule-snooze-v1';
 const SNOOZE_STALE_MS = 24 * 60 * 60 * 1000; // 到期超過 24 小時的殘留視為過期，清掉不補發
 
