@@ -254,7 +254,7 @@ function renderWeek(visibleTasks) {
         const dayTasks = visibleTasks.filter((task) => occursOnDate(task, key)).sort(compareTasks);
         const dayWeather = getWeatherDay(key);
         return `
-          <div class="week-day ${isToday(day) ? 'today' : ''} ${holidayName ? 'holiday' : ''}" data-drop-date="${key}">
+          <div class="week-day ${isToday(day) ? 'today' : ''} ${holidayName ? 'holiday' : ''}" data-drop-date="${key}" ${isToday(day) ? 'aria-current="date"' : ''}>
             <div class="day-head"><span>${weekdayName(day)}</span><span>${formatMonthDay(day)}${dayWeather ? `<span class="weather-mini">${weatherEmoji(dayWeather.code)}</span>` : ''}</span></div>
             ${appSettings.showLunar ? `<div class="lunar-mini">${escapeHtml(lunarCellLabel(day))}</div>` : ''}
             ${holidayName ? `<div class="holiday-label">${escapeHtml(holidayName)}</div>` : ''}
@@ -280,8 +280,8 @@ function renderMonth(visibleTasks) {
         const dayTasks = allDayTasks.slice().sort(compareTasks).slice(0, 4);
         const dayWeather = getWeatherDay(key);
         return `
-          <div class="month-day ${heatClass(allDayTasks.length)} ${isToday(day) ? 'today' : ''} ${day.getMonth() !== currentDate.getMonth() ? 'outside' : ''} ${holidayName ? 'holiday' : ''}" data-drop-date="${key}" title="${allDayTasks.length} 筆行程">
-            <div class="day-head"><span>${day.getDate()}${dayWeather ? `<span class="weather-mini">${weatherEmoji(dayWeather.code)}</span>` : ''}</span><button class="small-btn" data-new-date="${key}">＋</button></div>
+          <div class="month-day ${heatClass(allDayTasks.length)} ${isToday(day) ? 'today' : ''} ${day.getMonth() !== currentDate.getMonth() ? 'outside' : ''} ${holidayName ? 'holiday' : ''}" data-drop-date="${key}" title="${allDayTasks.length} 筆行程" ${isToday(day) ? 'aria-current="date"' : ''}>
+            <div class="day-head"><span>${day.getDate()}${dayWeather ? `<span class="weather-mini">${weatherEmoji(dayWeather.code)}</span>` : ''}</span><button class="small-btn" data-new-date="${key}" aria-label="新增行程">＋</button></div>
             ${appSettings.showLunar ? `<div class="lunar-mini">${escapeHtml(lunarCellLabel(day))}</div>` : ''}
             ${holidayName ? `<div class="holiday-label">${escapeHtml(holidayName)}</div>` : ''}
             ${moodDotHtml(key)}
@@ -300,7 +300,7 @@ function moodDotHtml(dateKey) {
   const entry = diaryEntries[dateKey];
   const mood = entry ? Number(entry.mood) : 0;
   if (!(mood >= 1 && mood <= 5)) return '';
-  return `<span class="mood-dot mood-dot-${mood}" title="心情 ${mood}/5" aria-hidden="true"></span>`;
+  return `<span class="mood-dot mood-dot-${mood}" title="心情 ${mood}/5" role="img" aria-label="心情 ${mood}/5"></span>`;
 }
 
 // 月檢視熱力圖：依「當天行程數」加淡淡的主色底色，疊在最底層（class 加在最前面，
