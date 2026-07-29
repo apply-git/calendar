@@ -7,6 +7,7 @@ const TEXT_KEY = 'desktop-schedule-text-settings-v1';
 const APP_SETTINGS_KEY = 'desktop-schedule-app-settings-v1';
 const MEMO_KEY = 'desktop-schedule-daily-memos-v1';
 const DIARY_KEY = 'desktop-schedule-diary-v1'; // 每日心情：{ 'YYYY-MM-DD': { mood: 1~5, updatedAt } }；文字內容沿用 dailyMemos，不重複存
+const POMODORO_LOG_KEY = 'desktop-schedule-pomodoro-log-v1'; // 番茄鐘完成紀錄：陣列 [{ id, at, minutes, taskId }]，**依 at 由舊到新排序**，上限 300 筆
 const TEMPLATE_KEY = 'desktop-schedule-templates-v1';
 const WEEKLY_GOAL_KEY = 'desktop-schedule-weekly-goals-v1';
 const WIDGET_KEY = 'desktop-schedule-widget-mode-v1';
@@ -206,6 +207,7 @@ let textSettings = { ...defaultTextSettings, ...loadJson(TEXT_KEY, {}) };
 let appSettings = { ...defaultAppSettings, ...loadJson(APP_SETTINGS_KEY, {}) };
 let dailyMemos = loadJson(MEMO_KEY, {});
 let diaryEntries = loadJson(DIARY_KEY, {});
+let pomodoroLog = loadJson(POMODORO_LOG_KEY, []);
 let templates = loadJson(TEMPLATE_KEY, defaultTemplates);
 let weeklyGoals = loadJson(WEEKLY_GOAL_KEY, []);
 let currentDate = startOfDay(new Date());
@@ -421,6 +423,8 @@ const els = {
   dashboardTimeDistribution: $('dashboardTimeDistribution'),
   dashboardMoodSummary: $('dashboardMoodSummary'),
   dashboardMoodDistribution: $('dashboardMoodDistribution'),
+  dashboardPomodoroSummary: $('dashboardPomodoroSummary'),
+  dashboardPomodoroDaily: $('dashboardPomodoroDaily'),
   weeklyReviewRateValue: $('weeklyReviewRateValue'),
   weeklyReviewCountsLabel: $('weeklyReviewCountsLabel'),
   weeklyReviewCompare: $('weeklyReviewCompare'),

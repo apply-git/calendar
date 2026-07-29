@@ -149,6 +149,26 @@ function mergeDiaryTables(a, b) {
   return out;
 }
 
+// 番茄鐘紀錄合併：以 id 做聯集，同 id 只留一份。用聯集而不是相加，
+// 因為同一筆紀錄可能被同步多次，相加會重複計算。
+// ⚠️ 回傳一律「由舊到新」排序後 slice(-300)，必須與 logPomodoroSession() 的
+// push + slice(-300) 方向一致，否則會把最新的紀錄砍掉。
+function mergePomodoroLogs(a, b) {
+  const seen = new Map();
+  [a, b].forEach((src) => {
+    if (!Array.isArray(src)) return;
+    src.forEach((row) => {
+      if (!row || typeof row !== 'object') return;
+      const id = String(row.id || '');
+      const at = Number(row.at) || 0;
+      const minutes = Number(row.minutes) || 0;
+      if (!id || !at || !(minutes > 0)) return;
+      if (!seen.has(id)) seen.set(id, { id, at, minutes, taskId: String(row.taskId || '') });
+    });
+  });
+  return Array.from(seen.values()).sort((x, y) => x.at - y.at).slice(-300);
+}
+
 function checkReminders() {
   const now = new Date();
   const nowKey = toDateInput(now);
@@ -343,6 +363,7 @@ function buildBackupPayload() {
     weeklyGoals,
     snoozes: loadJson(SNOOZE_KEY, {}),
     diary: mergeDiaryTables(loadJson(DIARY_KEY, {}), {}),
+    pomodoroLog: mergePomodoroLogs(pomodoroLog, []),
     widgetMode,
     theme: localStorage.getItem(THEME_KEY) || 'light',
   };
@@ -453,6 +474,10 @@ function applyBackupObject(data) {
   if (data.diary && typeof data.diary === 'object') {
     diaryEntries = mergeDiaryTables(data.diary, {});
     saveJson(DIARY_KEY, diaryEntries);
+  }
+  if (Array.isArray(data.pomodoroLog)) {
+    pomodoroLog = mergePomodoroLogs(data.pomodoroLog, []);
+    saveJson(POMODORO_LOG_KEY, pomodoroLog);
   }
   saveJson(TEMPLATE_KEY, templates);
   saveJson(WEEKLY_GOAL_KEY, weeklyGoals);

@@ -565,6 +565,37 @@ function computeDashboardStats(baseDate) {
 
 // 近 30 天心情統計：只讀 diaryEntries，mood 0（取消的墓碑）不列入。
 // 回傳 max 至少為 1，避免長條寬度除以 0。
+// 番茄鐘統計：近 7 天逐日專注分鐘數 ＋ 近 30 天總計。只讀 pomodoroLog，不改它。
+// maxMinutes 至少為 1，避免長條寬度除以 0。
+function computePomodoroStats(baseDate) {
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const todayStart = startOfDay(baseDate);
+  const dayMinutes = new Map();
+  let total30 = 0;
+  let minutes30 = 0;
+  (Array.isArray(pomodoroLog) ? pomodoroLog : []).forEach((row) => {
+    const at = Number(row && row.at) || 0;
+    if (!at) return;
+    const diffDays = Math.round((todayStart - startOfDay(new Date(at))) / 86400000);
+    if (diffDays < 0 || diffDays > 29) return;
+    const minutes = Number(row.minutes) || 0;
+    total30 += 1;
+    minutes30 += minutes;
+    if (diffDays <= 6) dayMinutes.set(diffDays, (dayMinutes.get(diffDays) || 0) + minutes);
+  });
+  const days = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    const day = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() - i);
+    days.push({ label: formatMonthDay(day), minutes: dayMinutes.get(i) || 0 });
+  }
+  return {
+    days,
+    maxMinutes: days.reduce((m, d) => Math.max(m, d.minutes), 0) || 1,
+    total30,
+    minutes30,
+  };
+}
+
 function computeMoodStats(baseDate) {
   const labels = ['😞 很差', '🙁 不好', '😐 普通', '🙂 不錯', '😄 很好'];
   const counts = [0, 0, 0, 0, 0];
@@ -650,6 +681,22 @@ function renderDashboard() {
             <span class="dashboard-bar-value">${bucket.count} 天</span>
           </div>
           <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:${Math.round((bucket.count / moodStats.max) * 100)}%"></div></div>
+        </div>
+      `).join('')
+    : '<p class="muted">尚無資料</p>';
+
+  const pomodoroStats = computePomodoroStats(new Date());
+  els.dashboardPomodoroSummary.textContent = pomodoroStats.total30
+    ? `近 30 天完成 ${pomodoroStats.total30} 顆番茄，共 ${(pomodoroStats.minutes30 / 60).toFixed(1)} 小時，平均每日 ${Math.round(pomodoroStats.minutes30 / 30)} 分鐘`
+    : '近 30 天沒有番茄鐘紀錄';
+  els.dashboardPomodoroDaily.innerHTML = pomodoroStats.total30
+    ? pomodoroStats.days.map((day) => `
+        <div class="dashboard-bar-row">
+          <div class="dashboard-bar-head">
+            <span class="dashboard-bar-label">${escapeHtml(day.label)}</span>
+            <span class="dashboard-bar-value">${(day.minutes / 60).toFixed(1)} 小時</span>
+          </div>
+          <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:${Math.round((day.minutes / pomodoroStats.maxMinutes) * 100)}%"></div></div>
         </div>
       `).join('')
     : '<p class="muted">尚無資料</p>';

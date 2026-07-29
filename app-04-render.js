@@ -838,11 +838,24 @@ function pomodoroTick() {
   updatePomodoroDisplay();
 }
 
+// 番茄鐘完成紀錄：只記「專注」段落，休息段落不記。
+// 刻意存成「一筆一列」的陣列而不是每日累加數字，是為了讓雲端合併可以用 id 聯集
+// （見 app-07-reminders.js 的 mergePomodoroLogs）——多裝置同一天各做幾顆才不會
+// 互相蓋掉，同一筆被同步多次也不會重複累加。
+// ⚠️ 陣列一律維持「由舊到新」排序，超過 300 筆時用 slice(-300) 丟掉最舊的。
+function logPomodoroSession(taskId) {
+  const minutes = Math.max(1, Number(els.pomodoroFocusInput.value) || 25);
+  pomodoroLog.push({ id: crypto.randomUUID(), at: Date.now(), minutes, taskId: taskId || '' });
+  if (pomodoroLog.length > 300) pomodoroLog = pomodoroLog.slice(-300);
+  saveJson(POMODORO_LOG_KEY, pomodoroLog);
+}
+
 function completePomodoroSegment() {
   const finishedMode = pomodoroState.mode;
   pausePomodoro();
   playDoneSound();
   const task = tasks.find((item) => item.id === els.pomodoroTaskSelect.value);
+  if (finishedMode === 'focus') logPomodoroSession(task ? task.id : '');
   const label = finishedMode === 'focus' ? '專注時間結束，休息一下吧！' : '休息結束，繼續加油！';
   notify('番茄鐘', task ? `${label}（${task.title}）` : label);
   pomodoroState.mode = finishedMode === 'focus' ? 'break' : 'focus';

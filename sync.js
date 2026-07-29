@@ -457,6 +457,7 @@
       tasks: mergeTaskLists(localObj.tasks, cloudObj.tasks),
       snoozes: (typeof mergeSnoozeTables === 'function') ? mergeSnoozeTables(localObj.snoozes, cloudObj.snoozes) : (newerBlock.snoozes || {}),
       diary: (typeof mergeDiaryTables === 'function') ? mergeDiaryTables(localObj.diary, cloudObj.diary) : (newerBlock.diary || {}),
+      pomodoroLog: (typeof mergePomodoroLogs === 'function') ? mergePomodoroLogs(localObj.pomodoroLog, cloudObj.pomodoroLog) : (newerBlock.pomodoroLog || []),
       generatedAt: Math.max(localGen, cloudGen) || Date.now(),
     };
   }
