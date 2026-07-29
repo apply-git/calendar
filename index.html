@@ -210,6 +210,14 @@
           <span id="dailyMemoStatus" class="muted">自動儲存</span>
         </div>
         <textarea id="dailyMemo" rows="3" placeholder="寫下今天要記得的事..."></textarea>
+        <div id="moodPicker" class="mood-picker" role="group" aria-label="今日心情">
+          <span class="muted mood-label">今日心情</span>
+          <button type="button" class="mood-btn" data-mood="1" aria-label="很差" title="很差">😞</button>
+          <button type="button" class="mood-btn" data-mood="2" aria-label="不好" title="不好">🙁</button>
+          <button type="button" class="mood-btn" data-mood="3" aria-label="普通" title="普通">😐</button>
+          <button type="button" class="mood-btn" data-mood="4" aria-label="不錯" title="不錯">🙂</button>
+          <button type="button" class="mood-btn" data-mood="5" aria-label="很好" title="很好">😄</button>
+        </div>
       </section>
 
       <section id="calendarView" class="calendar-view panel"></section>

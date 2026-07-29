@@ -1884,3 +1884,37 @@ body.dark .app-footer { color: #fff; }
     z-index: 5;
   }
 }
+
+/* P1a æ¯æ¥å¿æé¸æåï¼è·èãæ¯æ¥åå¿éãé¢æ¿èµ°ï¼ä¸å¦å¤éé¢æ¿ */
+.mood-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.mood-picker .mood-label {
+  margin-right: 2px;
+}
+.mood-btn {
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.mood-btn:hover {
+  opacity: 0.85;
+}
+.mood-btn.is-active {
+  opacity: 1;
+  border-color: var(--accent, #4a90d9);
+  background: var(--accent-soft, rgba(74, 144, 217, 0.15));
+}
+.mood-btn:focus-visible {
+  outline: 2px solid var(--accent, #4a90d9);
+  outline-offset: 2px;
+}

@@ -131,6 +131,24 @@ function mergeSnoozeTables(a, b) {
   return out;
 }
 
+// 心情表合併：同一天以 updatedAt 較新者勝，沒有 updatedAt 視為 0。與 mergeSnoozeTables 同一套路數。
+function mergeDiaryTables(a, b) {
+  const out = {};
+  [a, b].forEach((src) => {
+    if (!src || typeof src !== 'object') return;
+    Object.keys(src).forEach((k) => {
+      const v = src[k];
+      if (!v || typeof v !== 'object') return;
+      const mood = Number(v.mood);
+      if (!(mood >= 1 && mood <= 5)) return;
+      const at = Number(v.updatedAt) || 0;
+      const prev = out[k];
+      if (!prev || at >= (Number(prev.updatedAt) || 0)) out[k] = { mood, updatedAt: at };
+    });
+  });
+  return out;
+}
+
 function checkReminders() {
   const now = new Date();
   const nowKey = toDateInput(now);
@@ -324,6 +342,7 @@ function buildBackupPayload() {
     templates,
     weeklyGoals,
     snoozes: loadJson(SNOOZE_KEY, {}),
+    diary: mergeDiaryTables(loadJson(DIARY_KEY, {}), {}),
     widgetMode,
     theme: localStorage.getItem(THEME_KEY) || 'light',
   };
@@ -431,6 +450,10 @@ function applyBackupObject(data) {
   saveJson(TEXT_KEY, textSettings);
   saveJson(APP_SETTINGS_KEY, appSettings);
   saveJson(MEMO_KEY, dailyMemos);
+  if (data.diary && typeof data.diary === 'object') {
+    diaryEntries = mergeDiaryTables(data.diary, {});
+    saveJson(DIARY_KEY, diaryEntries);
+  }
   saveJson(TEMPLATE_KEY, templates);
   saveJson(WEEKLY_GOAL_KEY, weeklyGoals);
   localStorage.setItem(WIDGET_KEY, widgetMode ? '1' : '0');

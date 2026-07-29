@@ -59,6 +59,29 @@ function renderDailyMemo() {
   const key = toDateInput(currentDate);
   els.dailyMemo.value = dailyMemos[key] || '';
   els.dailyMemoStatus.textContent = `${key} 自動儲存`;
+  renderMoodPicker();
+}
+
+// 心情選擇列：只負責把「目前這一天」的心情反白。點擊行為綁在 app-03-events.js 的 bindEvents()。
+function renderMoodPicker() {
+  if (!els.moodPicker) return;
+  const entry = diaryEntries[toDateInput(currentDate)];
+  const mood = entry && Number(entry.mood) ? Number(entry.mood) : 0;
+  els.moodPicker.querySelectorAll('.mood-btn').forEach((btn) => {
+    const on = Number(btn.dataset.mood) === mood;
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
+// 同一顆再按一次＝取消；updatedAt 供雲端同步「逐日較新者勝」使用。
+function setMoodForCurrentDate(mood) {
+  const key = toDateInput(currentDate);
+  const current = diaryEntries[key] && Number(diaryEntries[key].mood);
+  if (current === mood) delete diaryEntries[key];
+  else diaryEntries[key] = { mood, updatedAt: Date.now() };
+  saveJson(DIARY_KEY, diaryEntries);
+  renderMoodPicker();
 }
 
 function saveDailyMemo() {

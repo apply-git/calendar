@@ -258,6 +258,16 @@ function bindEvents() {
 
   [els.searchInput, els.filterCategory, els.filterStatus, els.filterPriority].forEach((el) => el.addEventListener('input', render));
   els.dailyMemo.addEventListener('input', saveDailyMemo);
+  // 心情選擇列用事件委派，避免逐顆綁定；只認 data-mood 為 1~5 的按鈕。
+  if (els.moodPicker) {
+    els.moodPicker.addEventListener('click', (e) => {
+      const btn = e.target.closest('.mood-btn');
+      if (!btn || !els.moodPicker.contains(btn)) return;
+      const mood = Number(btn.dataset.mood);
+      if (!(mood >= 1 && mood <= 5)) return;
+      setMoodForCurrentDate(mood);
+    });
+  }
 
   els.addWeeklyGoalBtn.addEventListener('click', addWeeklyGoal);
   els.weeklyGoalInput.addEventListener('keydown', (event) => {
