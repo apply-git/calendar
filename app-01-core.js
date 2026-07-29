@@ -88,7 +88,7 @@ const TAIWAN_HOLIDAYS = {
   '2027-12-31': '元旦（補假）',
 };
 
-const defaultAppSettings = { workStart: 7, workEnd: 21, showLunar: true, dayViewMode: 'list', autoSync: false, travelTimezone: null, digestMorning: false, digestEvening: false, digestWeekly: false };
+const defaultAppSettings = { workStart: 7, workEnd: 21, showLunar: true, dayViewMode: 'list', autoSync: false, travelTimezone: null, digestMorning: false, digestEvening: false, digestWeekly: false, autoErrorReport: false };
 const TIMELINE_HOUR_HEIGHT = 60;
 
 // D4 行程時區：任務表單「時區」select 常用清單＋旅行模式顯示時區 select 共用同一份清單。

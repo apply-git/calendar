@@ -4,6 +4,7 @@
 // 【絕不可】收集 localStorage 內容、token、行程資料本身，只留偵錯必要欄位：
 // 時間、錯誤訊息、呼叫堆疊前 500 字、瀏覽器 UA、頁面網址（去掉 query）。
 // 此 key 刻意不納入 buildBackupPayload()/applyBackupObject()，比照 sync-auth key 的處理。
+// 另有選用的雲端自動上報（appSettings.autoErrorReport，預設關閉），見 reportErrorToCloud() 與 schema-errorlog.sql。
 // ============================================================================
 function recordError(message, stack) {
   try {
@@ -17,8 +18,67 @@ function recordError(message, stack) {
     errorLog.push(entry);
     if (errorLog.length > ERROR_LOG_MAX) errorLog = errorLog.slice(errorLog.length - ERROR_LOG_MAX);
     saveJson(ERROR_LOG_KEY, errorLog);
+    reportErrorToCloud(entry);
   } catch {
     // 記錄錯誤本身不應該再拋出例外影響其他功能。
+  }
+}
+
+// 自動上報的節流／去重狀態（純字面值，載入時不執行任何邏輯）：
+//   lastSentAt：上一次實際送出的時間戳，用來做「每 60 秒最多送 1 筆」的節流；
+//   sentKeys：`message|stack 前 120 字` → 最近送出時間戳，同一種錯誤 24 小時內只送一次。
+// 兩者都只活在記憶體，重新整理後歸零（刻意不落地：這是防洗版的軟性保護，
+// 不是精確計數，也不值得為它多寫一個 localStorage key）。
+const errorReportState = { lastSentAt: 0, sentKeys: {} };
+const ERROR_REPORT_MIN_GAP_MS = 60 * 1000;
+const ERROR_REPORT_DEDUPE_MS = 24 * 60 * 60 * 1000;
+
+// 把單筆錯誤靜默上報到 Supabase 的 error_reports 表（schema-errorlog.sql）。
+// 【設計鐵則】這個函式對呼叫端而言必須「絕對安全」：
+//   1. 整段包在 try/catch 裡，任何例外都吞掉——上報失敗絕不能再觸發 recordError 造成無限迴圈；
+//   2. fire-and-forget，不 await、不重試、失敗不提示使用者；
+//   3. 預設關閉（appSettings.autoErrorReport），沒登入、沒設定雲端一律直接 return；
+//   4. 送出的欄位就是 recordError 收集的那 5 個，不多帶任何東西（不含 token／行程內容）。
+function reportErrorToCloud(entry) {
+  try {
+    if (!entry || typeof appSettings !== 'object' || !appSettings || appSettings.autoErrorReport !== true) return;
+    const rawConfig = (typeof window === 'object' && window && typeof window.CALENDAR_SYNC_CONFIG === 'object' && window.CALENDAR_SYNC_CONFIG) || {};
+    const baseUrl = String(rawConfig.supabaseUrl || '').trim().replace(/\/+$/, '');
+    const anonKey = String(rawConfig.supabaseAnonKey || '').trim();
+    if (!baseUrl || !anonKey) return;
+    const sync = (typeof window === 'object' && window) ? window.CalendarSync : null;
+    if (!sync || typeof sync.getAuthState !== 'function') return;
+    const state = sync.getAuthState();
+    if (!state || !state.accessToken || !state.user || !state.user.id) return;
+
+    const now = Date.now();
+    if (now - errorReportState.lastSentAt < ERROR_REPORT_MIN_GAP_MS) return;
+    const key = `${entry.message}|${String(entry.stack || '').slice(0, 120)}`;
+    const lastSameAt = Number(errorReportState.sentKeys[key]) || 0;
+    if (lastSameAt && now - lastSameAt < ERROR_REPORT_DEDUPE_MS) return;
+
+    errorReportState.lastSentAt = now;
+    errorReportState.sentKeys[key] = now;
+
+    fetch(`${baseUrl}/rest/v1/error_reports`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${state.accessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify([{
+        user_id: state.user.id,
+        occurred_at: entry.time,
+        message: entry.message,
+        stack: entry.stack,
+        page_url: entry.url,
+        user_agent: entry.ua,
+      }]),
+    }).catch(() => {});
+  } catch {
+    // 上報本身出錯一律忽略，避免跟 recordError 互相觸發。
   }
 }
 
