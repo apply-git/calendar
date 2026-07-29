@@ -24,7 +24,7 @@
 </head>
 <body>
   <h1>桌面行程表 - 測試跑道（tests.html）</h1>
-  <p class="desc">純開發工具，不加入 PWA 離線快取（不在 service-worker.js 的 APP_SHELL 內）。依序載入 app.js、sync.js 後，對 window.CalendarApp／window.CalendarSync 匯出的純函式跑迴歸測試，涵蓋 occursOnDate／parseNaturalDateTime／timeOverlaps／備份 roundtrip／S1 墓碑回歸／mergeBackupPayloads 逐筆合併，共 48 個測試案例。測試前後會完整快照／還原 localStorage，不會汙染真實行程資料。</p>
+  <p class="desc">純開發工具，不加入 PWA 離線快取（不在 service-worker.js 的 APP_SHELL 內）。依序載入 app.js、sync.js 後，對 window.CalendarApp／window.CalendarSync 匯出的純函式跑迴歸測試，涵蓋 occursOnDate／parseNaturalDateTime／timeOverlaps／備份 roundtrip／S1 墓碑回歸／mergeBackupPayloads 逐筆合併／computeMoodStats／computePomodoroStats，共 54 個測試案例。測試前後會完整快照／還原 localStorage，不會汙染真實行程資料。</p>
   <div id="allPass">ALL PASS</div>
   <div id="summary">執行中…</div>
   <ul id="results"></ul>
@@ -406,6 +406,59 @@
         assertEqual(threw, false, '雲端 payload 缺 tasks 欄位不應該讓合併丟出例外');
         assertDeepEqual(merged.tasks.map((t) => t.id), ['only-local'], '應該保留本機的 tasks（缺少的雲端 tasks 視為空陣列）');
       });
+
+      group('computeMoodStats（P1 心情追蹤）');
+      (function () {
+        const base = new Date(2026, 0, 31);
+        const snap = diaryEntries;
+        diaryEntries = {
+          [toDateInput(base)]: { mood: 5, updatedAt: 1 },
+          [toDateInput(new Date(2026, 0, 30))]: { mood: 3, updatedAt: 1 },
+          [toDateInput(new Date(2026, 0, 29))]: { mood: 0, updatedAt: 1 },
+          [toDateInput(new Date(2025, 11, 22))]: { mood: 1, updatedAt: 1 },
+        };
+        try {
+          const stats = computeMoodStats(base);
+          test('30 天窗口內只算有效心情（mood 0 與超出 30 天範圍的排除）', () => {
+            assertEqual(stats.total, 2, '應只計入 mood 5 與 mood 3 這兩筆');
+          });
+          test('平均值正確（(5+3)/2=4）', () => {
+            assertEqual(stats.avg, 4, '平均應為 4');
+          });
+          test('bucket 分佈正確對應到 mood 5 那一格', () => {
+            assertEqual(stats.buckets[4].count, 1, '「😄 很好」那一格應該是 1');
+          });
+        } finally {
+          diaryEntries = snap;
+        }
+      })();
+
+      group('computePomodoroStats（P2 番茄鐘統計）');
+      (function () {
+        const base = new Date(2026, 0, 31);
+        const dayMs = 86400000;
+        const snap = pomodoroLog;
+        pomodoroLog = [
+          { id: 'a', at: base.getTime(), minutes: 30 },
+          { id: 'b', at: base.getTime() - 8 * dayMs, minutes: 45 },
+          { id: 'c', at: base.getTime() - 35 * dayMs, minutes: 100 },
+        ];
+        try {
+          const stats = computePomodoroStats(base);
+          test('近 30 天總計只算窗口內兩筆（35 天前那筆排除）', () => {
+            assertEqual(stats.total30, 2, '應只計入 30 與 45 分鐘那兩筆');
+          });
+          test('近 30 天總分鐘數正確加總', () => {
+            assertEqual(stats.minutes30, 75, '30+45=75');
+          });
+          test('近 7 天長條圖：8 天前那筆不進柱狀圖（只進 30 天總計，不進 7 天長條）', () => {
+            const total7 = stats.days.reduce((sum, d) => sum + d.minutes, 0);
+            assertEqual(total7, 30, '7 天柱狀圖只應該看到今天那 30 分鐘，8 天前的不算');
+          });
+        } finally {
+          pomodoroLog = snap;
+        }
+      })();
     } finally {
       // 無論測試成功、失敗、或中途丟例外，都一定會執行到這裡：把 localStorage
       // 還原成執行測試之前的原始狀態，保護使用者的真實行程資料。
