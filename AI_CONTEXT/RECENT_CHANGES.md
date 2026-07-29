@@ -1,5 +1,9 @@
 # Recent Changes
 
+## 2026-07-29 第五波 002：W4-W6 收尾（G2 完成、G3 進行中，本機 commit 未 push）
+- ROADMAP 補打勾 S1-S4/P1/P2（程式碼確認已實作，S2/S4 待使用者跑部署/SQL）；G2 無障礙全面修正（aria-label/aria-labelledby/aria-current、鍵盤可達性、指令面板焦點框）
+- tests.html 補 computeMoodStats/computePomodoroStats，48→54 案例；CACHE_NAME v33→v35。P3 目標 OKR、G1 Google Calendar 匯入尚未開工
+
 ## 2026-07-22 第五波 002：W0–W3 完工（本機 commit、未 push、CACHE_NAME 未動）
 - W0 R1：app.js 拆 9 檔循序載入（app-01-core～app-09-entry，純搬移）；CACHE_NAME → v32
 - W1 資料層：D1 自訂色彩+地點、D2 多日曆本、D3 任務依賴、D4 時區旅行模式；W2 檢視：V1 年熱力圖、V3 列印、V2 甘特圖
