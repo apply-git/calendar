@@ -151,19 +151,19 @@ Google Calendar 整合、時區旅行模式、專案任務依賴、錯誤紀錄�
 - [x] M3（Haiku）：快速新增列＋震動回饋
 
 ### W4 智慧與雲端
-- [ ] S1（Sonnet）：空檔智慧建議（依習慣時段）
-- [ ] S2（Sonnet）：週報＋早／晚摘要推播（Edge Function＋排程，使用者部署）
-- [ ] S3（Sonnet）：snooze 雲端化（併入 sync payload）
-- [ ] S4（Sonnet）：錯誤紀錄自動上報（schema-errorlog.sql，使用者執行 SQL）
+- [x] S1（Sonnet）：空檔智慧建議（依習慣時段）
+- [x] S2（Sonnet）：週報＋早／晚摘要推播（Edge Function＋排程，使用者部署——尚待使用者重新部署 + 排程）
+- [x] S3（Sonnet）：snooze 雲端化（併入 sync payload）
+- [x] S4（Sonnet）：錯誤紀錄自動上報（schema-errorlog.sql，使用者執行 SQL——尚待使用者跑 SQL）
 
 ### W5 個人化
-- [ ] P1（Sonnet）：日記／心情追蹤（月曆疊加＋統計整合）
-- [ ] P2（Haiku）：番茄鐘統計強化（專注時數圖表）
+- [x] P1（Sonnet）：日記／心情追蹤（月曆疊加＋統計整合）
+- [x] P2（Haiku）：番茄鐘統計強化（專注時數圖表）
 - [ ] P3（Sonnet）：目標 OKR（月／季目標＋行程貢獻＋進度條）
 
 ### W6 整合收斂
 - [ ] G1（Opus）：Google Calendar 唯讀匯入（Supabase OAuth scope＋Calendar API）＋CLOUD_GCAL_SETUP.md
-- [ ] G2（Sonnet）：無障礙全面審查修正（ARIA／鍵盤／焦點／對比）
+- [x] G2（Sonnet）：無障礙全面審查修正（ARIA／鍵盤／焦點／對比）
 - [ ] G3（總指揮）：整合稽核、tests.html 補案例、CACHE_NAME、文件統整 → 使用者驗收 → 存新版 002
 
 ### 使用者需自行執行（屆時逐項提醒）
