@@ -419,6 +419,8 @@ const els = {
   dashboardOverdueSummary: $('dashboardOverdueSummary'),
   dashboardOverdueList: $('dashboardOverdueList'),
   dashboardTimeDistribution: $('dashboardTimeDistribution'),
+  dashboardMoodSummary: $('dashboardMoodSummary'),
+  dashboardMoodDistribution: $('dashboardMoodDistribution'),
   weeklyReviewRateValue: $('weeklyReviewRateValue'),
   weeklyReviewCountsLabel: $('weeklyReviewCountsLabel'),
   weeklyReviewCompare: $('weeklyReviewCompare'),

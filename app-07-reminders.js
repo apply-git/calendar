@@ -140,7 +140,7 @@ function mergeDiaryTables(a, b) {
       const v = src[k];
       if (!v || typeof v !== 'object') return;
       const mood = Number(v.mood);
-      if (!(mood >= 1 && mood <= 5)) return;
+      if (!(mood >= 0 && mood <= 5)) return; // 0 = 取消心情的墓碑，必須保留並同步，否則舊紀錄會把「取消」蓋回來
       const at = Number(v.updatedAt) || 0;
       const prev = out[k];
       if (!prev || at >= (Number(prev.updatedAt) || 0)) out[k] = { mood, updatedAt: at };

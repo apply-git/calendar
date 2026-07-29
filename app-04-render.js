@@ -78,7 +78,7 @@ function renderMoodPicker() {
 function setMoodForCurrentDate(mood) {
   const key = toDateInput(currentDate);
   const current = diaryEntries[key] && Number(diaryEntries[key].mood);
-  if (current === mood) delete diaryEntries[key];
+  if (current === mood) diaryEntries[key] = { mood: 0, updatedAt: Date.now() }; // 取消不是刪除，留 mood:0 墓碑讓雲端合併知道「這是新的取消動作」
   else diaryEntries[key] = { mood, updatedAt: Date.now() };
   saveJson(DIARY_KEY, diaryEntries);
   renderMoodPicker();
@@ -284,6 +284,7 @@ function renderMonth(visibleTasks) {
             <div class="day-head"><span>${day.getDate()}${dayWeather ? `<span class="weather-mini">${weatherEmoji(dayWeather.code)}</span>` : ''}</span><button class="small-btn" data-new-date="${key}">＋</button></div>
             ${appSettings.showLunar ? `<div class="lunar-mini">${escapeHtml(lunarCellLabel(day))}</div>` : ''}
             ${holidayName ? `<div class="holiday-label">${escapeHtml(holidayName)}</div>` : ''}
+            ${moodDotHtml(key)}
             ${dayTasks.map((task) => taskCard(task, key)).join('')}
             ${allDayTasks.length > 4 ? '<span class="badge">更多...</span>' : ''}
           </div>
@@ -291,6 +292,15 @@ function renderMonth(visibleTasks) {
       }).join('')}
     </div>
   `;
+}
+
+// 月檢視心情色點：絕對定位在格子右下角，不佔文字流、不改格子高度。
+// mood 0（取消的墓碑）與沒記錄一律回空字串，不畫點。
+function moodDotHtml(dateKey) {
+  const entry = diaryEntries[dateKey];
+  const mood = entry ? Number(entry.mood) : 0;
+  if (!(mood >= 1 && mood <= 5)) return '';
+  return `<span class="mood-dot mood-dot-${mood}" title="心情 ${mood}/5" aria-hidden="true"></span>`;
 }
 
 // 月檢視熱力圖：依「當天行程數」加淡淡的主色底色，疊在最底層（class 加在最前面，

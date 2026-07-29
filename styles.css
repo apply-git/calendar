@@ -1918,3 +1918,22 @@ body.dark .app-footer { color: #fff; }
   outline: 2px solid var(--accent, #4a90d9);
   outline-offset: 2px;
 }
+
+/* P1b 月檢視心情色點：絕對定位，不佔文字流、不改格子高度 */
+.month-day {
+  position: relative;
+}
+.mood-dot {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.mood-dot-1 { background: #e05252; }
+.mood-dot-2 { background: #e08a4a; }
+.mood-dot-3 { background: #b8b8b8; }
+.mood-dot-4 { background: #6aa96a; }
+.mood-dot-5 { background: #3f9d4f; }

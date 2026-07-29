@@ -563,6 +563,30 @@ function computeDashboardStats(baseDate) {
   };
 }
 
+// 近 30 天心情統計：只讀 diaryEntries，mood 0（取消的墓碑）不列入。
+// 回傳 max 至少為 1，避免長條寬度除以 0。
+function computeMoodStats(baseDate) {
+  const labels = ['😞 很差', '🙁 不好', '😐 普通', '🙂 不錯', '😄 很好'];
+  const counts = [0, 0, 0, 0, 0];
+  let total = 0;
+  let sum = 0;
+  for (let i = 0; i < 30; i += 1) {
+    const day = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() - i);
+    const entry = diaryEntries[toDateInput(day)];
+    const mood = entry ? Number(entry.mood) : 0;
+    if (!(mood >= 1 && mood <= 5)) continue;
+    counts[mood - 1] += 1;
+    total += 1;
+    sum += mood;
+  }
+  return {
+    buckets: labels.map((label, i) => ({ label, count: counts[i] })),
+    total,
+    max: counts.reduce((m, c) => Math.max(m, c), 0) || 1,
+    avg: total ? sum / total : 0,
+  };
+}
+
 function renderDashboard() {
   const data = computeDashboardStats(new Date());
 
@@ -610,6 +634,22 @@ function renderDashboard() {
             <span class="dashboard-bar-value">${bucket.count} 筆</span>
           </div>
           <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:${Math.round((bucket.count / maxBucket) * 100)}%"></div></div>
+        </div>
+      `).join('')
+    : '<p class="muted">尚無資料</p>';
+
+  const moodStats = computeMoodStats(new Date());
+  els.dashboardMoodSummary.textContent = moodStats.total
+    ? `近 30 天記錄 ${moodStats.total} 天，平均 ${moodStats.avg.toFixed(1)} / 5`
+    : '近 30 天沒有心情記錄';
+  els.dashboardMoodDistribution.innerHTML = moodStats.total
+    ? moodStats.buckets.map((bucket) => `
+        <div class="dashboard-bar-row">
+          <div class="dashboard-bar-head">
+            <span class="dashboard-bar-label">${bucket.label}</span>
+            <span class="dashboard-bar-value">${bucket.count} 天</span>
+          </div>
+          <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:${Math.round((bucket.count / moodStats.max) * 100)}%"></div></div>
         </div>
       `).join('')
     : '<p class="muted">尚無資料</p>';
