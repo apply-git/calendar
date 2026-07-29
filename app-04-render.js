@@ -536,7 +536,7 @@ function renderCountdownPanel() {
         const daysLabel = days <= 0 ? '就是今天！' : `還有 ${days} 天`;
         const md = formatMonthDay(new Date(`${dateKey}T00:00:00`));
         return `
-          <div class="countdown-item" data-countdown-edit="${task.id}" data-countdown-date="${dateKey}">
+          <div class="countdown-item" data-countdown-edit="${task.id}" data-countdown-date="${dateKey}" tabindex="0" role="button">
             <span class="countdown-days ${days <= 0 ? 'countdown-today' : ''}">${daysLabel}</span>
             <span class="countdown-title">${escapeHtml(task.title)}</span>
             <span class="muted">${md}</span>

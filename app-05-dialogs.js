@@ -649,7 +649,7 @@ function renderDashboard() {
     : '尚無資料';
   els.dashboardOverdueList.innerHTML = data.overdue.items.length
     ? data.overdue.items.map((item) => `
-        <li class="dashboard-overdue-item" data-dashboard-edit="${item.id}" data-dashboard-date="${item.date}">
+        <li class="dashboard-overdue-item" data-dashboard-edit="${item.id}" data-dashboard-date="${item.date}" tabindex="0" role="button">
           <span class="dashboard-overdue-date">${formatMonthDay(new Date(`${item.date}T00:00:00`))}</span>
           <span class="dashboard-overdue-title">${escapeHtml(item.title)}</span>
         </li>

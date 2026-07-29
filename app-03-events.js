@@ -385,6 +385,13 @@ function bindEvents() {
   });
 
   document.addEventListener('click', handleCalendarClick);
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const item = event.target.closest('[data-countdown-edit], [data-dashboard-edit]');
+    if (!item) return;
+    event.preventDefault();
+    item.click();
+  });
   document.addEventListener('change', handleCalendarChange);
   document.addEventListener('dragstart', handleDragStart);
   document.addEventListener('dragover', handleDragOver);
