@@ -704,6 +704,10 @@
       <hr />
       <p class="muted">錯誤紀錄：本機自動收集程式錯誤（不含行程內容或帳號資訊），供回報問題時參考。</p>
       <p id="dataCheckErrorLogSummary" class="muted">目前沒有錯誤紀錄</p>
+      <div class="field checkbox-field">
+        <label><input id="autoErrorReportToggle" type="checkbox" /> 🐞 自動上報錯誤紀錄到雲端（需登入）</label>
+      </div>
+      <p class="muted">開啟後，發生錯誤時會把「錯誤訊息／堆疊／瀏覽器版本／頁面網址」自動送到你自己的 Supabase（不含行程內容與帳號密碼），方便遠端診斷手機端問題。需先完成雲端同步登入，並在 Supabase SQL Editor 執行過 <code>schema-errorlog.sql</code>。</p>
       <div class="pomodoro-actions">
         <button type="button" id="exportErrorLogBtn" class="ghost-btn">匯出錯誤紀錄</button>
         <button type="button" id="clearErrorLogBtn" class="ghost-btn">清空紀錄</button>

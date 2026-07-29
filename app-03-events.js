@@ -317,6 +317,16 @@ function bindEvents() {
   els.closeDataCheckBtn?.addEventListener('click', closeDataCheckDialog);
   els.dataCheckFixBtn?.addEventListener('click', handleDataCheckFix);
   els.exportErrorLogBtn?.addEventListener('click', exportErrorLog);
+  // 🐞 自動上報錯誤紀錄開關：值存在 appSettings，讀取端是 app-09-entry.js 的
+  // reportErrorToCloud()。這裡只負責「初始勾選狀態」與「勾選後存檔」，
+  // 不做登入狀態判斷——沒登入時上報端自己會直接 return，不需要在 UI 重複判斷。
+  if (els.autoErrorReportToggle) {
+    els.autoErrorReportToggle.checked = appSettings.autoErrorReport === true;
+    els.autoErrorReportToggle.addEventListener('change', () => {
+      appSettings.autoErrorReport = els.autoErrorReportToggle.checked;
+      saveJson(APP_SETTINGS_KEY, appSettings);
+    });
+  }
   els.clearErrorLogBtn?.addEventListener('click', clearErrorLog);
 
   els.addHabitBtn.addEventListener('click', addHabit);

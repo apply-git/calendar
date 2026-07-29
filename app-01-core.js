@@ -430,6 +430,7 @@ const els = {
   dataCheckList: $('dataCheckList'),
   dataCheckFixBtn: $('dataCheckFixBtn'),
   dataCheckErrorLogSummary: $('dataCheckErrorLogSummary'),
+  autoErrorReportToggle: $('autoErrorReportToggle'),
   exportErrorLogBtn: $('exportErrorLogBtn'),
   clearErrorLogBtn: $('clearErrorLogBtn'),
   swUpdateBanner: $('swUpdateBanner'),
