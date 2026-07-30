@@ -420,6 +420,13 @@ const els = {
   dashboardBtn: $('dashboardBtn'),
   dashboardDialog: $('dashboardDialog'),
   closeDashboardBtn: $('closeDashboardBtn'),
+  okrBtn: $('okrBtn'),
+  okrDialog: $('okrDialog'),
+  closeOkrBtn: $('closeOkrBtn'),
+  okrTitleInput: $('okrTitleInput'),
+  okrDueDateInput: $('okrDueDateInput'),
+  addOkrBtn: $('addOkrBtn'),
+  okrList: $('okrList'),
   dashboardCategoryHours: $('dashboardCategoryHours'),
   dashboardWeeklyTrend: $('dashboardWeeklyTrend'),
   dashboardOverdueSummary: $('dashboardOverdueSummary'),
@@ -517,6 +524,7 @@ const TOOLBAR_MENU_GROUPS = [
     items: [
       { proxyId: 'dashboardBtn' },
       { proxyId: 'weeklyReviewBtn' },
+      { proxyId: 'okrBtn' },
     ],
   },
   {

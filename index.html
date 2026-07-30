@@ -154,6 +154,7 @@
           <button id="todayTodoBtn" class="ghost-btn grouped-tool">今日待辦</button>
           <button id="weeklyReviewBtn" class="ghost-btn grouped-tool">📊 週回顧</button>
           <button id="dashboardBtn" class="ghost-btn grouped-tool">📈 統計</button>
+          <button id="okrBtn" class="ghost-btn grouped-tool">🎯 OKR</button>
           <button id="dataCheckBtn" class="ghost-btn grouped-tool" title="檢查行程資料是否有壞資料並可一鍵修復">🩺 資料檢查</button>
           <button id="widgetModeBtn" class="ghost-btn grouped-tool">小工具模式</button>
           <button id="calendarsBtn" class="ghost-btn grouped-tool">📚 日曆本</button>
@@ -665,6 +666,23 @@
     </div>
   </dialog>
 
+  <dialog id="okrDialog" class="task-dialog okr-dialog" aria-labelledby="okrDialogTitle">
+    <div class="dialog-header">
+      <h2 id="okrDialogTitle">🎯 目標 OKR</h2>
+      <button type="button" id="closeOkrBtn" class="icon-btn" aria-label="關閉">✕</button>
+    </div>
+
+    <div class="okr-body">
+      <p class="muted">目標（Objective）＋幾條可量化的關鍵結果（Key Result），依「目前進度／目標值」自動算完成百分比。</p>
+      <div class="okr-add-row">
+        <input type="text" id="okrTitleInput" placeholder="新增目標，例如：這一季把健康顧好" aria-label="新增目標標題" />
+        <input type="month" id="okrDueDateInput" aria-label="目標期限（年月）" />
+        <button type="button" id="addOkrBtn" class="primary-btn">＋ 新增目標</button>
+      </div>
+      <div id="okrList" class="okr-list"></div>
+    </div>
+  </dialog>
+
   <dialog id="calendarVisibilityDialog" class="task-dialog calendar-visibility-dialog" aria-labelledby="calendarVisibilityDialogTitle">
     <div class="dialog-header">
       <h2 id="calendarVisibilityDialogTitle">📚 日曆本</h2>
@@ -745,6 +763,7 @@
     <div class="more-tools-body">
       <button type="button" class="more-tools-item" id="moreToolsWeeklyReviewBtn">📊 本週回顧</button>
       <button type="button" class="more-tools-item" data-proxy="dashboardBtn">📈 統計</button>
+      <button type="button" class="more-tools-item" data-proxy="okrBtn">🎯 OKR</button>
       <button type="button" class="more-tools-item" data-proxy="commandPaletteBtn">🔍 命令面板</button>
       <button type="button" class="more-tools-item" data-proxy="dataCheckBtn">🩺 資料檢查</button>
       <button type="button" class="more-tools-item" data-proxy="enableNotificationsBtn">🔔 開啟通知</button>
