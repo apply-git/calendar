@@ -1883,6 +1883,9 @@ body.dark .app-footer { color: #fff; }
     color: var(--muted);
   }
   .bottom-nav-btn span { font-size: 10px; }
+  /* 底部導航「月」的日曆圖示：自製 SVG（原本用系統 emoji 📆，各平台 emoji 字型長相不一致，
+     而且上面的日期是字型寫死的）。配色比照導航列「選擇年月日」按鈕的日曆圖示。 */
+  .bottom-nav-btn .nav-icon { display: block; width: 22px; height: 22px; }
   .bottom-nav-btn.active { color: var(--primary); font-weight: 700; }
   body.has-bottom-nav { padding-bottom: 62px; }
   body.has-bottom-nav .fab-add:not([hidden]) { bottom: 118px; }
