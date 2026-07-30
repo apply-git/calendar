@@ -620,9 +620,13 @@ textarea { resize: vertical; }
 }
 .weather-mini {
   margin-left: 4px;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--muted);
+}
+.weather-emoji {
+  font-size: 16px;
+  line-height: 1;
 }
 .agenda-weather { margin-left: 0; }
 .holiday-banner {
