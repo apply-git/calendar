@@ -1,0 +1,26 @@
+// ============================================================================
+// config.js — 雲端同步設定（實際會被 index.html 載入的檔案）
+// ----------------------------------------------------------------------------
+// 預設是空值：雲端同步整個停用，App 維持純本機 localStorage 運作，
+// 不會發出任何網路請求，離線可用，行為與加入同步功能之前完全一樣。
+//
+// 要啟用雲端同步：
+//   1. 參考 CLOUD_SETUP.md 建立 Supabase 專案、執行 schema.sql、開啟 Google 登入。
+//   2. 把下面兩個空字串換成你自己 Supabase 專案的 Project URL 與 anon public 金鑰
+//      （Project Settings → API 頁面可以找到）。
+//   3. 存檔後重新整理 index.html，工具列會出現「☁️ 雲端同步」按鈕。
+//
+// 注意：
+//   - anon public 金鑰依 Supabase 設計可以公開內嵌在前端程式碼，不是密鑰；
+//     資料安全靠 schema.sql 內的 RLS（Row Level Security）規則保護。
+//   - 這個檔案找不到或內容是空值時，sync.js 會自動判定為「未設定」而安全停用，
+//     不會噴錯，也不影響原本的本機行程功能。
+// ============================================================================
+
+window.CALENDAR_SYNC_CONFIG = {
+  supabaseUrl: 'https://uaentjtgdrzbzfkccybs.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZW50anRnZHJ6Ynpma2NjeWJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNzUzMTEsImV4cCI6MjA5OTc1MTMxMX0.SMLhjdcyMmEaySTj4_tr3Soii6_POsPu-Ue1XFvshWM',
+  // VAPID 公鑰（Web Push 背景推播用，本來就設計成可公開，安全性靠只有伺服器持有的私鑰）。
+  // 私鑰只存在 Supabase Edge Function 的 secrets，絕不放進前端程式碼。
+  webPushPublicKey: 'BL0A8Kp5GJNhYXiH6n0xHAOLxOHxyHGUCOwYrHdxC-zAiUoXZqCDeTKK773KG97UUHYjcyzPaFK3cPdCw8g4SCM',
+};
