@@ -25,7 +25,7 @@
 ## localStorage / IndexedDB keys
 
 `desktop-schedule-v1`(行程) `-habits-v1` `-theme-v1` `-categories-v1` `-text-settings-v1`
-`-app-settings-v1` `-daily-memos-v1` `-templates-v1` `-weekly-goals-v1` `-widget-mode-v1`
+`-app-settings-v1` `-daily-memos-v1` `-templates-v1` `-weekly-goals-v1` `-widget-mode-v1` `-okrs-v1`（P3 目標 OKR）
 
 不進備份（帳號/裝置本機狀態）：`-sync-auth-v1` `-sync-meta-v1` `-share-v1` `-errorlog-v1` `-weather-v1` `-holidays-v1` `-snooze-v1`
 

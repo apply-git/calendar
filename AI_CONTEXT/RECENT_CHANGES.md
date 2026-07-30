@@ -1,5 +1,9 @@
 # Recent Changes
 
+## 2026-07-30 第五波 002 持續微調＋P3 完工：全自製導航圖示、手機標題、OKR 目標追蹤（本機多個 commit 未 push）
+- 品牌大圖示／選日期／底部導航（日週月/列表/今天）全部改自製圖示（不再吃各平台 emoji 字型）並修正置中；手機寬度標題自動顯示「手機行程表」
+- P3 目標 OKR 完工（4 包）：okrs 資料層+CRUD+進度計算、okrDialog 介面、tests.html 61 案例；CACHE_NAME v35→v43；CLAUDE.md 補「存新版」footer 同步步驟＋「存檔」交接檔改固定動作。G1 Google Calendar 匯入尚未開工
+
 ## 2026-07-30 第五波 002 收尾微調：天氣圖示彩色化＋全自製介面圖示（本機 5 個 commit 未 push）
 - 天氣 emoji 補 VS16（6 種原本在 Windows 退回單色）並放大到 16px；頁尾版號 0.002；品牌大圖示改用 icons/icon.svg，選日期按鈕改自繪日曆卡並由 render() 依 currentDate 更新月份/日期
 - CACHE_NAME v35→v37；README 補第 51 項；versions/行事曆-002 快照與 VERSION.md 同步。P3 目標 OKR、G1 Google Calendar 匯入仍未開工
