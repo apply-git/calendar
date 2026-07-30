@@ -361,6 +361,7 @@ function buildBackupPayload() {
     dailyMemos,
     templates,
     weeklyGoals,
+    okrs,
     snoozes: loadJson(SNOOZE_KEY, {}),
     diary: mergeDiaryTables(loadJson(DIARY_KEY, {}), {}),
     pomodoroLog: mergePomodoroLogs(pomodoroLog, []),
@@ -456,6 +457,7 @@ function applyBackupObject(data) {
   dailyMemos = data.dailyMemos && typeof data.dailyMemos === 'object' ? data.dailyMemos : {};
   templates = Array.isArray(data.templates) && data.templates.length ? data.templates : defaultTemplates;
   weeklyGoals = Array.isArray(data.weeklyGoals) ? data.weeklyGoals : [];
+  okrs = Array.isArray(data.okrs) ? data.okrs : [];
   if (data.snoozes && typeof data.snoozes === 'object') {
     saveJson(SNOOZE_KEY, sanitizeSnoozeTable(data.snoozes));
   }
@@ -481,6 +483,7 @@ function applyBackupObject(data) {
   }
   saveJson(TEMPLATE_KEY, templates);
   saveJson(WEEKLY_GOAL_KEY, weeklyGoals);
+  saveJson(OKR_KEY, okrs);
   localStorage.setItem(WIDGET_KEY, widgetMode ? '1' : '0');
   document.body.classList.toggle('widget-mode', widgetMode);
   applyTheme();

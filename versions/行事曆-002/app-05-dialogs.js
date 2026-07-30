@@ -596,6 +596,63 @@ function computePomodoroStats(baseDate) {
   };
 }
 
+// ---- P3 目標 OKR：純函式 CRUD，操作全域 okrs 陣列 + saveJson，不碰 DOM ----
+// 進度＝底下每條關鍵結果 (current/target) 的平均百分比，四捨五入、每條各自 clamp 在 0~100；
+// target<=0（尚未填數字）視為 0%；沒有任何關鍵結果時整體回傳 0（避免除以 0）。
+function computeOkrProgress(okr) {
+  const results = Array.isArray(okr && okr.keyResults) ? okr.keyResults : [];
+  if (!results.length) return 0;
+  const sum = results.reduce((acc, kr) => {
+    const target = Number(kr.target) || 0;
+    const current = Number(kr.current) || 0;
+    const pct = target > 0 ? Math.min(100, Math.max(0, (current / target) * 100)) : 0;
+    return acc + pct;
+  }, 0);
+  return Math.round(sum / results.length);
+}
+
+function addOkr(title, dueDate) {
+  const trimmed = (title || '').trim();
+  if (!trimmed) return null;
+  const okr = { id: crypto.randomUUID(), title: trimmed, dueDate: dueDate || '', keyResults: [], archived: false, updatedAt: Date.now() };
+  okrs.push(okr);
+  saveJson(OKR_KEY, okrs);
+  return okr;
+}
+
+function deleteOkr(id) {
+  okrs = okrs.filter((o) => o.id !== id);
+  saveJson(OKR_KEY, okrs);
+}
+
+function addKeyResult(okrId, title, target) {
+  const okr = okrs.find((o) => o.id === okrId);
+  const trimmed = (title || '').trim();
+  if (!okr || !trimmed) return null;
+  const kr = { id: crypto.randomUUID(), title: trimmed, target: Number(target) || 0, current: 0 };
+  okr.keyResults.push(kr);
+  okr.updatedAt = Date.now();
+  saveJson(OKR_KEY, okrs);
+  return kr;
+}
+
+function deleteKeyResult(okrId, krId) {
+  const okr = okrs.find((o) => o.id === okrId);
+  if (!okr) return;
+  okr.keyResults = okr.keyResults.filter((kr) => kr.id !== krId);
+  okr.updatedAt = Date.now();
+  saveJson(OKR_KEY, okrs);
+}
+
+function updateKeyResultProgress(okrId, krId, current) {
+  const okr = okrs.find((o) => o.id === okrId);
+  const kr = okr && okr.keyResults.find((k) => k.id === krId);
+  if (!kr) return;
+  kr.current = Number(current) || 0;
+  okr.updatedAt = Date.now();
+  saveJson(OKR_KEY, okrs);
+}
+
 function computeMoodStats(baseDate) {
   const labels = ['😞 很差', '🙁 不好', '😐 普通', '🙂 不錯', '😄 很好'];
   const counts = [0, 0, 0, 0, 0];

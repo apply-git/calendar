@@ -10,6 +10,7 @@ const DIARY_KEY = 'desktop-schedule-diary-v1'; // 每日心情：{ 'YYYY-MM-DD':
 const POMODORO_LOG_KEY = 'desktop-schedule-pomodoro-log-v1'; // 番茄鐘完成紀錄：陣列 [{ id, at, minutes, taskId }]，**依 at 由舊到新排序**，上限 300 筆
 const TEMPLATE_KEY = 'desktop-schedule-templates-v1';
 const WEEKLY_GOAL_KEY = 'desktop-schedule-weekly-goals-v1';
+const OKR_KEY = 'desktop-schedule-okrs-v1'; // P3 目標 OKR：陣列 [{ id, title, dueDate, keyResults:[{id,title,target,current}], archived, updatedAt }]
 const WIDGET_KEY = 'desktop-schedule-widget-mode-v1';
 // 錯誤紀錄（診斷用，見檔案底部 setupErrorLogging()）：只存偵錯必要欄位，
 // 刻意不納入備份匯出/還原（比照 sync-auth key 的處理，buildBackupPayload()/applyBackupObject() 不會碰它）。
@@ -210,6 +211,7 @@ let diaryEntries = loadJson(DIARY_KEY, {});
 let pomodoroLog = loadJson(POMODORO_LOG_KEY, []);
 let templates = loadJson(TEMPLATE_KEY, defaultTemplates);
 let weeklyGoals = loadJson(WEEKLY_GOAL_KEY, []);
+let okrs = loadJson(OKR_KEY, []);
 let currentDate = startOfDay(new Date());
 let currentView = 'day';
 let todayTodoMode = false;

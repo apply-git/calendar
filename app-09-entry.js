@@ -654,6 +654,12 @@ try {
 window.CalendarApp = {
   buildBackupPayload,
   applyBackupObject,
+  computeOkrProgress,
+  addOkr,
+  deleteOkr,
+  addKeyResult,
+  deleteKeyResult,
+  updateKeyResultProgress,
   isAutoSyncEnabled: () => Boolean(appSettings.autoSync),
   setAutoSyncEnabled: (enabled) => {
     appSettings.autoSync = Boolean(enabled);
