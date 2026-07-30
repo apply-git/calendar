@@ -1,5 +1,9 @@
 # Recent Changes
 
+## 2026-07-30 第五波 002 收尾微調：天氣圖示彩色化＋全自製介面圖示（本機 5 個 commit 未 push）
+- 天氣 emoji 補 VS16（6 種原本在 Windows 退回單色）並放大到 16px；頁尾版號 0.002；品牌大圖示改用 icons/icon.svg，選日期按鈕改自繪日曆卡並由 render() 依 currentDate 更新月份/日期
+- CACHE_NAME v35→v37；README 補第 51 項；versions/行事曆-002 快照與 VERSION.md 同步。P3 目標 OKR、G1 Google Calendar 匯入仍未開工
+
 ## 2026-07-29 第五波 002：W4-W6 收尾（G2 完成、G3 進行中，本機 commit 未 push）
 - ROADMAP 補打勾 S1-S4/P1/P2（程式碼確認已實作，S2/S4 待使用者跑部署/SQL）；G2 無障礙全面修正（aria-label/aria-labelledby/aria-current、鍵盤可達性、指令面板焦點框）
 - tests.html 補 computeMoodStats/computePomodoroStats，48→54 案例；CACHE_NAME v33→v35。P3 目標 OKR、G1 Google Calendar 匯入尚未開工

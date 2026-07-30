@@ -13,7 +13,8 @@
 - **智慧與雲端（S1–S4）**：⚡ 找空檔智慧建議（依習慣時段）、早／晚／週摘要推播（Supabase Edge Function＋Cron，使用者需自行部署）、snooze 延後動作雲端化（併入同步 payload）、錯誤紀錄自動上報（進階選用，需使用者執行 `schema-errorlog.sql`）。
 - **個人化（P1–P2）**：心情追蹤（月曆疊加＋統計整合）、番茄鐘統計強化（近 30 天總量＋近 7 天每日分佈）。
 - **無障礙全面修正（G2）**：全站按鈕／輸入框補齊 `aria-label`，13 個對話框補 `aria-labelledby`，逾期／倒數清單支援鍵盤操作，修正指令面板鍵盤焦點框被覆蓋的問題。
-- **整合稽核與收尾（G3）**：測試跑道 tests.html 由 48 案例增至 54（新增心情/番茄鐘統計測試，並修正一個過期的備份 roundtrip 測試 fixture）；`CACHE_NAME` 統一升版至 v35；文件（README／ROADMAP／AI_CONTEXT）同步更新。
+- **整合稽核與收尾（G3）**：測試跑道 tests.html 由 48 案例增至 54（新增心情/番茄鐘統計測試，並修正一個過期的備份 roundtrip 測試 fixture）；`CACHE_NAME` 統一升版至 v37；文件（README／ROADMAP／AI_CONTEXT）同步更新。
+- **收尾微調（2026-07-30）**：天氣圖示補齊 Unicode VS16，讓多雲／霧／雨／雪／陣雨／雷雨 6 種正確顯示彩色（原本在 Windows 會退回單色）並放大到 16px；頁尾版號改為 0.002；品牌大圖示與「選擇年月日」按鈕改用自製圖示，不再吃各平台 emoji 字型，且選日期圖示會依目前檢視日期自動顯示月份／日期。
 
 詳細功能清單見同資料夾 `README.md`；程式邏輯細節見主專案 `AI_CONTEXT/NOTES.md`、`ROADMAP.md`、`AI_CONTEXT/RECENT_CHANGES.md`。
 
