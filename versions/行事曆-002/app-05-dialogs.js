@@ -653,6 +653,57 @@ function updateKeyResultProgress(okrId, krId, current) {
   saveJson(OKR_KEY, okrs);
 }
 
+function openOkrDialog() {
+  if (els.okrDialog.open) return;
+  renderOkrList();
+  els.okrDialog.showModal();
+}
+
+function closeOkrDialog() {
+  if (els.okrDialog.open) els.okrDialog.close();
+}
+
+// 渲染 okrDialog 清單：每個目標一張卡片，含進度條、關鍵結果清單（可改進度/刪除）、
+// 卡片內的「新增關鍵結果」小表單。委派事件都綁在 els.okrList 上（見 app-03-events.js），
+// 這裡只負責產生 HTML，不綁事件。
+function renderOkrList() {
+  if (!els.okrList) return;
+  if (!okrs.length) {
+    els.okrList.innerHTML = '<p class="muted">還沒有目標，上面輸入標題新增一個。</p>';
+    return;
+  }
+  els.okrList.innerHTML = okrs.map((okr) => {
+    const progress = computeOkrProgress(okr);
+    const krRows = (okr.keyResults || []).map((kr) => `
+      <div class="okr-kr-row">
+        <span class="okr-kr-title">${escapeHtml(kr.title)}</span>
+        <input type="number" class="okr-kr-input" min="0" value="${Number(kr.current) || 0}" data-okr-id="${okr.id}" data-kr-progress="${kr.id}" aria-label="${escapeHtml(kr.title)} 目前進度" />
+        <span class="muted">／ ${Number(kr.target) || 0}</span>
+        <button type="button" class="icon-btn" data-okr-id="${okr.id}" data-kr-delete="${kr.id}" aria-label="刪除關鍵結果">✕</button>
+      </div>
+    `).join('');
+    return `
+      <div class="okr-card" data-okr-id="${okr.id}">
+        <div class="okr-card-head">
+          <div>
+            <div class="okr-card-title">${escapeHtml(okr.title)}</div>
+            ${okr.dueDate ? `<div class="okr-card-due">期限：${escapeHtml(okr.dueDate)}</div>` : ''}
+          </div>
+          <button type="button" class="icon-btn" data-okr-delete="${okr.id}" aria-label="刪除目標">✕</button>
+        </div>
+        <div class="okr-progress-track"><div class="okr-progress-fill" style="width:${progress}%"></div></div>
+        <div class="muted">${progress}%</div>
+        ${krRows}
+        <div class="okr-kr-row">
+          <input type="text" class="okr-kr-title okr-kr-add-title" placeholder="新增關鍵結果" aria-label="新增關鍵結果標題" data-okr-add-title="${okr.id}" />
+          <input type="number" class="okr-kr-input okr-kr-add-target" min="0" placeholder="目標值" aria-label="關鍵結果目標值" data-okr-add-target="${okr.id}" />
+          <button type="button" class="ghost-btn" data-okr-add-kr="${okr.id}">＋</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function computeMoodStats(baseDate) {
   const labels = ['😞 很差', '🙁 不好', '😐 普通', '🙂 不錯', '😄 很好'];
   const counts = [0, 0, 0, 0, 0];

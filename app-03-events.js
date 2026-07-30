@@ -312,6 +312,39 @@ function bindEvents() {
   // 委派寫法，但用 data-dashboard-edit 這組新 dataset key 避免跟既有委派衝突。
   els.dashboardBtn?.addEventListener('click', openDashboardDialog);
   els.closeDashboardBtn?.addEventListener('click', closeDashboardDialog);
+  // P3 目標 OKR：新增目標／刪除目標／新增關鍵結果／刪除關鍵結果／改進度，
+  // 都委派在 els.okrList 上（清單是動態 innerHTML，個別按鈕不會各自綁一次）。
+  els.okrBtn?.addEventListener('click', openOkrDialog);
+  els.closeOkrBtn?.addEventListener('click', closeOkrDialog);
+  els.addOkrBtn?.addEventListener('click', () => {
+    if (!addOkr(els.okrTitleInput.value, els.okrDueDateInput.value)) return;
+    els.okrTitleInput.value = '';
+    els.okrDueDateInput.value = '';
+    renderOkrList();
+  });
+  els.okrTitleInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') els.addOkrBtn.click();
+  });
+  els.okrList?.addEventListener('click', (event) => {
+    const delOkr = event.target.closest('[data-okr-delete]');
+    if (delOkr) { deleteOkr(delOkr.dataset.okrDelete); renderOkrList(); return; }
+    const delKr = event.target.closest('[data-kr-delete]');
+    if (delKr) { deleteKeyResult(delKr.dataset.okrId, delKr.dataset.krDelete); renderOkrList(); return; }
+    const addKr = event.target.closest('[data-okr-add-kr]');
+    if (addKr) {
+      const okrId = addKr.dataset.okrAddKr;
+      const titleInput = els.okrList.querySelector(`[data-okr-add-title="${okrId}"]`);
+      const targetInput = els.okrList.querySelector(`[data-okr-add-target="${okrId}"]`);
+      if (!addKeyResult(okrId, titleInput?.value, targetInput?.value)) return;
+      renderOkrList();
+    }
+  });
+  els.okrList?.addEventListener('change', (event) => {
+    const input = event.target.closest('[data-kr-progress]');
+    if (!input) return;
+    updateKeyResultProgress(input.dataset.okrId, input.dataset.krProgress, input.value);
+    renderOkrList();
+  });
   els.dashboardOverdueList?.addEventListener('click', (event) => {
     const item = event.target.closest('[data-dashboard-edit]');
     if (!item) return;
