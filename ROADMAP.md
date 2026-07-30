@@ -164,7 +164,7 @@ Google Calendar 整合、時區旅行模式、專案任務依賴、錯誤紀錄�
 ### W6 整合收斂
 - [ ] G1（Opus）：Google Calendar 唯讀匯入（Supabase OAuth scope＋Calendar API）＋CLOUD_GCAL_SETUP.md
 - [x] G2（Sonnet）：無障礙全面審查修正（ARIA／鍵盤／焦點／對比）
-- [ ] G3（總指揮）：整合稽核、tests.html 補案例、CACHE_NAME、文件統整 → 使用者驗收 → 存新版 002
+- [x] G3（總指揮）：整合稽核、tests.html 補案例、CACHE_NAME、文件統整 → 使用者驗收 → 存新版 002
 
 ### 使用者需自行執行（屆時逐項提醒）
 1. S2：部署更新後的 Edge Function＋排程
