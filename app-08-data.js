@@ -45,9 +45,16 @@ function formatInTz(epochMs, tz) {
   return { date: `${map.year}-${map.month}-${map.day}`, time: `${hour}:${map.minute}` };
 }
 
+// 標題文字含「桌面」兩字時，手機寬度顯示成「手機」開頭（跟 app-02-init.js 的 isMobile 判斷
+// 同一套規格：只在呼叫當下判斷一次 matchMedia，不監聽 resize）。使用者若自訂成不含「桌面」
+// 的名稱，原樣顯示不做替換；設定對話框裡的輸入框一律顯示原始值，不受這個顯示轉換影響。
+function displayAppTitle(title) {
+  const isMobile = window.matchMedia && window.matchMedia('(max-width: 760px)').matches;
+  return (isMobile && title.includes('桌面')) ? title.replace('桌面', '手機') : title;
+}
 function applyTextSettings() {
-  document.title = textSettings.appTitle;
-  els.brandTitle.textContent = textSettings.appTitle;
+  document.title = displayAppTitle(textSettings.appTitle);
+  els.brandTitle.textContent = displayAppTitle(textSettings.appTitle);
   els.quickAddBtn.textContent = textSettings.addTaskText;
   els.topThreeHeading.textContent = textSettings.topThreeTitle;
   els.completionHeading.textContent = textSettings.completionTitle;
