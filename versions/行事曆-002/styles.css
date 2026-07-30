@@ -1883,9 +1883,17 @@ body.dark .app-footer { color: #fff; }
     color: var(--muted);
   }
   .bottom-nav-btn span { font-size: 10px; }
-  /* 底部導航「月」的日曆圖示：自製 SVG（原本用系統 emoji 📆，各平台 emoji 字型長相不一致，
-     而且上面的日期是字型寫死的）。配色比照導航列「選擇年月日」按鈕的日曆圖示。 */
-  .bottom-nav-btn .nav-icon { display: block; width: 22px; height: 22px; }
+  /* 底部導航「日／週／月」的圖示：沿用上面 .date-icon 那張自製日曆卡（原本是系統 emoji，
+     各平台 emoji 字型長相不一致、上面的日期還是字型寫死的），中間直接放「日」「週」「月」字。
+     選中的那一顆連圖示裡的字一起變主色，比只有下面標籤變色更好認。 */
+  .bottom-nav-btn .nav-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    grid-template-rows: 8px 1fr;
+  }
+  .bottom-nav-btn .nav-icon .date-icon-day { font-size: 11px; font-weight: 700; }
+  .bottom-nav-btn.active .nav-icon .date-icon-day { color: var(--primary); }
   .bottom-nav-btn.active { color: var(--primary); font-weight: 700; }
   body.has-bottom-nav { padding-bottom: 62px; }
   body.has-bottom-nav .fab-add:not([hidden]) { bottom: 118px; }
