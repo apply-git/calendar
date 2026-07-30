@@ -252,6 +252,8 @@ const els = {
   nextBtn: $('nextBtn'),
   jumpDateInput: $('jumpDateInput'),
   jumpDateBtn: $('jumpDateBtn'),
+  jumpDateIconMonth: $('jumpDateIconMonth'),
+  jumpDateIconDay: $('jumpDateIconDay'),
   themeBtn: $('themeBtn'),
   enableNotificationsBtn: $('enableNotificationsBtn'),
   dayModeSwitch: $('dayModeSwitch'),

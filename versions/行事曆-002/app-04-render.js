@@ -53,6 +53,9 @@ function renderTitle() {
     els.weatherDayLabel.innerHTML = dayWeather ? weatherDayHtml(dayWeather) : '';
   }
   if (els.jumpDateInput) els.jumpDateInput.value = toDateInput(currentDate);
+  // 選日期按鈕上的自製日曆圖示：跟著 currentDate 跳，所以每日自動正確、選了其他日期也會跟著改。
+  if (els.jumpDateIconMonth) els.jumpDateIconMonth.textContent = `${currentDate.getMonth() + 1}月`;
+  if (els.jumpDateIconDay) els.jumpDateIconDay.textContent = String(currentDate.getDate());
 }
 
 function renderDailyMemo() {

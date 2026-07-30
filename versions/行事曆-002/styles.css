@@ -78,6 +78,10 @@ button { cursor: pointer; }
   font-size: 30px;
   box-shadow: var(--shadow);
 }
+/* 品牌大圖示改用自製 icons/icon.svg：原本放系統 emoji 📅，各平台 emoji 字型長相不一致
+   （Windows 藍白格線、iOS 紅色 July 17），改成自家圖檔所有裝置才一致。 */
+.brand-icon { background: none; box-shadow: none; }
+.brand-icon img { display: block; width: 100%; height: 100%; }
 .brand h1 { margin: 0; font-size: 25px; }
 .brand p { margin: 4px 0 0; color: var(--muted); }
 
@@ -124,6 +128,40 @@ button { cursor: pointer; }
   font: inherit;
   font-size: 14px;
   cursor: pointer;
+}
+/* 選擇年月日按鈕的日曆圖示：自製 HTML+CSS（原本用系統 emoji 📅，各平台長相不一致，
+   而且 emoji 上那個日期是字型寫死的、永遠換不掉）。月份／日期文字由 render() 依
+   currentDate 更新，所以按了選日期之後圖示會跟著跳到選取那一天。 */
+.date-icon {
+  display: inline-grid;
+  grid-template-rows: 10px 1fr;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, .2);
+  line-height: 1;
+}
+.date-icon-month {
+  display: grid;
+  place-items: center;
+  background: #ef4444;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+}
+.date-icon-day {
+  display: grid;
+  place-items: center;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 800;
+}
+#jumpDateBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
 }
 /* 瀏覽器支援 showPicker() 時，把選擇器本體藏起來（仍需保持 rendered，不能 display:none），
    只留 📅 按鈕與點標題兩個入口，版面乾淨；不支援的舊瀏覽器則顯示小型輸入框當備援。 */
