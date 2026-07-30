@@ -1875,6 +1875,9 @@ body.dark .app-footer { color: #fff; }
     display: flex;
     flex-direction: column;
     align-items: center;
+    /* 日/週/月只有圖示、列表/今天是圖示+文字，內容高度不一樣，用 justify-content:center
+       讓每顆圖示都在按鈕垂直置中，不會因為少了下面那行字而整個往上貼，造成上下不均。 */
+    justify-content: center;
     gap: 1px;
     background: none;
     border: none;
@@ -1887,12 +1890,12 @@ body.dark .app-footer { color: #fff; }
      各平台 emoji 字型長相不一致、上面的日期還是字型寫死的），中間直接放「日」「週」「月」字。
      選中的那一顆連圖示裡的字一起變主色，比只有下面標籤變色更好認。 */
   .bottom-nav-btn .nav-icon {
-    width: 24px;
-    height: 24px;
-    border-radius: 5px;
-    grid-template-rows: 8px 1fr;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    grid-template-rows: 9px 1fr;
   }
-  .bottom-nav-btn .nav-icon .date-icon-day { font-size: 11px; font-weight: 700; }
+  .bottom-nav-btn .nav-icon .date-icon-day { font-size: 13px; font-weight: 700; }
   .bottom-nav-btn.active .nav-icon .date-icon-day { color: var(--primary); }
   /* 日/週/月圖示本身已經顯示文字，下面原本重複的小標籤拿掉了（見 index.html），
      改由 button 的 aria-label 提供無障礙名稱；列表/今天沒有重複問題所以保留原本標籤。 */
