@@ -228,11 +228,11 @@
 
   <button id="fabAddBtn" class="fab-add" hidden aria-label="新增行程">＋</button>
   <nav id="bottomNav" class="bottom-nav" hidden aria-label="檢視切換">
-    <button type="button" class="bottom-nav-btn" data-nav-view="day"><span class="date-icon nav-icon" aria-hidden="true"><span class="date-icon-month"></span><span class="date-icon-day">日</span></span><span>日</span></button>
-    <button type="button" class="bottom-nav-btn" data-nav-view="week"><span class="date-icon nav-icon" aria-hidden="true"><span class="date-icon-month"></span><span class="date-icon-day">週</span></span><span>週</span></button>
-    <button type="button" class="bottom-nav-btn" data-nav-view="month"><span class="date-icon nav-icon" aria-hidden="true"><span class="date-icon-month"></span><span class="date-icon-day">月</span></span><span>月</span></button>
-    <button type="button" class="bottom-nav-btn" data-nav-view="agenda">📋<span>列表</span></button>
-    <button type="button" class="bottom-nav-btn" data-nav-today="1">🎯<span>今天</span></button>
+    <button type="button" class="bottom-nav-btn" data-nav-view="day" aria-label="日檢視"><span class="date-icon nav-icon" aria-hidden="true"><span class="date-icon-month"></span><span class="date-icon-day">日</span></span></button>
+    <button type="button" class="bottom-nav-btn" data-nav-view="week" aria-label="週檢視"><span class="date-icon nav-icon" aria-hidden="true"><span class="date-icon-month"></span><span class="date-icon-day">週</span></span></button>
+    <button type="button" class="bottom-nav-btn" data-nav-view="month" aria-label="月檢視"><span class="date-icon nav-icon" aria-hidden="true"><span class="date-icon-month"></span><span class="date-icon-day">月</span></span></button>
+    <button type="button" class="bottom-nav-btn" data-nav-view="agenda"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><rect x="4" y="3.5" width="16" height="17" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>列表</span></button>
+    <button type="button" class="bottom-nav-btn" data-nav-today="1"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="4.6" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg><span>今天</span></button>
   </nav>
   <form id="quickAddBar" class="quick-add-bar" hidden>
     <input id="quickAddBarInput" type="text" placeholder="快速新增：例 明天15:00 開會" autocomplete="off" aria-label="快速新增行程" />

@@ -1894,6 +1894,8 @@ body.dark .app-footer { color: #fff; }
   }
   .bottom-nav-btn .nav-icon .date-icon-day { font-size: 11px; font-weight: 700; }
   .bottom-nav-btn.active .nav-icon .date-icon-day { color: var(--primary); }
+  /* 日/週/月圖示本身已經顯示文字，下面原本重複的小標籤拿掉了（見 index.html），
+     改由 button 的 aria-label 提供無障礙名稱；列表/今天沒有重複問題所以保留原本標籤。 */
   .bottom-nav-btn.active { color: var(--primary); font-weight: 700; }
   body.has-bottom-nav { padding-bottom: 62px; }
   body.has-bottom-nav .fab-add:not([hidden]) { bottom: 118px; }
