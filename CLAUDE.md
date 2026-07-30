@@ -20,7 +20,7 @@
 
 ## 觸發短語
 
-- **存檔**：更新 `AI_CONTEXT/RECENT_CHANGES.md`（必要時 `NOTES.md`/`PROJECT_BRIEF.md`），不 push、不部署。
+- **存檔**：更新交接檔是**固定動作**，不是「有需要才做」——`AI_CONTEXT/RECENT_CHANGES.md` 一定更新（簡述這次做了什麼、還剩什麼）；`NOTES.md`（待辦/已知邊界有變才更新）、`PROJECT_BRIEF.md`（產品/架構有變才更新）視實際內容決定要不要動，但只要有動就必須跟著這次存檔一起做，不能留到下次。不 push、不部署。
 - **推送**：`git status` 確認 → 具名 `git add` → commit → push（觸發 Cloudflare 自動部署）。
 - **存新版**：建立世代快照，永久保留、絕不覆蓋舊代。步驟：
   1. 讀 `versions/` 底下既有最大編號，新資料夾 `versions/行事曆-NNN/`（三位數遞增，如 002、003）。
