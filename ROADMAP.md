@@ -159,7 +159,7 @@ Google Calendar 整合、時區旅行模式、專案任務依賴、錯誤紀錄�
 ### W5 個人化
 - [x] P1（Sonnet）：日記／心情追蹤（月曆疊加＋統計整合）
 - [x] P2（Haiku）：番茄鐘統計強化（專注時數圖表）
-- [ ] P3（Sonnet）：目標 OKR（月／季目標＋行程貢獻＋進度條）
+- [x] P3（Sonnet）：目標 OKR（月／季目標＋行程貢獻＋進度條）——手動輸入進度版，尚未接「行程貢獻自動算」
 
 ### W6 整合收斂
 - [ ] G1（Opus）：Google Calendar 唯讀匯入（Supabase OAuth scope＋Calendar API）＋CLOUD_GCAL_SETUP.md
