@@ -25,5 +25,6 @@
 - **存新版**：建立世代快照，永久保留、絕不覆蓋舊代。步驟：
   1. 讀 `versions/` 底下既有最大編號，新資料夾 `versions/行事曆-NNN/`（三位數遞增，如 002、003）。
   2. 複製核心程式檔（見下方清單）＋一份 `VERSION.md`（簡述這代新增了什麼）。
-  3. 具名 `git add versions/行事曆-NNN/` → commit → push（此短語**會**推送，跟「存檔」不同）。
+  3. 同步更新 `index.html` 頁尾版本字樣（`<footer class="app-footer">`）：格式「0.0NN」比照世代編號 NNN 位數對齊（002 代 → 0.002 版、003 代 → 0.003 版，以此類推）。這是使用者實際會看到的版本號，務必跟 `versions/` 資料夾編號一致，不能只更新其中一邊。
+  4. 具名 `git add versions/行事曆-NNN/` **以及**根目錄 `index.html`（步驟 3 改的頁尾在這裡，不在 versions/ 底下，兩處都要 add）→ commit → push（此短語**會**推送，跟「存檔」不同）。
   - 核心程式檔清單：`index.html` `styles.css` `app.js` `sync.js` `config.js` `config.example.js` `push.js` `manifest.json` `service-worker.js` `icons/` `schema*.sql` `supabase/` `start-pwa-local.bat` `README.md` `CLOUD_SETUP.md` `CLOUD_PUSH_SETUP.md`。**不含** `AI_CONTEXT/`、`ROADMAP.md`、`CLAUDE.md`、`AGENTS.md`、`tests.html`（開發文件只在根目錄維護一份，不隨版本重複）。
