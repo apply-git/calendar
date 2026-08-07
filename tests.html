@@ -24,7 +24,7 @@
 </head>
 <body>
   <h1>桌面行程表 - 測試跑道（tests.html）</h1>
-  <p class="desc">純開發工具，不加入 PWA 離線快取（不在 service-worker.js 的 APP_SHELL 內）。依序載入 app.js、sync.js 後，對 window.CalendarApp／window.CalendarSync 匯出的純函式跑迴歸測試，涵蓋 occursOnDate／parseNaturalDateTime／timeOverlaps／備份 roundtrip／S1 墓碑回歸／mergeBackupPayloads 逐筆合併／computeMoodStats／computePomodoroStats／OKR 目標進度計算，共 61 個測試案例。測試前後會完整快照／還原 localStorage，不會汙染真實行程資料。</p>
+  <p class="desc">純開發工具，不加入 PWA 離線快取（不在 service-worker.js 的 APP_SHELL 內）。依序載入 app-0*.js、gcal.js、sync.js 後，對 window.CalendarApp／window.CalendarSync／window.CalendarGCal 匯出的純函式跑迴歸測試，涵蓋 occursOnDate／parseNaturalDateTime／timeOverlaps／備份 roundtrip／S1 墓碑回歸／mergeBackupPayloads 逐筆合併／computeMoodStats／computePomodoroStats／OKR 目標進度計算／G1 Google 日曆匯入（區間計算與活動對應）／habitStreak 連續天數，共 77 個測試案例。測試前後會完整快照／還原 localStorage，不會汙染真實行程資料。</p>
   <div id="allPass">ALL PASS</div>
   <div id="summary">執行中…</div>
   <ul id="results"></ul>
