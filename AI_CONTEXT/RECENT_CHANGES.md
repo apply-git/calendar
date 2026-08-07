@@ -1,5 +1,8 @@
 # Recent Changes
 
+## 2026-08-07 新增 AI_CONTEXT/BOOTSTRAP_PROMPTS.md 開機提示詞
+- Claude Code／Codex 各一份「開新 session 第一則訊息」範本（讀取順序＋回報格式＋三條硬性提醒），兩份除規則檔名外內容一致；CLAUDE.md/AGENTS.md 先讀鏈已加指引
+
 ## 2026-08-07 新增 AI_CONTEXT/GENERATIONS.md 世代總覽交接檔
 - 001/002 完整架構與能力、G1 完工現況、未來波次候選清單（P3 行程貢獻自動算／G1 延伸／存新版 003／使用者待部署項）全部集中一份，Claude Code 與 Codex 的先讀鏈（CLAUDE.md/AGENTS.md）已加入指引
 - 併修 CLAUDE.md/AGENTS.md「存新版」核心檔清單過時問題：app.js 時代清單更新為 002 實況（app-01..09.js＋gcal.js＋tests.html＋lan 預覽檔＋CLOUD_GCAL_SETUP.md）

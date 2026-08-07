@@ -5,7 +5,8 @@
 
 **先讀** `AI_CONTEXT/PROJECT_BRIEF.md`（事實清單）→ `AI_CONTEXT/NOTES.md`（踩坑鐵則）→
 `AI_CONTEXT/RECENT_CHANGES.md`（最近異動）；世代架構總覽（001/002/未來規劃）見
-`AI_CONTEXT/GENERATIONS.md`；功能規劃/施工進度見 `ROADMAP.md`。
+`AI_CONTEXT/GENERATIONS.md`；功能規劃/施工進度見 `ROADMAP.md`；
+開新 session 的完整開機提示詞見 `AI_CONTEXT/BOOTSTRAP_PROMPTS.md`。
 
 ## 紅線
 
