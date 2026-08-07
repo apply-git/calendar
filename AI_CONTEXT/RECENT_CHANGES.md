@@ -1,5 +1,9 @@
 # Recent Changes
 
+## 2026-08-07 新增 AI_CONTEXT/GENERATIONS.md 世代總覽交接檔
+- 001/002 完整架構與能力、G1 完工現況、未來波次候選清單（P3 行程貢獻自動算／G1 延伸／存新版 003／使用者待部署項）全部集中一份，Claude Code 與 Codex 的先讀鏈（CLAUDE.md/AGENTS.md）已加入指引
+- 併修 CLAUDE.md/AGENTS.md「存新版」核心檔清單過時問題：app.js 時代清單更新為 002 實況（app-01..09.js＋gcal.js＋tests.html＋lan 預覽檔＋CLOUD_GCAL_SETUP.md）
+
 ## 2026-08-07 G1 Google 日曆唯讀匯入完工（本機 commit 未 push）
 - 新增 `gcal.js`（區間計算／Calendar API events.list／活動→行程對應／匯入 UI）＋`CLOUD_GCAL_SETUP.md`；`app-08-data.js` 新增 `replaceGcalTasks()`/`ensureGcalCategory()` 為唯一動 tasks 入口
 - 唯讀鎖定改在既有唯一入口：`openTaskDialog()`（含刪除）、拖曳、勾選完成三處擋 `source==='gcal'`；`sync.js` 登入帶 `calendar.readonly` scope、收 `provider_token`、登出清除

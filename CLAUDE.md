@@ -4,7 +4,8 @@
 正式站：https://calendar88.pages.dev/（Cloudflare Pages，push main 自動部署）。
 
 **先讀** `AI_CONTEXT/PROJECT_BRIEF.md`（事實清單）→ `AI_CONTEXT/NOTES.md`（踩坑鐵則）→
-`AI_CONTEXT/RECENT_CHANGES.md`（最近異動）；功能規劃/施工進度見 `ROADMAP.md`。
+`AI_CONTEXT/RECENT_CHANGES.md`（最近異動）；世代架構總覽（001/002/未來規劃）見
+`AI_CONTEXT/GENERATIONS.md`；功能規劃/施工進度見 `ROADMAP.md`。
 
 ## 紅線
 
@@ -27,4 +28,4 @@
   2. 複製核心程式檔（見下方清單）＋一份 `VERSION.md`（簡述這代新增了什麼）。
   3. 同步更新 `index.html` 頁尾版本字樣（`<footer class="app-footer">`）：格式「0.0NN」比照世代編號 NNN 位數對齊（002 代 → 0.002 版、003 代 → 0.003 版，以此類推）。這是使用者實際會看到的版本號，務必跟 `versions/` 資料夾編號一致，不能只更新其中一邊。
   4. 具名 `git add versions/行事曆-NNN/` **以及**根目錄 `index.html`（步驟 3 改的頁尾在這裡，不在 versions/ 底下，兩處都要 add）→ commit → push（此短語**會**推送，跟「存檔」不同）。
-  - 核心程式檔清單：`index.html` `styles.css` `app.js` `sync.js` `config.js` `config.example.js` `push.js` `manifest.json` `service-worker.js` `icons/` `schema*.sql` `supabase/` `start-pwa-local.bat` `README.md` `CLOUD_SETUP.md` `CLOUD_PUSH_SETUP.md`。**不含** `AI_CONTEXT/`、`ROADMAP.md`、`CLAUDE.md`、`AGENTS.md`、`tests.html`（開發文件只在根目錄維護一份，不隨版本重複）。
+  - 核心程式檔清單（002 起）：`index.html` `styles.css` `app-01-core.js`…`app-09-entry.js` `gcal.js` `sync.js` `config.js` `config.example.js` `push.js` `manifest.json` `service-worker.js` `icons/` `schema*.sql` `supabase/` `start-pwa-local.bat` `start-pwa-lan.bat` `_lan_server.py` `tests.html` `README.md` `CLOUD_SETUP.md` `CLOUD_PUSH_SETUP.md` `CLOUD_GCAL_SETUP.md`。**不含** `AI_CONTEXT/`、`ROADMAP.md`、`CLAUDE.md`、`AGENTS.md`（開發文件只在根目錄維護一份，不隨版本重複）。
