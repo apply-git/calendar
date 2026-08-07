@@ -38,6 +38,7 @@
   <script src="app-07-reminders.js"></script>
   <script src="app-08-data.js"></script>
   <script src="app-09-entry.js"></script>
+  <script src="gcal.js"></script>
   <script src="sync.js"></script>
   <script>
     // ------------------------------------------------------------------------
@@ -504,6 +505,139 @@
           okrs = snap;
         }
       })();
+
+      // ------------------------------------------------------------------
+      group('G1 Google 日曆唯讀匯入');
+
+      const GC = window.CalendarGCal;
+
+      test('computeRange 預設區間＝前一個月～後三個月', () => {
+        const r = GC.computeRange('default', new Date(2026, 4, 15, 12, 0, 0)); // 2026-05-15
+        assertEqual(new Date(r.timeMin).getDate(), 15, 'timeMin 日期不變');
+        assertEqual(new Date(r.timeMin).getMonth(), 3, 'timeMin 落在 4 月');
+        assertEqual(new Date(r.timeMax).getMonth(), 7, 'timeMax 落在 8 月');
+      });
+
+      test('computeRange 認不得的 preset 退回預設區間，不會壞掉', () => {
+        const now = new Date(2026, 4, 15, 12, 0, 0);
+        assertEqual(GC.computeRange('這不是有效值', now).timeMin, GC.computeRange('default', now).timeMin, '應與 default 相同');
+      });
+
+      test('computeRange 今年整年＝年初到年末', () => {
+        const r = GC.computeRange('thisYear', new Date(2026, 6, 4, 9, 0, 0));
+        assertEqual(new Date(r.timeMin).getFullYear(), 2026, '起點年份');
+        assertEqual(new Date(r.timeMin).getMonth(), 0, '起點是 1 月');
+        assertEqual(new Date(r.timeMax).getMonth(), 11, '終點是 12 月');
+      });
+
+      test('shiftMonths 遇到月底會夾住，3/31 往前一個月是 2/28', () => {
+        const r = GC.shiftMonths(new Date(2026, 2, 31), -1); // 2026 非閏年
+        assertEqual(r.getMonth(), 1, '月份應該是 2 月');
+        assertEqual(r.getDate(), 28, '日期應該被夾成 28');
+      });
+
+      test('mapEventToTask 有時段活動 → 正確的日期與起訖時間', () => {
+        const t = GC.mapEventToTask({
+          id: 'abc123',
+          summary: '產品會議',
+          start: { dateTime: '2026-05-20T14:00:00+08:00' },
+          end: { dateTime: '2026-05-20T15:30:00+08:00' },
+        });
+        assertEqual(t.id, 'gcal-abc123', 'id 應該加上 gcal- 前綴');
+        assertEqual(t.title, '產品會議', '標題');
+        assertEqual(t.source, 'gcal', '來源標記');
+        assertEqual(t.category, 'Google 日曆', '分類');
+        assertEqual(t.reminder, -1, '匯入行程不提醒');
+        assertEqual(t.repeat, 'none', '展開後一律非重複');
+      });
+
+      test('mapEventToTask 全天活動 → 只有日期，沒有起訖時間', () => {
+        const t = GC.mapEventToTask({ id: 'allday1', summary: '生日', start: { date: '2026-06-01' }, end: { date: '2026-06-02' } });
+        assertEqual(t.date, '2026-06-01', '日期取起始日');
+        assertEqual(t.start, '', '全天活動沒有開始時間');
+        assertEqual(t.end, '', '全天活動沒有結束時間');
+      });
+
+      test('mapEventToTask 零長度活動會補一分鐘，避免 end <= start', () => {
+        const t = GC.mapEventToTask({
+          id: 'zero1',
+          summary: '打卡',
+          start: { dateTime: '2026-05-20T09:00:00+08:00' },
+          end: { dateTime: '2026-05-20T09:00:00+08:00' },
+        });
+        assertEqual(t.end > t.start, true, '結束時間必須晚於開始時間');
+      });
+
+      test('mapEventToTask 已取消／缺 id／缺時間的活動一律回 null', () => {
+        assertEqual(GC.mapEventToTask({ id: 'x', status: 'cancelled', start: { date: '2026-01-01' } }), null, '已取消');
+        assertEqual(GC.mapEventToTask({ summary: '沒有 id', start: { date: '2026-01-01' } }), null, '缺 id');
+        assertEqual(GC.mapEventToTask({ id: 'y', summary: '沒有時間' }), null, '缺時間');
+        assertEqual(GC.mapEventToTask(null), null, '空值');
+      });
+
+      test('mapEventToTask 沒有標題時給預設名稱，不會產生空白行程', () => {
+        assertEqual(GC.mapEventToTask({ id: 'noname', start: { date: '2026-02-02' } }).title, '(無標題活動)', '預設標題');
+      });
+
+      test('replaceGcalTasks 只動匯入行程，使用者自建行程完全不受影響', () => {
+        const snap = tasks;
+        try {
+          const mine = { id: 'mine-1', title: '我的行程', date: '2026-05-20', start: '08:00', end: '09:00', category: '工作', repeat: 'none' };
+          const oldImport = { id: 'gcal-old', title: '舊匯入', date: '2026-05-01', category: 'Google 日曆', repeat: 'none', source: 'gcal' };
+          tasks = [mine, oldImport];
+          const fresh = GC.mapEventToTask({ id: 'new1', summary: '新活動', start: { date: '2026-05-25' } });
+          const result = CA.replaceGcalTasks([fresh]);
+          assertEqual(result.imported, 1, '匯入一筆');
+          assertEqual(result.removed, 1, '舊匯入被清掉一筆');
+          assertEqual(tasks.find((t) => t.id === 'mine-1').deletedAt, undefined, '自建行程不可被標記刪除');
+          assertEqual(Boolean(tasks.find((t) => t.id === 'gcal-old').deletedAt), true, '舊匯入應該留墓碑');
+          assertEqual(Boolean(tasks.find((t) => t.id === 'gcal-new1')), true, '新匯入應該進 tasks');
+        } finally {
+          tasks = snap;
+        }
+      });
+
+      test('replaceGcalTasks 重複匯入同一筆不會產生兩筆', () => {
+        const snap = tasks;
+        try {
+          tasks = [];
+          const ev = { id: 'dup1', summary: '週會', start: { dateTime: '2026-05-20T10:00:00+08:00' }, end: { dateTime: '2026-05-20T11:00:00+08:00' } };
+          CA.replaceGcalTasks([GC.mapEventToTask(ev)]);
+          CA.replaceGcalTasks([GC.mapEventToTask(ev)]);
+          assertEqual(tasks.filter((t) => t.id === 'gcal-dup1').length, 1, '同一活動只應存在一筆');
+        } finally {
+          tasks = snap;
+        }
+      });
+
+      // ------------------------------------------------------------------
+      group('habitStreak 習慣連續天數（重複定義修正後的回歸測試）');
+
+      const dayKey = (offset) => toDateInput(addDays(new Date(), offset));
+
+      test('沒有 records 欄位時回 0，不會丟例外', () => {
+        assertEqual(habitStreak({}), 0, '缺欄位');
+        assertEqual(habitStreak({ records: [] }), 0, '空陣列');
+      });
+
+      test('records 不是陣列時回 0（舊的重複實作會在這裡丟 TypeError）', () => {
+        assertEqual(habitStreak({ records: {} }), 0, '物件');
+        assertEqual(habitStreak({ records: 'abc' }), 0, '字串');
+      });
+
+      test('今天有打卡＝1 天；今天＋昨天＝2 天', () => {
+        assertEqual(habitStreak({ records: [dayKey(0)] }), 1, '只有今天');
+        assertEqual(habitStreak({ records: [dayKey(-1), dayKey(0)] }), 2, '今天加昨天');
+      });
+
+      test('今天沒打卡時連續天數歸零（即使昨天有）', () => {
+        assertEqual(habitStreak({ records: [dayKey(-1), dayKey(-2)] }), 0, '今天沒打卡');
+      });
+
+      test('中間斷掉只算到斷點為止', () => {
+        assertEqual(habitStreak({ records: [dayKey(0), dayKey(-1), dayKey(-3)] }), 2, '第三天斷掉');
+      });
+
     } finally {
       // 無論測試成功、失敗、或中途丟例外，都一定會執行到這裡：把 localStorage
       // 還原成執行測試之前的原始狀態，保護使用者的真實行程資料。

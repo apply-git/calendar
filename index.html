@@ -563,6 +563,24 @@
           <button type="button" id="cloudSyncForcePushBtn" class="ghost-btn">⬆️ 強制推送本機資料覆蓋雲端</button>
         </div>
 
+        <div class="push-block" id="gcalBlock">
+          <h3 class="push-heading">📆 Google 日曆匯入（唯讀）</h3>
+          <p id="gcalStatus" class="muted">尚未授權 Google 日曆。</p>
+          <div class="field">
+            <label for="gcalRangeSelect">匯入區間</label>
+            <select id="gcalRangeSelect">
+              <option value="default">前一個月～後三個月（預設）</option>
+              <option value="next1m">僅未來一個月</option>
+              <option value="around3m">前後各三個月</option>
+              <option value="thisYear">今年整年</option>
+            </select>
+          </div>
+          <div class="pomodoro-actions">
+            <button type="button" id="gcalImportBtn" class="primary-btn">匯入 Google 日曆</button>
+          </div>
+          <p class="muted">匯入的活動唯讀：不能編輯、刪除、拖曳或勾選完成，也不會寫回 Google。重新匯入會整批更新這批活動。</p>
+        </div>
+
         <div class="push-block">
           <h3 class="push-heading">👨‍👩‍👧 家庭共享</h3>
           <div id="shareGroupBody" class="share-group-body">
@@ -843,6 +861,7 @@
   <script src="app-07-reminders.js"></script>
   <script src="app-08-data.js"></script>
   <script src="app-09-entry.js"></script>
+  <script src="gcal.js"></script>
   <script src="sync.js"></script>
   <script src="push.js"></script>
 </body>

@@ -1,5 +1,11 @@
 # Recent Changes
 
+## 2026-08-07 G1 Google 日曆唯讀匯入完工（本機 commit 未 push）
+- 新增 `gcal.js`（區間計算／Calendar API events.list／活動→行程對應／匯入 UI）＋`CLOUD_GCAL_SETUP.md`；`app-08-data.js` 新增 `replaceGcalTasks()`/`ensureGcalCategory()` 為唯一動 tasks 入口
+- 唯讀鎖定改在既有唯一入口：`openTaskDialog()`（含刪除）、拖曳、勾選完成三處擋 `source==='gcal'`；`sync.js` 登入帶 `calendar.readonly` scope、收 `provider_token`、登出清除
+- 匯入區間預設「前一個月～後三個月」，另有僅未來一個月／前後三個月／今年整年；CACHE_NAME v43→v44；tests.html 61→77 案例
+- 順手修既有問題：`app-08-data.js` 的 `habitStreak()` 有兩份同名實作（後者靜默覆蓋前者），移除死碼版本並補 5 條回歸測試；全專案 306 個頂層函式已掃過，無其他同名衝突
+
 ## 2026-07-30 第五波 002 持續微調＋P3 完工：全自製導航圖示、手機標題、OKR 目標追蹤（本機多個 commit 未 push）
 - 品牌大圖示／選日期／底部導航（日週月/列表/今天）全部改自製圖示（不再吃各平台 emoji 字型）並修正置中；手機寬度標題自動顯示「手機行程表」
 - P3 目標 OKR 完工（4 包）：okrs 資料層+CRUD+進度計算、okrDialog 介面、tests.html 61 案例；CACHE_NAME v35→v43；CLAUDE.md 補「存新版」footer 同步步驟＋「存檔」交接檔改固定動作。G1 Google Calendar 匯入尚未開工

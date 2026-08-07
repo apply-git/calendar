@@ -131,17 +131,6 @@ function addHabit() {
   renderHabits();
 }
 
-function habitStreak(habit) {
-  const records = new Set(habit.records || []);
-  let streak = 0;
-  let cursor = startOfDay(new Date());
-  while (records.has(toDateInput(cursor))) {
-    streak += 1;
-    cursor = addDays(cursor, -1);
-  }
-  return streak;
-}
-
 function addCategory() {
   const name = els.categoryNameInput.value.trim();
   const color = els.categoryColorInput.value;
@@ -290,6 +279,59 @@ function tombstoneTask(task) {
   });
 }
 
+// G1 Google 日曆唯讀匯入：把 gcal.js 抓回來、已對應好的活動整批換掉「上一次的匯入結果」。
+// 只動 source === 'gcal' 的行程，使用者自己建立的行程一律不碰。
+// 這次沒再出現的舊匯入走 tombstoneTask() 留墓碑（不是真刪），雲端同步才能正確收斂。
+// 回傳 { imported, removed } 供 gcal.js 顯示 toast。
+function replaceGcalTasks(list) {
+  const incoming = (Array.isArray(list) ? list : []).filter((item) => item && item.id && item.date);
+  const incomingIds = new Set(incoming.map((item) => item.id));
+
+  let removed = 0;
+  tasks.forEach((task) => {
+    if (task.source !== 'gcal' || task.deletedAt) return;
+    if (incomingIds.has(task.id)) return;
+    tombstoneTask(task);
+    removed++;
+  });
+
+  incoming.forEach((fresh) => {
+    const existing = tasks.find((task) => task.id === fresh.id);
+    if (!existing) {
+      tasks.push(fresh);
+      return;
+    }
+    // 以 Google 為準覆蓋內容，但保留排序值避免每次匯入都跳位；墓碑要清掉（活動又出現了）。
+    const keepSortOrder = existing.sortOrder || fresh.sortOrder;
+    Object.assign(existing, fresh, { sortOrder: keepSortOrder });
+    delete existing.deletedAt;
+    touchTask(existing);
+  });
+
+  if (incoming.length) ensureGcalCategory();
+  saveJson(STORAGE_KEY, tasks); // 先落地，確保就算重繪出問題資料也已經存好
+  // render() 內部還會再存一次並觸發 onDataChanged（自動同步）掛勾。無 DOM 環境
+  // （tests.html）讓它安全失敗即可，資料在上一行已經寫入。
+  try {
+    render();
+  } catch (err) {
+    console.warn('[calendar] replaceGcalTasks 重繪失敗，資料已存檔不受影響', err);
+  }
+  return { imported: incoming.length, removed };
+}
+
+// 匯入行程統一掛在「Google 日曆」分類。分類不存在就補一筆，避免 checkDataIssues()
+// 判定成 orphanCategory；已存在時完全不動，使用者改過的顏色會被保留。
+function ensureGcalCategory() {
+  if (categories.some((cat) => cat.name === 'Google 日曆')) return;
+  categories.push({ name: 'Google 日曆', color: '#4285f4' });
+  saveJson(CATEGORY_KEY, categories);
+}
+
+// 習慣連續天數：從今天往回數，直到某天沒有打卡紀錄為止。
+// 注意：這個檔案（以及所有 app-0*.js）共用同一個全域作用域，同名的頂層 function 宣告
+// 會被「後定義的那份」靜默覆蓋、完全不報錯。本函式一度存在兩份實作（見 NOTES 第 16 條），
+// 已於 2026-08-07 移除較早的死碼版本，只留這一份。新增函式前請先確認名稱沒被用過。
 function habitStreak(habit) {
   if (!Array.isArray(habit.records)) return 0;
   let count = 0;

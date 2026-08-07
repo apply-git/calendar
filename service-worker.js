@@ -1,4 +1,4 @@
-const CACHE_NAME = 'desktop-schedule-pwa-v43';
+const CACHE_NAME = 'desktop-schedule-pwa-v44';
 
 // 把「經過重新導向」的回應重新包成乾淨的 200 回應再存快取。
 // 原因：Cloudflare Pages 會把 /index.html 重導向到 /，導致快取到的回應帶有
@@ -27,6 +27,7 @@ const APP_SHELL = [
   './app-08-data.js',
   './app-09-entry.js',
   './config.js',
+  './gcal.js',
   './sync.js',
   './push.js',
   './manifest.json',

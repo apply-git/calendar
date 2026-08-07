@@ -25,3 +25,7 @@
 13. **區網 http 預覽是「非安全來源」**：`crypto.randomUUID` 等 API 不存在，儲存會炸（已在 init() 加 polyfill 防護）。沙盒重現這類問題必須用非 loopback IP——127.0.0.1 算安全來源，測不出來。預覽一律用 `start-pwa-lan.bat`（no-store 標頭，杜絕手機吃舊 JS 的鬼打牆）。
 
 14. **介面上的「圖示」不要用系統 emoji 呈現跨平台一致的視覺**：同一個 emoji 字元在 Windows/iOS/Android 各吃自己的 emoji 字型，長相（甚至顏色）完全不一樣，且部份字元（如 🌤🌫🌧🌨🌦⛈）預設是「文字呈現」，缺 VS16（`\uFE0F`）在 Windows/Chrome 會整個變單色。需要跨裝置外觀一致的圖示一律自畫 SVG／CSS，不要依賴系統 emoji 字型；真的要用 emoji 純粹點綴時，記得補 VS16 逼它用彩色呈現。
+
+15. **Google 日曆匯入一律唯讀，鎖在「唯一入口」而不是各呼叫點**：`source === 'gcal'` 的行程擋在 `openTaskDialog()`（一擋就連帶擋掉對話框內的刪除）、`handleDragStart()`/`handleDrop()`、`handleCalendarChange()` 三處即可全面生效——`openTaskDialog()` 有十幾個呼叫端，逐點加判斷必漏。OAuth scope 只要 `calendar.readonly` 不要 `auth/calendar`（可寫），讓「不可能改壞使用者的 Google 日曆」是結構保證而非約定。`provider_token` 約 1 小時到期、只存 localStorage 且不進備份 JSON。
+
+16. **所有 `app-0*.js`／`sync.js`／`gcal.js` 共用同一個全域作用域，頂層同名 `function` 會被後定義者靜默覆蓋**——不報錯、不警告，前面那份直接變死碼。`habitStreak()` 就這樣同時存在兩份實作（2026-08-07 已移除死碼版）。新增頂層函式前先 `grep -n "^function 名稱("` 確認名稱沒被用過；懷疑時用這段掃全專案：`python3` 逐檔 regex `^function\s+(\w+)\s*\(` 收集後找重複（最近一次掃描：306 個頂層函式、0 衝突）。

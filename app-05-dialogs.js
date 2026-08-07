@@ -822,6 +822,12 @@ function closeDashboardDialog() {
 
 function openTaskDialog(defaults = {}, occurrenceDate = '') {
   if (els.taskDialog.open) return;
+  // G1：Google 日曆匯入的行程唯讀。擋在這個唯一入口，所有呼叫端（卡片、時間軸、倒數、
+  // 儀表板、命令面板…）一次全部生效，連帶也擋掉對話框內的刪除按鈕。
+  if (defaults && defaults.source === 'gcal') {
+    showToast('這筆行程由 Google 日曆匯入，唯讀不可編輯');
+    return;
+  }
   renderCategoryOptions();
   renderCalendarField();
   const isEdit = Boolean(defaults.id);

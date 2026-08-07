@@ -162,11 +162,11 @@ Google Calendar 整合、時區旅行模式、專案任務依賴、錯誤紀錄�
 - [x] P3（Sonnet）：目標 OKR（月／季目標＋行程貢獻＋進度條）——手動輸入進度版，尚未接「行程貢獻自動算」
 
 ### W6 整合收斂
-- [ ] G1（Opus）：Google Calendar 唯讀匯入（Supabase OAuth scope＋Calendar API）＋CLOUD_GCAL_SETUP.md
+- [x] G1（Opus）：Google Calendar 唯讀匯入（Supabase OAuth scope＋Calendar API）＋CLOUD_GCAL_SETUP.md
 - [x] G2（Sonnet）：無障礙全面審查修正（ARIA／鍵盤／焦點／對比）
 - [x] G3（總指揮）：整合稽核、tests.html 補案例、CACHE_NAME、文件統整 → 使用者驗收 → 存新版 002
 
 ### 使用者需自行執行（屆時逐項提醒）
 1. S2：部署更新後的 Edge Function＋排程
 2. S4：Supabase SQL Editor 執行 schema-errorlog.sql
-3. G1：Google Cloud Console 啟用 Calendar API＋OAuth 同意畫面加 scope
+3. ~~G1：Google Cloud Console 啟用 Calendar API＋OAuth 同意畫面加 scope~~（2026-08-07 已完成）

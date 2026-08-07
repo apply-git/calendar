@@ -639,6 +639,12 @@ function handleCalendarChange(event) {
     const task = tasks.find((item) => item.id === taskId);
     const doneDate = event.target.dataset.doneDate || toDateInput(currentDate);
     // D3 任務依賴：只擋「勾選完成」，取消勾選不受前置任務狀態限制。
+    // G1：Google 日曆匯入的行程唯讀，勾選完成也要擋（勾選狀態立刻復原）。
+    if (task && task.source === 'gcal') {
+      event.target.checked = isTaskDone(task, doneDate);
+      showToast('Google 日曆匯入的行程唯讀，不可標記完成');
+      return;
+    }
     const blockers = task && event.target.checked ? getIncompleteDependencies(task) : [];
     if (blockers.length) {
       event.target.checked = false;
@@ -683,6 +689,12 @@ function handleCalendarChange(event) {
 function handleDragStart(event) {
   const card = event.target.closest('.task-card');
   if (!card) return;
+  // G1：Google 日曆匯入的行程唯讀，不可拖曳改日期／排序。
+  const dragged = tasks.find((item) => item.id === card.dataset.taskId);
+  if (dragged && dragged.source === 'gcal') {
+    event.preventDefault();
+    return;
+  }
   card.classList.add('dragging');
   event.dataTransfer.setData('text/plain', card.dataset.taskId);
 }
@@ -697,6 +709,10 @@ function handleDrop(event) {
   event.preventDefault();
   const id = event.dataTransfer.getData('text/plain');
   const task = tasks.find((item) => item.id === id);
+  if (task && task.source === 'gcal') {
+    showToast('Google 日曆匯入的行程唯讀，不可調整');
+    return;
+  }
   if (task) {
     const oldDate = task.date;
     task.date = target.dataset.dropDate;

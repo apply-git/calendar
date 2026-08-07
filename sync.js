@@ -35,6 +35,10 @@
   const SYNC_META_KEY = 'desktop-schedule-sync-meta-v1'; // 最後同步時間等狀態，不納入備份 JSON
   const SHARE_KEY = 'desktop-schedule-share-v1'; // 家庭共享群組（{groupId, groupName}），裝置本機狀態，不納入備份 JSON、登出時清除
   const AUTO_SYNC_DEBOUNCE_MS = 4000;
+  // G1：登入時一併向 Google 要「日曆唯讀」權限，gcal.js 才拿得到 provider_token 讀活動。
+  // 刻意只要 calendar.readonly，不要 calendar（可寫），確保匯入永遠不可能改動使用者的 Google 日曆。
+  // email/profile 明寫出來，避免帶了 scopes 參數後蓋掉 GoTrue 的預設值、拿不到使用者信箱。
+  const GOOGLE_OAUTH_SCOPES = 'email profile https://www.googleapis.com/auth/calendar.readonly';
 
   const rawConfig = (typeof window.CALENDAR_SYNC_CONFIG === 'object' && window.CALENDAR_SYNC_CONFIG) || {};
   const SUPABASE_URL = String(rawConfig.supabaseUrl || '').trim().replace(/\/+$/, '');
@@ -244,7 +248,9 @@
       const redirectTo = window.location.origin && window.location.origin !== 'null'
         ? window.location.origin + window.location.pathname
         : window.location.href.split('#')[0];
-      const authorizeUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
+      const authorizeUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google`
+        + `&redirect_to=${encodeURIComponent(redirectTo)}`
+        + `&scopes=${encodeURIComponent(GOOGLE_OAUTH_SCOPES)}`;
       window.location.href = authorizeUrl;
     } catch (err) {
       console.warn('[sync] 開啟登入頁面失敗', err);
@@ -254,6 +260,12 @@
 
   function logout() {
     clearAuthState();
+    // G1：登出時一併丟掉 Google 日曆權杖，避免換帳號後拿舊權杖去讀別人的日曆。
+    try {
+      window.CalendarGCal?.clearProviderToken();
+    } catch (err) {
+      console.warn('[sync] 清除 Google 日曆權杖失敗', err);
+    }
     updateUI();
     toast('已登出雲端同步（本機資料不受影響）');
   }
@@ -287,6 +299,16 @@
         expiresAt: Date.now() + expiresIn * 1000,
         user: { id: payload.sub || '', email: payload.email || '' },
       });
+      // G1：Google 直接發的存取權杖（約 1 小時效期），交給 gcal.js 存起來供唯讀匯入使用。
+      // gcal.js 沒載入時整段跳過，不影響登入本身。
+      const providerToken = params.get('provider_token') || '';
+      if (providerToken && window.CalendarGCal && typeof window.CalendarGCal.storeProviderToken === 'function') {
+        try {
+          window.CalendarGCal.storeProviderToken(providerToken);
+        } catch (tokenErr) {
+          console.warn('[sync] 儲存 Google 日曆權杖失敗，不影響登入', tokenErr);
+        }
+      }
       history.replaceState(null, '', window.location.pathname + window.location.search);
       toast('登入成功' + (authState.user.email ? `：${authState.user.email}` : ''));
 

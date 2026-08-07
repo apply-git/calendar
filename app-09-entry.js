@@ -655,6 +655,7 @@ window.CalendarApp = {
   buildBackupPayload,
   applyBackupObject,
   computeOkrProgress,
+  replaceGcalTasks,
   addOkr,
   deleteOkr,
   addKeyResult,
