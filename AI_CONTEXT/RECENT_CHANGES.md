@@ -1,5 +1,13 @@
 # Recent Changes
 
+## 2026-08-08 全專案架構稽核＋四項修正（倉庫衛生／開發文件不外洩／文件校正／lastSyncedAt 收斂）
+- 稽核結論：核心程式碼無功能性 bug——312 個頂層函式 0 同名衝突、APP_SHELL 與 index.html script 順序一致、備份 `buildBackupPayload`/`applyBackupObject` 欄位對稱、SW 跨網域護欄在。問題集中在倉庫衛生與文件過時
+- 倉庫衛生：刪掉誤入 git 的 `_we_test.js`/`_wf_check.js`（0 byte 空檔）、`里程碑總表_2026-07-21.docx` 移出追蹤（本機保留）、`.gitignore` 加 `*.docx`；順手清 `send-reminders/index.ts` 對已刪檔的懸空註解
+- 新增 `_redirects`：18 條 302，擋掉開發文件從正式站被直接讀取（輸出目錄是 `/`＝整包 repo 都被部署）。原本想回 404，官方明列不支援，改用「重定向優先於實體檔案」達成——完整踩坑見 NOTES 第 17 條
+- `sync.js` lastSyncedAt 收斂到唯一入口 `saveServerSyncedAt()`：伺服器沒回有效時間就「不更新」，不再退回 `Date.now()`（原本 5 個呼叫點各留一個 fallback 破口），順帶擋掉 NaN；`CACHE_NAME` v44→v45，tests 77→80 全過
+- 文件校正：PROJECT_BRIEF 主要檔案表改成九檔架構＋標明各函式落點並補 `_redirects`；GENERATIONS 修正「備份 build/apply」誤植在 app-08（實際在 app-07）；RECENT_CHANGES 檔尾「尚未實作」改「已銷案」
+- **剩什麼**：`_redirects` 只驗過語法與「沒擋錯 APP_SHELL」，實際效果需部署後線上 curl 確認；其餘見 GENERATIONS.md §3（P3 行程貢獻自動算、G1 延伸、存新版 003、S2 Cron／S4 SQL 待使用者跑）
+
 ## 2026-08-07 新增 AI_CONTEXT/BOOTSTRAP_PROMPTS.md 開機提示詞
 - Claude Code／Codex 各一份「開新 session 第一則訊息」範本（讀取順序＋回報格式＋三條硬性提醒），兩份除規則檔名外內容一致；CLAUDE.md/AGENTS.md 先讀鏈已加指引
 
@@ -43,8 +51,8 @@
 ## 2026-07-22 第三波：全速施工＋工具列改版（13+2 包）
 測試跑道/資料檢查/錯誤紀錄/SW 更新提示、App Badge/習慣 streak、批量新增/找空檔、Share Target/順延工作日、命令面板/統計儀表板/通知互動、農曆重複/天氣/假日更新/加密備份、UI polish/分享圖卡/看板模式；後續再改版桌面工具列為六組下拉選單（⚡檢視動作/🖥模式/🧰工具/📊分析/📤匯出入/⚙設定）。過程修過兩個 bug：TDZ 導致 `render()` 沒跑、`overflow:hidden` 裁切下拉選單（詳見 NOTES.md #4、#5）。`CACHE_NAME` → v27→v28。
 
-## 尚未實作（另案，見 ROADMAP.md §十）
-Google Calendar 整合、時區旅行模式、專案任務依賴、錯誤紀錄自動上報、無障礙全面審查。
+## 已銷案（原「尚未實作」清單，五項均已在第五波 002 完工）
+Google Calendar 整合＝G1、時區旅行模式＝D4、專案任務依賴＝D3、錯誤紀錄自動上報＝S4（程式已完成；`schema-errorlog.sql` 為選用，待使用者執行）、無障礙全面審查＝G2；均已實作並上線，詳見上方各波紀錄與 `GENERATIONS.md`。
 
 ## 使用者待辦（已完成，供留存）
 `schema-history.sql`（雲端備份版本）與 `schema-share.sql`（家庭共享）皆已在 Supabase 執行並實測通過；家庭共享後續只需把邀請碼傳給家人即可加入。

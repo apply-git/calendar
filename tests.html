@@ -24,7 +24,7 @@
 </head>
 <body>
   <h1>桌面行程表 - 測試跑道（tests.html）</h1>
-  <p class="desc">純開發工具，不加入 PWA 離線快取（不在 service-worker.js 的 APP_SHELL 內）。依序載入 app-0*.js、gcal.js、sync.js 後，對 window.CalendarApp／window.CalendarSync／window.CalendarGCal 匯出的純函式跑迴歸測試，涵蓋 occursOnDate／parseNaturalDateTime／timeOverlaps／備份 roundtrip／S1 墓碑回歸／mergeBackupPayloads 逐筆合併／computeMoodStats／computePomodoroStats／OKR 目標進度計算／G1 Google 日曆匯入（區間計算與活動對應）／habitStreak 連續天數，共 77 個測試案例。測試前後會完整快照／還原 localStorage，不會汙染真實行程資料。</p>
+  <p class="desc">純開發工具，不加入 PWA 離線快取（不在 service-worker.js 的 APP_SHELL 內）。依序載入 app-0*.js、gcal.js、sync.js 後，對 window.CalendarApp／window.CalendarSync／window.CalendarGCal 匯出的純函式跑迴歸測試，涵蓋 occursOnDate／parseNaturalDateTime／timeOverlaps／備份 roundtrip／S1 墓碑回歸／mergeBackupPayloads 逐筆合併／computeMoodStats／computePomodoroStats／OKR 目標進度計算／G1 Google 日曆匯入（區間計算與活動對應）／habitStreak 連續天數／toServerSyncedAtMs（lastSyncedAt 只認伺服器時間），共 80 個測試案例。測試前後會完整快照／還原 localStorage，不會汙染真實行程資料。</p>
   <div id="allPass">ALL PASS</div>
   <div id="summary">執行中…</div>
   <ul id="results"></ul>
@@ -636,6 +636,26 @@
 
       test('中間斷掉只算到斷點為止', () => {
         assertEqual(habitStreak({ records: [dayKey(0), dayKey(-1), dayKey(-3)] }), 2, '第三天斷掉');
+      });
+
+      // ------------------------------------------------------------------
+      // lastSyncedAt 只認伺服器時間（NOTES 鐵則 2）
+      // ------------------------------------------------------------------
+      group('toServerSyncedAtMs（lastSyncedAt 只認伺服器時間）');
+
+      test('合法的伺服器時間字串轉成毫秒', () => {
+        assertEqual(CS._toServerSyncedAtMs('2026-08-08T01:02:03Z'), Date.UTC(2026, 7, 8, 1, 2, 3), 'ISO 字串');
+      });
+
+      test('伺服器沒回時間一律回 null（呼叫端據此「不更新」而非退回本機時間）', () => {
+        assertEqual(CS._toServerSyncedAtMs(undefined), null, 'undefined');
+        assertEqual(CS._toServerSyncedAtMs(null), null, 'null');
+        assertEqual(CS._toServerSyncedAtMs(''), null, '空字串');
+      });
+
+      test('無法解析的時間字串回 null，不會寫進 NaN', () => {
+        assertEqual(CS._toServerSyncedAtMs('not-a-date'), null, '亂碼字串');
+        assertEqual(CS._toServerSyncedAtMs({}), null, '物件');
       });
 
     } finally {

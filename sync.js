@@ -219,6 +219,28 @@
     } catch {}
   }
 
+  // 純函式：把伺服器回傳的時間字串轉成毫秒；無值或無法解析一律回 null（供 tests.html 直接測）。
+  function toServerSyncedAtMs(serverUpdatedAt) {
+    if (!serverUpdatedAt) return null;
+    const ms = new Date(serverUpdatedAt).getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+
+  // NOTES 鐵則 2 的唯一落地點：lastSyncedAt 只能來自「伺服器」寫入的時間
+  // （cloudPush 的 Prefer: return=representation 回傳值，或 cloudPull 的 updated_at）。
+  // 伺服器沒回有效時間時，寧可「這次不更新 lastSyncedAt」也不要退回裝置本機 Date.now()：
+  // 裝置時鐘不準時，寫進去的錯誤時間會讓這台之後永遠誤判、單向覆蓋雲端（永久性偏差）。
+  // 不更新的代價只是下次同步多合併一次——逐筆合併本身冪等，重複 pull 是安全的。
+  function saveServerSyncedAt(serverUpdatedAt) {
+    const ms = toServerSyncedAtMs(serverUpdatedAt);
+    if (ms === null) {
+      console.warn('[sync] 伺服器未回傳有效的 updated_at，這次不更新 lastSyncedAt（下次同步會再合併一次）');
+      return false;
+    }
+    saveSyncMeta({ lastSyncedAt: ms });
+    return true;
+  }
+
   function decodeJwtPayload(token) {
     try {
       const part = String(token).split('.')[1];
@@ -573,8 +595,7 @@
         return;
       }
       window.CalendarApp.applyBackupObject(remote.payload || {});
-      const remoteUpdatedAtMs = remote.updated_at ? new Date(remote.updated_at).getTime() : Date.now();
-      saveSyncMeta({ lastSyncedAt: remoteUpdatedAtMs });
+      saveServerSyncedAt(remote.updated_at);
       alert('已套用雲端資料，即將重新整理頁面');
       window.location.reload();
     } catch (err) {
@@ -599,7 +620,7 @@
     try {
       const payload = window.CalendarApp.buildBackupPayload();
       const serverUpdatedAt = await cloudPush(payload);
-      saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
+      saveServerSyncedAt(serverUpdatedAt);
       saveHistorySnapshot(payload).catch(() => {});
       alert('已把這台的資料強制推送到雲端。接下來到另一台裝置按「⬇️ 強制拉取雲端資料覆蓋本機」即可。');
     } catch (err) {
@@ -743,7 +764,7 @@
     try {
       window.CalendarApp.applyBackupObject(entry.payload || {});
       const serverUpdatedAt = await cloudPush(entry.payload);
-      saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
+      saveServerSyncedAt(serverUpdatedAt);
       toast('已還原並同步該版本');
       syncEls.historyDialog?.close();
       saveHistorySnapshot(entry.payload).catch(() => {});
@@ -1021,8 +1042,8 @@
         const payload = withGeneratedAt(window.CalendarApp.buildBackupPayload());
         const serverUpdatedAt = await cloudPush(payload);
         // lastSyncedAt 必須用「伺服器」寫入的 updated_at，不能用裝置本機 Date.now()：
-        // 裝置時鐘不準時，之後跟其他裝置比較會永遠判斷錯誤。
-        saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
+        // 裝置時鐘不準時，之後跟其他裝置比較會永遠判斷錯誤（規則落在 saveServerSyncedAt）。
+        saveServerSyncedAt(serverUpdatedAt);
         saveHistorySnapshot(payload).catch(() => {});
         if (!silent) toast('已同步到雲端');
         // 家庭共享同步：獨立 try/catch，個人同步（上面已經成功）不會因為這裡失敗而跟著失敗（鐵則 2）。
@@ -1038,7 +1059,7 @@
       const merged = mergeBackupPayloads(local, remote.payload || {});
       window.CalendarApp.applyBackupObject(merged);
       const serverUpdatedAt = await cloudPush(merged);
-      saveSyncMeta({ lastSyncedAt: serverUpdatedAt ? new Date(serverUpdatedAt).getTime() : Date.now() });
+      saveServerSyncedAt(serverUpdatedAt);
       saveHistorySnapshot(merged).catch(() => {});
       if (!silent) toast('已雙向合併同步');
       try {
@@ -1118,5 +1139,6 @@
     // 純函式，供 node 腳本直接測試合併邏輯用，不依賴登入狀態或網路。
     _mergeBackupPayloads: mergeBackupPayloads,
     _mergeTaskLists: mergeTaskLists,
+    _toServerSyncedAtMs: toServerSyncedAtMs,
   };
 })();

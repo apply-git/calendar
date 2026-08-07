@@ -1,0 +1,47 @@
+# 開發文件不對外服務
+#
+# 背景：Cloudflare Pages 的建置設定是 Framework=None、輸出目錄 `/`，等於整個 repo
+# 都被部署，開發文件原本能直接用 URL 從正式站讀到（例：/CLAUDE.md、/schema.sql）。
+#
+# 為什麼是 302 導回首頁、而不是回 404：
+#   Pages 的 _redirects **不支援 404**（官方文件把「Rewrites (other status codes)」
+#   明列為不支援）。但官方同時載明「Redirects are always followed, regardless of
+#   whether or not an asset matches the incoming request」——重定向規則優先於實體
+#   檔案，所以 302 就足以讓檔案內容不再外洩。真要回 404 得改用 Pages Functions
+#   middleware，那會把純靜態站變成帶 Functions 的部署形態，代價不成比例。
+#   用 302（暫時）而非 301（永久）：301 會被瀏覽器長期快取，日後要解除很麻煩。
+#
+# 語法注意：每條規則只能有一個 `*`；副檔名 glob（如 /*.sql）官方文件未記載，
+# 因此 .sql 一律逐檔列，不賭沒寫在文件裡的行為。
+#
+# ⚠ 絕不可把 APP_SHELL 內的檔案列進來（index.html / styles.css / app-0*.js /
+#   config.js / gcal.js / sync.js / push.js / manifest.json / service-worker.js /
+#   icons/*），也不要擋 README.md 與 tests.html。列進去等於把正式站弄壞。
+
+# 開發指引與規劃
+/CLAUDE.md            /  302
+/AGENTS.md            /  302
+/ROADMAP.md           /  302
+/AI_CONTEXT/*         /  302
+
+# 世代快照（歷代完整原始碼）與 Supabase Edge Function 原始碼
+/versions/*           /  302
+/supabase/*           /  302
+
+# 資料庫結構（逐檔列，不用副檔名 glob）
+/schema.sql           /  302
+/schema-history.sql   /  302
+/schema-share.sql     /  302
+/schema-push.sql      /  302
+/schema-errorlog.sql  /  302
+
+# 雲端設定教學（含專案結構細節）
+/CLOUD_SETUP.md       /  302
+/CLOUD_PUSH_SETUP.md  /  302
+/CLOUD_GCAL_SETUP.md  /  302
+
+# 本機開發／預覽用檔案
+/start-pwa-local.bat  /  302
+/start-pwa-lan.bat    /  302
+/_lan_server.py       /  302
+/config.example.js    /  302

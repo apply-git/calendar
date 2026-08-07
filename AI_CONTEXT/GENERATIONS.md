@@ -51,8 +51,8 @@
 | app-04-render.js | render() 總入口（含 saveJson 落地＋onDataChanged 掛勾）、各檢視渲染 |
 | app-05-dialogs.js | 各對話框（openTaskDialog **唯一**編輯入口、OKR、分類…） |
 | app-06-taskform.js | 表單存檔 saveTaskFromForm、拖曳、勾選完成 handleCalendarChange、附件 UI |
-| app-07-reminders.js | 提醒/通知/snooze/番茄鐘 |
-| app-08-data.js | 資料層：occursOnDate、touchTask/tombstoneTask、備份 build/apply、replaceGcalTasks |
+| app-07-reminders.js | 提醒/通知/snooze/番茄鐘、備份 build/apply＋加密備份 |
+| app-08-data.js | 資料層：occursOnDate、touchTask/tombstoneTask、replaceGcalTasks |
 | app-09-entry.js | 錯誤上報、資料檢查、`window.CalendarApp` 匯出 |
 
 **第五波新增**：D1–D4（自訂色/地點、多日曆本、任務依賴 dependsOn、時區＋旅行模式）、

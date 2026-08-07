@@ -12,13 +12,16 @@
 
 | 檔案 | 用途 |
 |---|---|
-| `index.html` / `styles.css` / `app.js` | 主體。`app.js` 含 `window.CalendarApp` 介面供 `sync.js` 用；備份單一真相 `buildBackupPayload()`/`applyBackupObject()`；逐筆同步時間戳/墓碑 `touchTask()`/`tombstoneTask()`；附件 IndexedDB 存取層 `idbPut()` 等 |
+| `index.html` / `styles.css` | 主體頁面與樣式 |
+| `app-01-core.js`～`app-09-entry.js` | 002 世代把原單檔 `app.js` 依頂層宣告邊界純搬移拆成九檔，循序載入、共用同一全域作用域。關鍵函式落點：`saveJson()`＝01；`render()`＝04；備份單一真相 `buildBackupPayload()`/`applyBackupObject()`＋AES-GCM 加密備份 `encryptBackupJson()`/`decryptBackupJson()`＝07；資料層 `normalizeStoredData()`/`occursOnDate()`/`replaceGcalTasks()`/`habitStreak()`、逐筆同步時間戳/墓碑 `touchTask()`/`tombstoneTask()`＝08；`window.CalendarApp` 介面（供 `sync.js` 用）＝09 |
+| `gcal.js` | G1 Google 日曆唯讀匯入：權杖／區間／Calendar API events.list／活動→行程對應；寫入 tasks 唯一入口 `replaceGcalTasks()`（在 app-08） |
 | `sync.js` / `config.js` | 雲端同步（pull→merge→push 逐筆合併 `mergeBackupPayloads()`，含家庭共享 `syncSharedTasks()`），未設定 config 時整個 no-op |
 | `push.js` | 背景推播訂閱 UI，`webPushPublicKey` 空值時零影響 |
-| `schema.sql` / `schema-history.sql` / `schema-share.sql` / `schema-push.sql` | 依序對應：個人同步／備份版本／家庭共享／推播的 Supabase 表 |
-| `CLOUD_SETUP.md` / `CLOUD_PUSH_SETUP.md` | 雲端功能設定教學 |
-| `manifest.json` / `service-worker.js` / `icons/` / `start-pwa-local.bat` | PWA；`CACHE_NAME` 見 `service-worker.js` 開頭 |
-| `tests.html` | 測試跑道，48 案例，開發用，不進 APP_SHELL |
+| `schema.sql` / `schema-history.sql` / `schema-share.sql` / `schema-push.sql` / `schema-errorlog.sql` | 依序對應：個人同步／備份版本／家庭共享／推播／錯誤上報(S4，選用)的 Supabase 表 |
+| `CLOUD_SETUP.md` / `CLOUD_PUSH_SETUP.md` / `CLOUD_GCAL_SETUP.md` | 雲端功能設定教學（同步／推播／Google 日曆匯入） |
+| `manifest.json` / `service-worker.js` / `icons/` / `start-pwa-local.bat` / `start-pwa-lan.bat` / `_lan_server.py` | PWA；`CACHE_NAME` 見 `service-worker.js` 開頭；`start-pwa-lan.bat`＋`_lan_server.py`＝區網預覽伺服器（送 no-store 標頭，供手機測非安全來源功能） |
+| `tests.html` | 測試跑道，80 案例，開發用，不進 APP_SHELL |
+| `_redirects` | Cloudflare Pages 專用：把開發文件路徑（CLAUDE/AGENTS/ROADMAP/AI_CONTEXT/versions/supabase/schema*/CLOUD_*/bat/py/config.example.js）302 導回首頁，避免整包 repo 被部署後可從正式站直接讀取。**絕不可把 APP_SHELL 檔案列進去** |
 | `ROADMAP.md` | 功能規劃與逐波施工進度（checkbox 格式，本身即變更歷史，不需另建 changelog） |
 | `README.md` | 使用者說明文件（面向終端使用者，非 agent context） |
 

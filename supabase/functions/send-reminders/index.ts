@@ -212,7 +212,7 @@ function todayKeyInZone(timeZone: string, now: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 
-// ---- 提醒視窗判斷：抽成單一純函式，方便獨立測試（見 _we_test.js 的移植版） ----
+// ---- 提醒視窗判斷：抽成單一純函式，方便獨立測試 ----
 // 「提醒時刻（開始時間減提醒分鐘數）落在現在～現在+15分鐘」判斷。15 分鐘的窗口
 // 搭配建議的 10 分鐘排程間隔，留一點緩衝避免排程延遲漏掉；真正防止重複通知靠的
 // 是 push_sent_log，不是靠這個窗口大小。
