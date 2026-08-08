@@ -414,6 +414,7 @@ const els = {
   welcomeDialog: $('welcomeDialog'),
   closeWelcomeBtn: $('closeWelcomeBtn'),
   welcomeStartBtn: $('welcomeStartBtn'),
+  welcomeDialogTitle: $('welcomeDialogTitle'),
   welcomeGuideBtn: $('welcomeGuideBtn'),
   welcomeDontShowAgain: $('welcomeDontShowAgain'),
   welcomeReopenBtn: $('welcomeReopenBtn'),

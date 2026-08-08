@@ -1746,6 +1746,19 @@ body.widget-mode .task-card { font-size: 14px; }
     overflow-y: auto;
   }
 
+  /* 例外：歡迎教學卡片是「一次性導覽」而不是操作用的工作面板，改成懸浮置中、
+     四角全圓、左右留白，不跟其他 dialog 一樣貼齊底部。
+     ⚠ 這條必須排在上面 dialog.task-dialog 之後——兩者特異性相同（元素＋class），
+     靠原始碼順序決勝負，往前搬就會被貼底規則蓋回去。 */
+  dialog.welcome-dialog {
+    width: calc(100vw - 32px);
+    max-width: 420px;
+    max-height: 82vh;
+    margin: auto;
+    border-radius: 18px;
+    overflow-y: auto;
+  }
+
   /* toast 提示原本跟 FAB 同一個右下角位置，手機加了 FAB 後把 toast 往上推，避免疊在一起。 */
   .toast { bottom: 86px; }
 }

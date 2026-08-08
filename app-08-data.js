@@ -55,6 +55,8 @@ function displayAppTitle(title) {
 function applyTextSettings() {
   document.title = displayAppTitle(textSettings.appTitle);
   els.brandTitle.textContent = displayAppTitle(textSettings.appTitle);
+  // 歡迎教學卡片標題跟著同一套規格走：手機寬度顯示「歡迎使用手機行程表」。
+  if (els.welcomeDialogTitle) els.welcomeDialogTitle.textContent = `\u{1F44B}️ 歡迎使用${displayAppTitle(textSettings.appTitle)}`;
   els.quickAddBtn.textContent = textSettings.addTaskText;
   els.topThreeHeading.textContent = textSettings.topThreeTitle;
   els.completionHeading.textContent = textSettings.completionTitle;
