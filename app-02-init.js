@@ -127,6 +127,9 @@ function init() {
   handleNotifUrlAction();
   setInterval(checkReminders, 30 * 1000);
 
+  // 首次進入時自動彈出歡迎教學卡片（只在 WELCOME_KEY 不存在時；見 maybeShowWelcome()）。
+  maybeShowWelcome();
+
   // 天氣（Open-Meteo，免金鑰）：零設定零影響——file:// 雙擊開啟或離線時完全跳過，
   // 不顯示天氣但其他功能不受影響；fetchWeather() 內部已包 try/catch 靜默降級。
   if (location.protocol !== 'file:' && navigator.onLine) {
@@ -139,6 +142,20 @@ function init() {
   if (location.protocol !== 'file:' && navigator.onLine) {
     fetchHolidayUpdates();
   }
+}
+
+// 首次進入的歡迎教學卡片：只有 WELCOME_KEY 不存在（沒看過、也沒勾「不再顯示」）時，
+// init() 完成後自動彈出一次。純裝置本機 UI 狀態，不進備份 JSON、不進雲端同步。
+// localStorage 讀取以 try/catch 保護（隱私模式可能 throw）：讀不到就當作已看過、不打擾，
+// 避免異常環境反覆彈窗（寫入旗標由 app-03-events.js 的 closeWelcomeDialog() 負責，同樣包 try/catch）。
+function maybeShowWelcome() {
+  let seen = true;
+  try {
+    seen = localStorage.getItem(WELCOME_KEY) === '1';
+  } catch (_) {
+    seen = true;
+  }
+  if (!seen) els.welcomeDialog?.showModal();
 }
 
 // 深色模式三段循環（淺色 → 深色 → 自動(跟隨系統) → 淺色）：THEME_KEY 存 'light'|'dark'|'auto'。

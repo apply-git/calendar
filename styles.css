@@ -1441,6 +1441,63 @@ body.dark .conflict-warning {
 }
 #overflowProxyGroup:empty { display: none; }
 
+/* 首次進入的歡迎教學卡片：沿用 .task-dialog 外觀（含手機底部彈出那條既有規則），這裡只補自身版型。
+   桌機六個分類用兩欄網格、卡片寬度比照 .more-tools-dialog 的 min(px, 100vw-28px)；
+   手機（≤760px，本專案斷點）改單欄，底部三控制項用 flex-wrap 保證不擠爆到看不懂。 */
+.welcome-dialog { width: min(560px, calc(100vw - 28px)); }
+.welcome-intro { margin: 14px 2px 2px; color: var(--muted); font-size: 14px; }
+.welcome-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0 18px;
+}
+.welcome-feature {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 14px;
+  color: var(--text);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+}
+.welcome-ico {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  color: var(--primary);
+}
+.welcome-feature-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.welcome-feature-title { font-weight: 700; }
+.welcome-feature-desc { font-size: 13px; line-height: 1.5; color: var(--muted); }
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.welcome-dontshow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+.welcome-dontshow input { width: auto; margin: 0; }
+.welcome-actions-btns { display: flex; gap: 10px; align-items: center; }
+
+@media (max-width: 760px) {
+  .welcome-dialog { width: 100%; }
+  .welcome-grid { grid-template-columns: 1fr; gap: 10px; }
+  .welcome-actions { gap: 10px; }
+  .welcome-actions-btns { flex: 1 0 100%; justify-content: flex-end; }
+}
+
 /* 懸浮新增按鈕（FAB）：桌面版固定隱藏，只有 @media (max-width:760px) 內才會顯示
    （且需要 JS 在手機時移除 hidden 屬性，兩個條件都成立才真的看得到）。 */
 .fab-add { display: none; }

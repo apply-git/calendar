@@ -1,4 +1,4 @@
-const CACHE_NAME = 'desktop-schedule-pwa-v46';
+const CACHE_NAME = 'desktop-schedule-pwa-v47';
 
 // 把「經過重新導向」的回應重新包成乾淨的 200 回應再存快取。
 // 原因：Cloudflare Pages 會把 /index.html 重導向到 /，導致快取到的回應帶有
@@ -16,6 +16,8 @@ async function sanitizeResponse(response) {
 const APP_SHELL = [
   './',
   './index.html',
+  // 完整使用教學頁：自我包含（樣式與插圖都內嵌），離線也要能查。
+  './guide.html',
   './styles.css',
   './app-01-core.js',
   './app-02-init.js',

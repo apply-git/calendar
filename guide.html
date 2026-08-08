@@ -1,0 +1,1266 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>桌面行程表 · 完整使用教學</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #eef3fb;
+    --surface: rgba(255, 255, 255, 0.86);
+    --surface-strong: #ffffff;
+    --text: #1d2737;
+    --muted: #6d7a8c;
+    --border: rgba(35, 55, 85, 0.12);
+    --primary: #4568f0;
+    --primary-strong: #2f4ed8;
+    --danger: #e5484d;
+    --shadow: 0 2px 8px rgba(44, 64, 105, 0.06), 0 24px 60px rgba(44, 64, 105, 0.14);
+    --radius: 22px;
+    --work: #3b82f6;
+    --home: #f97316;
+    --study: #8b5cf6;
+    --sport: #10b981;
+    --important: #ef4444;
+    /* 教學頁自加：SVG 線條用實色（--border 半透明在圖上太淡），例子框底色 */
+    --line: #b9c4d6;
+    --example-bg: rgba(69, 104, 240, 0.07);
+    --chip: rgba(69, 104, 240, 0.10);
+  }
+  /* 深色：使用者在 App 主動選「深色」時套用（讀 localStorage 由下方 script 設 data-theme） */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101624;
+    --surface: rgba(25, 34, 52, 0.82);
+    --surface-strong: #172033;
+    --text: #ecf2ff;
+    --muted: #9ba8bd;
+    --border: rgba(219, 229, 255, 0.16);
+    --primary: #7c97ff;
+    --primary-strong: #607cff;
+    --danger: #ff6b6b;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 24px 60px rgba(0, 0, 0, 0.5);
+    --line: #3a4864;
+    --example-bg: rgba(124, 151, 255, 0.12);
+    --chip: rgba(124, 151, 255, 0.16);
+  }
+  /* 使用者選「自動」或從未設定：跟隨系統深色（但不覆蓋主動選「淺色」者） */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #101624;
+      --surface: rgba(25, 34, 52, 0.82);
+      --surface-strong: #172033;
+      --text: #ecf2ff;
+      --muted: #9ba8bd;
+      --border: rgba(219, 229, 255, 0.16);
+      --primary: #7c97ff;
+      --primary-strong: #607cff;
+      --danger: #ff6b6b;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 24px 60px rgba(0, 0, 0, 0.5);
+      --line: #3a4864;
+      --example-bg: rgba(124, 151, 255, 0.12);
+      --chip: rgba(124, 151, 255, 0.16);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-family: "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
+    color: var(--text);
+    line-height: 1.75;
+    background:
+      radial-gradient(circle at top left, rgba(69, 104, 240, 0.22), transparent 36rem),
+      radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.18), transparent 32rem),
+      var(--bg);
+  }
+  a { color: var(--primary); }
+
+  /* ---------- 頁首 ---------- */
+  .guide-header {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 26px 20px 10px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .header-logo { flex: 0 0 auto; width: 54px; height: 54px; }
+  .header-titles { flex: 1 1 260px; min-width: 0; }
+  .header-titles h1 { margin: 0; font-size: clamp(22px, 4.4vw, 30px); letter-spacing: .5px; }
+  .header-titles p { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+  .back-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 18px;
+    border: 0;
+    border-radius: 14px;
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+    background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+    box-shadow: 0 12px 26px rgba(69, 104, 240, .28);
+  }
+  .back-btn svg { width: 18px; height: 18px; }
+
+  /* ---------- 版面 ---------- */
+  .layout {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 236px 1fr;
+    gap: 30px;
+    padding: 12px 20px 60px;
+  }
+
+  /* ---------- 目錄 ---------- */
+  .toc {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+  }
+  .toc details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+    padding: 6px 6px 12px;
+  }
+  .toc summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 12px 14px;
+    font-weight: 800;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary .chev { transition: transform .2s ease; color: var(--muted); }
+  .toc details[open] summary .chev { transform: rotate(90deg); }
+  .toc ol { list-style: none; margin: 0; padding: 0 6px; counter-reset: toc; }
+  .toc li { margin: 2px 0; }
+  .toc a {
+    counter-increment: toc;
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    padding: 8px 10px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--text);
+    font-size: 14px;
+    transition: background .15s ease;
+  }
+  .toc a::before {
+    content: counter(toc);
+    flex: 0 0 22px;
+    height: 22px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 7px;
+    background: var(--chip);
+    color: var(--primary);
+    font-weight: 800;
+    font-size: 12px;
+  }
+  .toc a:hover { background: var(--chip); }
+
+  /* ---------- 內容 ---------- */
+  .content { min-width: 0; }
+  .intro {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+    padding: 22px 24px;
+    margin-bottom: 26px;
+  }
+  .intro h2 { margin: 0 0 8px; font-size: 19px; }
+  .intro p { margin: 8px 0; color: var(--muted); }
+  .intro strong { color: var(--text); }
+
+  section.chapter {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+    padding: 24px 26px 28px;
+    margin-bottom: 26px;
+    scroll-margin-top: 16px;
+  }
+  .chapter-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .chapter-num {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 13px;
+    font-weight: 800;
+    font-size: 20px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+    box-shadow: 0 8px 18px rgba(69, 104, 240, .26);
+  }
+  .chapter-head h2 { margin: 0; font-size: clamp(18px, 3.6vw, 22px); }
+  .chapter-head .sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .chapter p { margin: 12px 0; }
+  .chapter ul { margin: 12px 0; padding-left: 22px; }
+  .chapter li { margin: 6px 0; }
+  .chapter h3 {
+    font-size: 16px;
+    margin: 22px 0 6px;
+    padding-left: 12px;
+    border-left: 4px solid var(--primary);
+  }
+  .tip { color: var(--muted); font-size: 14px; }
+
+  /* 內文小標籤 */
+  .k {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 7px;
+    background: var(--chip);
+    color: var(--primary);
+    font-weight: 700;
+    font-size: .92em;
+    white-space: nowrap;
+  }
+  kbd {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 7px;
+    background: var(--surface-strong);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: .86em;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* ---------- 插圖 ---------- */
+  figure { margin: 20px 0 4px; }
+  .illus {
+    display: block;
+    width: 100%;
+    max-width: 660px;
+    height: auto;
+    margin: 0 auto;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 6px;
+  }
+  .illus text { font-family: "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif; }
+  figcaption {
+    max-width: 660px;
+    margin: 12px auto 0;
+    color: var(--muted);
+    font-size: 13.5px;
+    text-align: center;
+    line-height: 1.6;
+  }
+  figcaption b { color: var(--text); }
+
+  /* ---------- 實際例子框 ---------- */
+  .example {
+    margin: 18px 0 4px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    background: var(--example-bg);
+    border-radius: 0 14px 14px 0;
+    padding: 14px 18px;
+  }
+  .example .ex-tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .5px;
+    color: var(--primary);
+    margin-bottom: 4px;
+  }
+  .example p { margin: 6px 0; }
+  .flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 2px; }
+  .flow .step {
+    padding: 5px 11px;
+    border-radius: 9px;
+    background: var(--surface-strong);
+    border: 1px solid var(--border);
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+  .flow .arrow { color: var(--primary); font-weight: 800; }
+
+  /* 表格（提醒時間等）自己可橫向捲動 */
+  .table-wrap { overflow-x: auto; margin: 14px 0; -webkit-overflow-scrolling: touch; }
+  table { border-collapse: collapse; width: 100%; min-width: 420px; font-size: 14px; }
+  th, td { padding: 9px 12px; border: 1px solid var(--border); text-align: left; }
+  th { background: var(--chip); font-weight: 800; }
+
+  /* ---------- 頁尾 ---------- */
+  .guide-footer {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 10px 20px 50px;
+    text-align: center;
+  }
+  .guide-footer .back-btn { margin: 0 auto; }
+  .guide-footer .ver { margin-top: 16px; color: var(--muted); font-size: 13px; }
+
+  /* ---------- 手機（本專案斷點 760px） ---------- */
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; gap: 16px; padding: 8px 14px 40px; }
+    .guide-header { padding: 18px 16px 6px; }
+    .toc { position: static; }
+    section.chapter { padding: 20px 16px 22px; border-radius: 18px; }
+    .chapter h3 { margin-top: 18px; }
+    .back-btn { width: 100%; justify-content: center; }
+    .header-titles { flex-basis: 100%; order: 3; }
+  }
+</style>
+<script>
+  /* 讀 App 的主題設定，讓本教學頁跟目前主題一致。
+     desktop-schedule-theme-v1 存 'light' | 'dark' | 'auto'（App 主動切換才寫入）。
+     dark/light → 強制；auto 或未設定 → 交給 @media (prefers-color-scheme)。 */
+  (function () {
+    try {
+      var t = localStorage.getItem('desktop-schedule-theme-v1');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) { /* file:// 或隱私模式讀不到 localStorage 時忽略，退回系統偏好 */ }
+  })();
+</script>
+</head>
+<body>
+
+<header class="guide-header">
+  <!-- 頁首日曆 logo（自繪，非九張教學圖之一；不使用系統 emoji） -->
+  <svg class="header-logo" viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect x="4" y="8" width="46" height="42" rx="9" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+    <path d="M4 18 Q4 8 13 8 L41 8 Q50 8 50 18 Z" fill="var(--primary)"/>
+    <rect x="15" y="3" width="5" height="12" rx="2.5" fill="var(--primary-strong)"/>
+    <rect x="34" y="3" width="5" height="12" rx="2.5" fill="var(--primary-strong)"/>
+    <g fill="var(--muted)">
+      <circle cx="16" cy="27" r="2.6"/><circle cx="27" cy="27" r="2.6"/><circle cx="38" cy="27" r="2.6"/>
+      <circle cx="16" cy="37" r="2.6"/>
+    </g>
+    <circle cx="27" cy="37" r="4.6" fill="var(--sport)"/>
+    <path d="M24.8 37.2 L26.4 38.8 L29.4 35.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="38" cy="37" r="2.6" fill="var(--important)"/>
+  </svg>
+  <div class="header-titles">
+    <h1>桌面行程表 · 完整使用教學</h1>
+    <p>圖文並重的功能導覽，從新增第一筆行程到手機 PWA 全都教。</p>
+  </div>
+  <a class="back-btn" href="./index.html">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    回行事曆
+  </a>
+</header>
+
+<div class="layout">
+  <!-- ================= 目錄 ================= -->
+  <nav class="toc" aria-label="章節目錄">
+    <details open>
+      <summary>本頁目錄 <span class="chev">›</span></summary>
+      <ol>
+        <li><a href="#ch1">基本操作</a></li>
+        <li><a href="#ch2">六種檢視</a></li>
+        <li><a href="#ch3">重複行程</a></li>
+        <li><a href="#ch4">分類・標籤・優先度・日曆本</a></li>
+        <li><a href="#ch5">提醒與專注</a></li>
+        <li><a href="#ch6">進階工具</a></li>
+        <li><a href="#ch7">統計與追蹤</a></li>
+        <li><a href="#ch8">資料與雲端</a></li>
+        <li><a href="#ch9">手機與 PWA</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <main class="content">
+    <section class="intro">
+      <h2>開始之前</h2>
+      <p>「桌面行程表」是一個<strong>免安裝、純本機</strong>的行事曆，雙擊 <span class="k">index.html</span> 就能用，所有資料存在你這台裝置的瀏覽器裡，不上傳、不追蹤。</p>
+      <p>本頁把功能拆成九個主題，<strong>每個主題都有一張說明圖與實際例子</strong>。你可以從左側（手機在上方）的目錄直接跳到想看的段落。準備好了就從第一章開始吧。</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 第 1 章：基本操作 -->
+    <!-- ============================================================ -->
+    <section class="chapter" id="ch1">
+      <div class="chapter-head">
+        <div class="chapter-num">1</div>
+        <div>
+          <h2>基本操作</h2>
+          <p class="sub">新增、編輯、完成一筆行程，以及行程卡上的每個小按鈕</p>
+        </div>
+      </div>
+
+      <p>按左側欄的 <span class="k">＋ 新增行程</span>（手機是畫面右下角的圓形浮動鈕），填入<b>事項名稱、日期、時間、分類、提醒</b>後儲存，資料就自動保存在本機瀏覽器。想修改就點行程卡打開編輯視窗；完成後點卡片左側的<b>圓形勾選圈</b>即可打勾。</p>
+
+      <p>每張行程卡上還藏著幾個好用的小動作：</p>
+      <ul>
+        <li><b>置頂</b>：把重要行程釘在當天最上面（卡片上的圖釘鈕）。</li>
+        <li><b>複製到明天</b>：一鍵把這筆行程複製一份到隔天，臨時延期或每天要做的事很方便。</li>
+        <li><b>子任務</b>：一筆行程底下可以再列幾個小步驟，逐項打勾。</li>
+        <li><b>逾時標紅</b>：時間已過卻還沒完成的行程會自動變紅色，一眼看出漏掉什麼。</li>
+      </ul>
+
+      <figure>
+        <svg class="illus" viewBox="0 0 660 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cap1">
+          <!-- 行程卡本體 -->
+          <rect x="150" y="70" width="360" height="290" rx="18" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+          <!-- 左側分類色條 -->
+          <rect x="150" y="70" width="12" height="290" rx="6" fill="var(--work)"/>
+          <!-- 完成勾選圈 -->
+          <circle cx="196" cy="112" r="15" fill="none" stroke="var(--primary)" stroke-width="3"/>
+          <path d="M189 112 l5 5 9 -11" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- 標題 -->
+          <text x="224" y="106" font-size="21" font-weight="700" fill="var(--text)">寫季度報告</text>
+          <text x="224" y="130" font-size="14" fill="var(--muted)">14:00 – 15:30 ・ 工作</text>
+          <!-- 置頂圖釘（自繪，非 emoji） -->
+          <g transform="translate(470 96) rotate(35)">
+            <rect x="-4" y="-14" width="8" height="18" rx="2" fill="var(--home)"/>
+            <circle cx="0" cy="-16" r="6" fill="var(--home)"/>
+            <rect x="-1.5" y="4" width="3" height="12" rx="1.5" fill="var(--home)"/>
+          </g>
+          <!-- 標籤 pill -->
+          <rect x="224" y="150" width="86" height="26" rx="13" fill="var(--chip)"/>
+          <text x="267" y="168" font-size="13" font-weight="700" fill="var(--primary)" text-anchor="middle">#工作</text>
+          <!-- 子任務 -->
+          <g>
+            <rect x="224" y="196" width="16" height="16" rx="4" fill="none" stroke="var(--muted)" stroke-width="2"/>
+            <path d="M228 204 l3 3 5 -6" fill="none" stroke="var(--sport)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="250" y="209" font-size="14" fill="var(--text)">收集本季數據</text>
+            <rect x="224" y="224" width="16" height="16" rx="4" fill="none" stroke="var(--muted)" stroke-width="2"/>
+            <text x="250" y="237" font-size="14" fill="var(--muted)">撰寫摘要</text>
+          </g>
+          <!-- 複製到明天鈕 -->
+          <g transform="translate(452 300)">
+            <rect x="0" y="0" width="44" height="30" rx="9" fill="var(--chip)"/>
+            <rect x="12" y="8" width="14" height="14" rx="2.5" fill="none" stroke="var(--primary)" stroke-width="2"/>
+            <rect x="18" y="12" width="14" height="14" rx="2.5" fill="var(--surface-strong)" stroke="var(--primary)" stroke-width="2"/>
+          </g>
+          <!-- 標註引導線與文字 -->
+          <g stroke="var(--line)" stroke-width="1.6" stroke-dasharray="4 4">
+            <line x1="196" y1="112" x2="40" y2="112"/>
+            <line x1="156" y1="220" x2="40" y2="250"/>
+            <line x1="470" y1="96" x2="620" y2="70"/>
+            <line x1="310" y1="163" x2="620" y2="150"/>
+            <line x1="240" y1="204" x2="620" y2="230"/>
+            <line x1="496" y1="315" x2="620" y2="320"/>
+          </g>
+          <g font-size="13" fill="var(--text)">
+            <text x="36" y="108" text-anchor="end" font-weight="700">① 點一下打勾完成</text>
+            <text x="36" y="254" text-anchor="end" font-weight="700">② 分類色條</text>
+            <text x="624" y="66" font-weight="700">③ 置頂圖釘</text>
+            <text x="624" y="146" font-weight="700">④ 關鍵字標籤</text>
+            <text x="624" y="226" font-weight="700">⑤ 子任務逐項打勾</text>
+            <text x="624" y="316" font-weight="700">⑥ 複製到明天</text>
+          </g>
+        </svg>
+        <figcaption id="cap1">一張<b>行程卡的完整解剖</b>：左緣的粗色條代表分類；左上圓圈是完成鍵；右上是置頂圖釘；標題下方可放標籤與子任務；右下角是「複製到明天」。<b>逾時未完成的卡片會整張轉紅</b>提醒你。</figcaption>
+      </figure>
+
+      <div class="example">
+        <span class="ex-tag">實際例子</span>
+        <p>你想記「明天下午三點開會」，不必逐格填欄位——直接在<b>事項名稱</b>欄輸入一句話：</p>
+        <div class="flow">
+          <span class="step">輸入「明天15:00 開會」</span>
+          <span class="arrow">→</span>
+          <span class="step">欄位失焦</span>
+          <span class="arrow">→</span>
+          <span class="step">自動填好日期＝明天、時間＝15:00</span>
+          <span class="arrow">→</span>
+          <span class="step">標題只留「開會」</span>
+        </div>
+        <p class="tip">支援今天／明天／後天、下週一～下週日、7月20日、上午／晚上＋點鐘等中文語彙；解析完成會跳出「已解析：M/D HH:MM」小提示。旁邊若有 🎤 鈕還能直接語音輸入。</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 第 2 章：六種檢視 -->
+    <!-- ============================================================ -->
+    <section class="chapter" id="ch2">
+      <div class="chapter-head">
+        <div class="chapter-num">2</div>
+        <div>
+          <h2>六種檢視</h2>
+          <p class="sub">日／週／月／年／甘特／列表，同一批行程換六種角度看</p>
+        </div>
+      </div>
+
+      <p>上方工具列的檢視切換鈕可以在六種版面之間切換，每一種都在回答不同的問題：</p>
+      <ul>
+        <li><b>日</b>：今天一天有什麼，適合當日執行。</li>
+        <li><b>週</b>：本週一到日的分佈，安排一週節奏。</li>
+        <li><b>月</b>：整月月曆，日期格越忙底色越深（熱力圖）。</li>
+        <li><b>年</b>：12 個迷你月曆＋全年行程數熱力圖，點月名或日格可跳進去。</li>
+        <li><b>甘特</b>：本週起 8 週的橫向時間軸，看跨週的長專案與前置依賴連線。</li>
+        <li><b>列表</b>：從今天起未來 30 天，依日期分組條列（今天／明天特別標示）。</li>
+      </ul>
+
+      <h3>日檢視的隱藏切換：清單／時間軸</h3>
+      <p>切到「日」檢視時，上方會多一組 <span class="k">清單／時間軸</span> 鈕。時間軸模式左側是小時刻度，行程依起訖時間排成方塊：<b>按住方塊下緣往下拖，就能直接延長結束時間</b>，放開即存檔；同一時段有多筆會並排並標「⚠️ 衝突」。</p>
+
+      <figure>
+        <svg class="illus" viewBox="0 0 660 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cap2">
+          <g font-size="14" font-weight="700" fill="var(--text)" text-anchor="middle">
+            <!-- 日 -->
+            <rect x="24" y="24" width="190" height="150" rx="14" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+            <text x="119" y="196">日</text>
+            <g stroke="var(--line)" stroke-width="1.4"><line x1="44" y1="60" x2="194" y2="60"/><line x1="44" y1="90" x2="194" y2="90"/><line x1="44" y1="120" x2="194" y2="120"/></g>
+            <rect x="70" y="66" width="110" height="20" rx="5" fill="var(--work)"/>
+            <rect x="70" y="96" width="80" height="20" rx="5" fill="var(--study)"/>
+            <!-- 週 -->
+            <rect x="235" y="24" width="190" height="150" rx="14" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+            <text x="330" y="196">週</text>
+            <g>
+              <rect x="250" y="46" width="20" height="100" rx="4" fill="var(--chip)"/>
+              <rect x="275" y="46" width="20" height="100" rx="4" fill="var(--chip)"/>
+              <rect x="300" y="46" width="20" height="100" rx="4" fill="var(--chip)"/>
+              <rect x="325" y="46" width="20" height="100" rx="4" fill="var(--chip)"/>
+              <rect x="350" y="46" width="20" height="100" rx="4" fill="var(--chip)"/>
+              <rect x="375" y="46" width="20" height="100" rx="4" fill="var(--chip)"/>
+              <rect x="400" y="46" width="20" height="100" rx="4" fill="var(--chip)"/>
+              <rect x="252" y="60" width="16" height="14" rx="3" fill="var(--home)"/>
+              <rect x="327" y="80" width="16" height="14" rx="3" fill="var(--sport)"/>
+              <rect x="402" y="60" width="16" height="14" rx="3" fill="var(--important)"/>
+            </g>
+            <!-- 月 -->
+            <rect x="446" y="24" width="190" height="150" rx="14" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+            <text x="541" y="196">月</text>
+            <g>
+              <rect x="462" y="46" width="158" height="104" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4"/>
+              <rect x="462" y="46" width="52" height="26" fill="rgba(69,104,240,0.10)"/>
+              <rect x="514" y="72" width="53" height="26" fill="rgba(69,104,240,0.22)"/>
+              <rect x="567" y="98" width="53" height="26" fill="rgba(69,104,240,0.34)"/>
+              <path d="M462 72 h158 M462 98 h158 M462 124 h158 M514 46 v104 M567 46 v104" stroke="var(--line)" stroke-width="1"/>
+            </g>
+            <!-- 年 -->
+            <rect x="24" y="230" width="190" height="150" rx="14" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+            <text x="119" y="402">年</text>
+            <g fill="var(--chip)" stroke="var(--line)" stroke-width="1">
+              <rect x="42" y="250" width="34" height="30" rx="4"/><rect x="84" y="250" width="34" height="30" rx="4"/><rect x="126" y="250" width="34" height="30" rx="4"/><rect x="168" y="250" width="34" height="30" rx="4"/>
+              <rect x="42" y="288" width="34" height="30" rx="4"/><rect x="84" y="288" width="34" height="30" rx="4"/><rect x="126" y="288" width="34" height="30" rx="4"/><rect x="168" y="288" width="34" height="30" rx="4"/>
+              <rect x="42" y="326" width="34" height="30" rx="4"/><rect x="84" y="326" width="34" height="30" rx="4"/><rect x="126" y="326" width="34" height="30" rx="4"/><rect x="168" y="326" width="34" height="30" rx="4"/>
+            </g>
+            <rect x="84" y="288" width="34" height="30" rx="4" fill="rgba(69,104,240,0.30)"/>
+            <rect x="126" y="326" width="34" height="30" rx="4" fill="rgba(69,104,240,0.45)"/>
+            <!-- 甘特 -->
+            <rect x="235" y="230" width="190" height="150" rx="14" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+            <text x="330" y="402">甘特</text>
+            <g>
+              <rect x="250" y="250" width="120" height="16" rx="6" fill="var(--work)"/>
+              <rect x="285" y="276" width="120" height="16" rx="6" fill="var(--study)"/>
+              <rect x="262" y="302" width="90" height="16" rx="6" fill="var(--sport)"/>
+              <path d="M370 258 h14 v26" fill="none" stroke="var(--muted)" stroke-width="1.6"/>
+            </g>
+            <!-- 列表 -->
+            <rect x="446" y="230" width="190" height="150" rx="14" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+            <text x="541" y="402">列表</text>
+            <g>
+              <circle cx="470" cy="256" r="4" fill="var(--primary)"/><rect x="484" y="251" width="130" height="10" rx="5" fill="var(--chip)"/>
+              <circle cx="470" cy="284" r="4" fill="var(--home)"/><rect x="484" y="279" width="100" height="10" rx="5" fill="var(--chip)"/>
+              <circle cx="470" cy="312" r="4" fill="var(--sport)"/><rect x="484" y="307" width="120" height="10" rx="5" fill="var(--chip)"/>
+              <circle cx="470" cy="340" r="4" fill="var(--important)"/><rect x="484" y="335" width="80" height="10" rx="5" fill="var(--chip)"/>
+            </g>
+          </g>
+        </svg>
+        <figcaption id="cap2">六種檢視的<b>縮圖對照</b>：由左到右、由上到下依序是日、週、月（含熱力圖底色）、年、甘特、列表。同一批行程換角度呈現，<b>先想「我現在想回答什麼問題」再選檢視</b>。</figcaption>
+      </figure>
+
+      <div class="example">
+        <span class="ex-tag">實際例子</span>
+        <p>開會臨時從一小時延長到一個半小時：</p>
+        <div class="flow">
+          <span class="step">切到「日」檢視</span>
+          <span class="arrow">→</span>
+          <span class="step">按「時間軸」</span>
+          <span class="arrow">→</span>
+          <span class="step">按住會議方塊下緣往下拖</span>
+          <span class="arrow">→</span>
+          <span class="step">放開，結束時間改成 15:30 並自動存檔</span>
+        </div>
+        <p class="tip">若剛好和另一筆行程重疊，兩個方塊會自動並排並標「⚠️ 衝突」，提醒你撞期。</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 第 3 章：重複行程 -->
+    <!-- ============================================================ -->
+    <section class="chapter" id="ch3">
+      <div class="chapter-head">
+        <div class="chapter-num">3</div>
+        <div>
+          <h2>重複行程</h2>
+          <p class="sub">七種重複規則，而且「每一天各自打勾」</p>
+        </div>
+      </div>
+
+      <p>新增／編輯行程時的<b>重複</b>欄位提供七種規則：</p>
+      <ul>
+        <li><b>每天</b>、<b>每週</b>、<b>每月</b></li>
+        <li><b>每隔 N 天</b>（自訂間隔天數）</li>
+        <li><b>只工作日</b>（週一～週五）</li>
+        <li><b>每月第幾個週幾</b>（例如每月第 2 個週二，含「最後一個」選項）</li>
+        <li><b>農曆每年</b>（農曆生日、忌日、拜拜；閏月年不會出現兩次）</li>
+      </ul>
+
+      <p>重複行程最重要的觀念是：<b>每一次出現都是各自獨立完成的</b>。今天把它打勾，不會害明天、下週的同一件事也跟著被打勾——每天都得自己完成自己那一格。</p>
+
+      <h3>只想改一次？「僅這次」vs「這次及之後」</h3>
+      <p>編輯某一次出現時會問你範圍：</p>
+      <ul>
+        <li><b>僅這次</b>：系統把「這一天」從原系列排除（記進 <span class="k">excludedDates</span>），另外建一筆單次行程放你的修改，其他日期完全不受影響。</li>
+        <li><b>這次及之後</b>：從這天起，未來所有出現都套用新內容。</li>
+      </ul>
+      <p class="tip">日／週／月檢視的「🗑 清空」對重複行程也是同樣邏輯——不會刪掉整個系列，只把牽涉到的那幾天標成「不出現」。</p>
+
+      <figure>
+        <svg class="illus" viewBox="0 0 660 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cap3">
+          <text x="330" y="30" font-size="15" font-weight="800" fill="var(--text)" text-anchor="middle">「每週二」在月曆上展開的樣子</text>
+          <!-- 星期標頭 -->
+          <g font-size="13" font-weight="700" fill="var(--muted)" text-anchor="middle">
+            <text x="80" y="66">一</text><text x="160" y="66">二</text><text x="240" y="66">三</text><text x="320" y="66">四</text><text x="400" y="66">五</text><text x="480" y="66">六</text><text x="560" y="66">日</text>
+          </g>
+          <!-- 週二整欄高亮 -->
+          <rect x="126" y="76" width="68" height="320" rx="10" fill="var(--chip)"/>
+          <text x="160" y="418" font-size="12.5" font-weight="700" fill="var(--primary)" text-anchor="middle">每週二發生</text>
+          <!-- 月曆格 4 週 -->
+          <g stroke="var(--line)" stroke-width="1.4" fill="var(--surface-strong)">
+            <!-- 產生 7x4 的格；用矩形逐一 -->
+            <rect x="48" y="78" width="64" height="74" rx="8"/><rect x="128" y="78" width="64" height="74" rx="8"/><rect x="208" y="78" width="64" height="74" rx="8"/><rect x="288" y="78" width="64" height="74" rx="8"/><rect x="368" y="78" width="64" height="74" rx="8"/><rect x="448" y="78" width="64" height="74" rx="8"/><rect x="528" y="78" width="64" height="74" rx="8"/>
+            <rect x="48" y="158" width="64" height="74" rx="8"/><rect x="128" y="158" width="64" height="74" rx="8"/><rect x="208" y="158" width="64" height="74" rx="8"/><rect x="288" y="158" width="64" height="74" rx="8"/><rect x="368" y="158" width="64" height="74" rx="8"/><rect x="448" y="158" width="64" height="74" rx="8"/><rect x="528" y="158" width="64" height="74" rx="8"/>
+            <rect x="48" y="238" width="64" height="74" rx="8"/><rect x="128" y="238" width="64" height="74" rx="8"/><rect x="208" y="238" width="64" height="74" rx="8"/><rect x="288" y="238" width="64" height="74" rx="8"/><rect x="368" y="238" width="64" height="74" rx="8"/><rect x="448" y="238" width="64" height="74" rx="8"/><rect x="528" y="238" width="64" height="74" rx="8"/>
+            <rect x="48" y="318" width="64" height="74" rx="8"/><rect x="128" y="318" width="64" height="74" rx="8"/><rect x="208" y="318" width="64" height="74" rx="8"/><rect x="288" y="318" width="64" height="74" rx="8"/><rect x="368" y="318" width="64" height="74" rx="8"/><rect x="448" y="318" width="64" height="74" rx="8"/><rect x="528" y="318" width="64" height="74" rx="8"/>
+          </g>
+          <!-- 週二方塊：四次出現，只有第2個打勾 -->
+          <g>
+            <rect x="136" y="90" width="48" height="20" rx="5" fill="var(--work)" opacity="0.5"/>
+            <!-- 第2個週二：已完成（實色+勾） -->
+            <rect x="136" y="170" width="48" height="20" rx="5" fill="var(--work)"/>
+            <path d="M144 180 l5 5 9 -10" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="136" y="250" width="48" height="20" rx="5" fill="var(--work)" opacity="0.5"/>
+            <rect x="136" y="330" width="48" height="20" rx="5" fill="var(--work)" opacity="0.5"/>
+          </g>
+          <!-- 指出第2個 -->
+          <line x1="184" y1="180" x2="360" y2="180" stroke="var(--line)" stroke-width="1.6" stroke-dasharray="4 4"/>
+          <text x="368" y="176" font-size="13" font-weight="700" fill="var(--text)">只有這天被打勾＝</text>
+          <text x="368" y="196" font-size="13" font-weight="700" fill="var(--sport)">逐日獨立完成</text>
+        </svg>
+        <figcaption id="cap3">「每週二」在整個月會出現四次（高亮那一直欄）。圖中<b>只有第 2 個週二被打勾</b>，其餘三次仍是待辦——這就是「每一次各自完成」。若某週想跳過，用「僅這次」把那天排除即可。</figcaption>
+      </figure>
+
+      <div class="example">
+        <span class="ex-tag">實際例子</span>
+        <p>要設「每月第 2 個週二的部門會議」：</p>
+        <div class="flow">
+          <span class="step">重複選「每月第幾個週幾」</span>
+          <span class="arrow">→</span>
+          <span class="step">第「2」個</span>
+          <span class="arrow">→</span>
+          <span class="step">週「二」</span>
+          <span class="arrow">→</span>
+          <span class="step">儲存</span>
+        </div>
+        <p class="tip">某個月因故停開？打開那次、選「僅這次」刪掉，只會少那一個月，之後每月照常出現。</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 第 4 章：分類・標籤・優先度・日曆本 -->
+    <!-- ============================================================ -->
+    <section class="chapter" id="ch4">
+      <div class="chapter-head">
+        <div class="chapter-num">4</div>
+        <div>
+          <h2>分類・標籤・優先度・日曆本</h2>
+          <p class="sub">四種分身術，把一堆行程整理得井井有條</p>
+        </div>
+      </div>
+
+      <p>四種歸類工具可以疊著用：</p>
+      <ul>
+        <li><b>分類與顏色</b>：內建工作、家庭、學習、運動、重要事項五類；側邊欄「自訂分類」還能新增你自己的分類名稱與顏色。</li>
+        <li><b>單筆自訂色</b>：某一筆想跳脫分類色時，取消「使用分類色」就能指定這筆專屬的顏色，各檢視都會優先套用。</li>
+        <li><b>關鍵字標籤</b>：事項名稱裡輸入 <span class="k">#標籤</span>，之後用搜尋就能把同標籤的行程全撈出來。</li>
+        <li><b>優先度</b>：高／中／低三級，可用「重要度」下拉只看高優先事項。</li>
+      </ul>
+
+      <h3>多日曆本：分本管理，疊加顯示</h3>
+      <p>每筆行程可歸到不同<b>日曆本</b>（例如「工作」「家庭」「讀書會」）。工具列 <span class="k">🖥 模式 → 📚 日曆本</span> 可勾選要顯示哪幾本（<b>可複選疊加</b>），也能新增／改名／刪除日曆本。刪掉某本時，本內行程會自動歸回「預設」本，不會消失。只有一本時整個欄位會自動隱藏，不打擾你。</p>
+
+      <figure>
+        <svg class="illus" viewBox="0 0 660 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cap4">
+          <!-- 區塊1：分類色票 -->
+          <text x="40" y="40" font-size="14" font-weight="800" fill="var(--text)">分類與顏色</text>
+          <g font-size="13" fill="var(--text)">
+            <circle cx="52" cy="72" r="13" fill="var(--work)"/><text x="74" y="77">工作</text>
+            <circle cx="164" cy="72" r="13" fill="var(--home)"/><text x="186" y="77">家庭</text>
+            <circle cx="276" cy="72" r="13" fill="var(--study)"/><text x="298" y="77">學習</text>
+            <circle cx="388" cy="72" r="13" fill="var(--sport)"/><text x="410" y="77">運動</text>
+            <circle cx="500" cy="72" r="13" fill="var(--important)"/><text x="522" y="77">重要</text>
+          </g>
+          <!-- 單筆自訂色（滴管） -->
+          <g transform="translate(560 56)">
+            <circle cx="16" cy="16" r="15" fill="#e0459a"/>
+            <path d="M9 21 l8 -8 3 3 -8 8 -4 1 1 -4z" fill="#fff"/>
+            <text x="16" y="52" font-size="11.5" font-weight="700" fill="var(--muted)" text-anchor="middle">自訂色</text>
+          </g>
+
+          <line x1="40" y1="104" x2="620" y2="104" stroke="var(--line)" stroke-width="1.2"/>
+
+          <!-- 區塊2：標籤 -->
+          <text x="40" y="140" font-size="14" font-weight="800" fill="var(--text)">關鍵字標籤</text>
+          <g font-size="14" font-weight="700" fill="var(--primary)" text-anchor="middle">
+            <rect x="40" y="154" width="96" height="30" rx="15" fill="var(--chip)"/><text x="88" y="174">#專案A</text>
+            <rect x="148" y="154" width="80" height="30" rx="15" fill="var(--chip)"/><text x="188" y="174">#家人</text>
+            <rect x="240" y="154" width="80" height="30" rx="15" fill="var(--chip)"/><text x="280" y="174">#健身</text>
+          </g>
+          <text x="336" y="174" font-size="12.5" fill="var(--muted)">← 搜尋「#專案A」一次撈出</text>
+
+          <line x1="40" y1="206" x2="620" y2="206" stroke="var(--line)" stroke-width="1.2"/>
+
+          <!-- 區塊3：優先度 -->
+          <text x="40" y="242" font-size="14" font-weight="800" fill="var(--text)">優先度</text>
+          <g font-size="13" font-weight="700">
+            <rect x="40" y="256" width="200" height="24" rx="6" fill="var(--important)"/><text x="52" y="273" fill="#fff">高</text>
+            <rect x="40" y="288" width="140" height="24" rx="6" fill="var(--home)"/><text x="52" y="305" fill="#fff">中</text>
+            <rect x="40" y="320" width="90" height="24" rx="6" fill="var(--sport)"/><text x="52" y="337" fill="#fff">低</text>
+          </g>
+          <text x="260" y="305" font-size="12.5" fill="var(--muted)">用「重要度」下拉可只看「高」</text>
+
+          <!-- 區塊4：多日曆本疊層 -->
+          <text x="380" y="242" font-size="14" font-weight="800" fill="var(--text)">多日曆本疊加</text>
+          <g>
+            <rect x="420" y="300" width="150" height="96" rx="12" fill="var(--study)" opacity="0.85"/>
+            <rect x="400" y="282" width="150" height="96" rx="12" fill="var(--home)" opacity="0.9"/>
+            <rect x="380" y="264" width="150" height="96" rx="12" fill="var(--work)"/>
+            <text x="455" y="300" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">工作本</text>
+            <text x="455" y="322" font-size="12" fill="#fff" text-anchor="middle" opacity="0.9">＋家庭本</text>
+            <text x="455" y="342" font-size="12" fill="#fff" text-anchor="middle" opacity="0.9">＋讀書會本</text>
+          </g>
+          <text x="455" y="416" font-size="11.5" font-weight="700" fill="var(--muted)" text-anchor="middle">勾選多本＝同時疊在一個畫面</text>
+        </svg>
+        <figcaption id="cap4">四種整理方式一次看懂：<b>分類色</b>給大方向、<b>單筆自訂色</b>做例外、<b>#標籤</b>做跨分類串連、<b>優先度</b>排輕重；右下的<b>多日曆本</b>則像透明片一樣可以疊在一起或單獨看。</figcaption>
+      </figure>
+
+      <div class="example">
+        <span class="ex-tag">實際例子</span>
+        <p>想把工作和家庭徹底分開，但偶爾又要一起看：</p>
+        <div class="flow">
+          <span class="step">建「工作」「家庭」兩個日曆本</span>
+          <span class="arrow">→</span>
+          <span class="step">平常只勾「工作」本專心上班</span>
+          <span class="arrow">→</span>
+          <span class="step">週末兩本都勾，一次看全家行程</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 第 5 章：提醒與專注 -->
+    <!-- ============================================================ -->
+    <section class="chapter" id="ch5">
+      <div class="chapter-head">
+        <div class="chapter-num">5</div>
+        <div>
+          <h2>提醒與專注</h2>
+          <p class="sub">到點提醒你、還幫你專心把它做完</p>
+        </div>
+      </div>
+
+      <p>每筆行程都能設<b>提醒時間</b>，共四段：</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>提醒設定</th><th>什麼時候響</th><th>適合</th></tr></thead>
+          <tbody>
+            <tr><td>準時</td><td>行程開始的那一刻</td><td>鬧鐘、吃藥</td></tr>
+            <tr><td>5 分鐘前</td><td>提前 5 分鐘</td><td>線上會議接入</td></tr>
+            <tr><td>10 分鐘前</td><td>提前 10 分鐘</td><td>出門赴約前收拾</td></tr>
+            <tr><td>30 分鐘前</td><td>提前 30 分鐘</td><td>需要暖身、準備資料</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>提醒預設顯示在畫面右下角。按工具列 <span class="k">🔔 開啟通知</span> 授權後，會改用<b>系統推播通知</b>（有安裝 PWA 時透過 Service Worker 發送），就算切到別的視窗也看得到；不支援或被封鎖時自動退回頁面內提示，不會報錯。</p>
+
+      <h3>番茄鐘：把「開始做」變簡單</h3>
+      <p>工具列 <span class="k">🍅 番茄鐘</span> 是專注計時器，預設專注 25 分、休息 5 分，分鐘數可調，還能<b>綁定今日某個行程</b>。倒數結束會播放提示音並跳出通知，提醒你休息或進下一輪。勾選完成行程時也會有一聲短提示音。</p>
+
+      <figure>
+        <svg class="illus" viewBox="0 0 660 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cap5">
+          <!-- 番茄鐘圓環 -->
+          <g transform="translate(210 210)">
+            <circle r="120" fill="none" stroke="var(--line)" stroke-width="20"/>
+            <!-- 進度弧：約 70%（周長 2πr=753.98，dashoffset=30%） -->
+            <circle r="120" fill="none" stroke="var(--primary)" stroke-width="20" stroke-linecap="round"
+                    stroke-dasharray="753.98" stroke-dashoffset="226" transform="rotate(-90)"/>
+            <text x="0" y="-6" font-size="46" font-weight="800" fill="var(--text)" text-anchor="middle">17:30</text>
+            <text x="0" y="28" font-size="15" fill="var(--muted)" text-anchor="middle">剩餘專注時間</text>
+            <text x="0" y="52" font-size="13" font-weight="700" fill="var(--primary)" text-anchor="middle">綁定：寫季度報告</text>
+          </g>
+          <text x="210" y="366" font-size="14" font-weight="800" fill="var(--text)" text-anchor="middle">番茄鐘 · 專注 25:00</text>
+
+          <!-- 鬧鈴 + 提醒時間刻度 -->
+          <g transform="translate(470 96)">
+            <!-- 鈴鐺 -->
+            <path d="M0 -30 C24 -30 30 -12 30 6 L34 16 L-34 16 L-30 6 C-30 -12 -24 -30 0 -30 Z" fill="var(--home)"/>
+            <rect x="-3" y="-40" width="6" height="12" rx="3" fill="var(--home)"/>
+            <path d="M-10 16 a10 10 0 0 0 20 0" fill="var(--primary-strong)"/>
+            <!-- 響鈴波 -->
+            <path d="M42 -14 q10 20 0 40" fill="none" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M-42 -14 q-10 20 0 40" fill="none" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/>
+          </g>
+          <text x="470" y="150" font-size="13" font-weight="800" fill="var(--text)" text-anchor="middle">到點提醒</text>
+
+          <!-- 時間刻度線 -->
+          <line x1="360" y1="250" x2="620" y2="250" stroke="var(--line)" stroke-width="3"/>
+          <g fill="var(--primary)">
+            <circle cx="370" cy="250" r="6"/><circle cx="440" cy="250" r="6"/><circle cx="510" cy="250" r="6"/>
+            <circle cx="610" cy="250" r="9" fill="var(--important)"/>
+          </g>
+          <g font-size="12.5" font-weight="700" fill="var(--text)" text-anchor="middle">
+            <text x="370" y="278">30分前</text>
+            <text x="440" y="278">10分前</text>
+            <text x="510" y="278">5分前</text>
+            <text x="610" y="278" fill="var(--important)">準時</text>
+          </g>
+          <text x="490" y="316" font-size="12.5" fill="var(--muted)" text-anchor="middle">四段提醒，越靠近開始時間越紅</text>
+        </svg>
+        <figcaption id="cap5">左邊是<b>番茄鐘</b>的倒數圓環（環走越滿代表這一輪快結束），可綁定今日行程；右邊是<b>四段提醒</b>的時間軸——從 30 分前到準時，時間到就用系統通知敲你一下。</figcaption>
+      </figure>
+
+      <div class="example">
+        <span class="ex-tag">實際例子</span>
+        <p>下午要交報告，想確保準備充分又能專心寫：</p>
+        <div class="flow">
+          <span class="step">報告行程提醒設「30 分鐘前」</span>
+          <span class="arrow">→</span>
+          <span class="step">開番茄鐘，綁定「寫報告」，設 25 分</span>
+          <span class="arrow">→</span>
+          <span class="step">響鈴＝休息 5 分</span>
+          <span class="arrow">→</span>
+          <span class="step">再來一輪</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 第 6 章：進階工具 -->
+    <!-- ============================================================ -->
+    <section class="chapter" id="ch6">
+      <div class="chapter-head">
+        <div class="chapter-num">6</div>
+        <div>
+          <h2>進階工具</h2>
+          <p class="sub">給想更快、更聰明安排的你</p>
+        </div>
+      </div>
+
+      <ul>
+        <li><b>命令面板</b>：按 <kbd>Ctrl</kbd>+<kbd>K</kbd>（Mac 是 <kbd>⌘</kbd>+<kbd>K</kbd>）叫出，打字就能執行指令、搜尋行程，Enter 直接跳去編輯。</li>
+        <li><b>批量新增</b>：貼上多行文字，每行一筆（支援中文日期時間語彙），一次建立一整串行程。</li>
+        <li><b>⚡ 找空檔</b>：新增行程時按 ⚡，往後最多找 7 天，自動挑出第一個夠長的空檔並帶入時間；若符合你近期常用時段還會額外提示。</li>
+        <li><b>⏭ 未完成順延</b>：日檢視一鍵把當天沒做完的非重複行程移到下一個工作日（自動跳過週末與國定假日）。</li>
+        <li><b>🔗 前置任務依賴</b>：單次行程可勾選其他單次行程當「前置任務」，<b>前置沒完成就無法把它打勾完成</b>；卡片會顯示 🔗 圖示。</li>
+        <li><b>🌏 時區與旅行模式</b>：行程可設 IANA 時區；開啟旅行模式並選顯示時區後，卡片時間旁會出現換算 badge（如「→台北 09:00」，跨日標 +1d／-1d），純顯示、不影響存檔值與排序。</li>
+      </ul>
+
+      <figure>
+        <svg class="illus" viewBox="0 0 660 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cap6">
+          <!-- 命令面板 -->
+          <rect x="70" y="30" width="520" height="150" rx="16" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+          <rect x="90" y="50" width="480" height="40" rx="10" fill="var(--bg)" stroke="var(--line)" stroke-width="1.5"/>
+          <!-- 搜尋放大鏡 -->
+          <g transform="translate(108 70)"><circle cx="0" cy="0" r="7" fill="none" stroke="var(--muted)" stroke-width="2.2"/><line x1="5" y1="5" x2="11" y2="11" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round"/></g>
+          <text x="130" y="75" font-size="15" fill="var(--text)">寫季度報告</text>
+          <rect x="250" y="60" width="2" height="20" fill="var(--primary)"/>
+          <rect x="512" y="58" width="48" height="24" rx="6" fill="var(--chip)"/>
+          <text x="536" y="74" font-size="12" font-weight="800" fill="var(--primary)" text-anchor="middle">⌘K</text>
+          <!-- 結果列 -->
+          <g font-size="13.5" fill="var(--text)">
+            <rect x="90" y="102" width="480" height="30" rx="7" fill="var(--chip)"/>
+            <text x="104" y="122">↵ 跳到「寫季度報告」</text>
+            <text x="104" y="152" fill="var(--muted)">＋ 新增行程</text>
+          </g>
+          <text x="330" y="200" font-size="13" font-weight="800" fill="var(--text)" text-anchor="middle">Ctrl / ⌘ + K　命令面板</text>
+
+          <!-- 依賴連線 -->
+          <text x="70" y="250" font-size="14" font-weight="800" fill="var(--text)">🔗 前置任務依賴</text>
+          <g>
+            <!-- 前置卡（已完成） -->
+            <rect x="70" y="266" width="200" height="60" rx="12" fill="var(--surface-strong)" stroke="var(--sport)" stroke-width="2.4"/>
+            <circle cx="96" cy="296" r="11" fill="var(--sport)"/>
+            <path d="M90 296 l4 4 8 -9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="116" y="291" font-size="14" font-weight="700" fill="var(--text)">收集資料</text>
+            <text x="116" y="311" font-size="12" fill="var(--sport)">已完成</text>
+            <!-- L 形連線 -->
+            <path d="M270 296 H320 V380 H360" fill="none" stroke="var(--primary)" stroke-width="2.6"/>
+            <circle cx="360" cy="380" r="4" fill="var(--primary)"/>
+            <!-- 後續卡（被鎖） -->
+            <rect x="366" y="350" width="220" height="60" rx="12" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+            <circle cx="392" cy="380" r="11" fill="none" stroke="var(--muted)" stroke-width="2.4"/>
+            <text x="412" y="375" font-size="14" font-weight="700" fill="var(--text)">寫季度報告</text>
+            <text x="412" y="395" font-size="12" fill="var(--muted)">前置完成前無法打勾 🔒</text>
+          </g>
+
+          <!-- 找空檔小圖 -->
+          <g transform="translate(430 250)">
+            <text x="0" y="0" font-size="13" font-weight="800" fill="var(--text)">⚡ 找空檔</text>
+            <rect x="0" y="10" width="24" height="70" rx="4" fill="var(--chip)"/>
+            <rect x="2" y="14" width="20" height="18" rx="3" fill="var(--work)"/>
+            <rect x="2" y="56" width="20" height="20" rx="3" fill="var(--study)"/>
+            <rect x="2" y="34" width="20" height="20" rx="3" fill="var(--sport)" opacity="0.35"/>
+            <text x="34" y="48" font-size="12" fill="var(--muted)">自動挑出空格</text>
+          </g>
+        </svg>
+        <figcaption id="cap6">上半是 <b>Ctrl／⌘ + K 命令面板</b>——打字即可搜尋行程或執行指令；下半示範 <b>🔗 前置依賴</b>：「收集資料」沒完成前，「寫季度報告」的勾選圈是鎖住的，用 L 形連線標出先後關係。</figcaption>
+      </figure>
+
+      <div class="example">
+        <span class="ex-tag">實際例子</span>
+        <p>週一早上一次把整週晨會排好，還要塞一場一小時的臨時討論：</p>
+        <div class="flow">
+          <span class="step">批量新增貼「週一9:00 晨會 / 週二9:00 晨會 / 週三9:00 晨會」</span>
+          <span class="arrow">→</span>
+          <span class="step">新增討論時按 ⚡ 找空檔</span>
+          <span class="arrow">→</span>
+          <span class="step">自動帶入今天第一個 1 小時空檔</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 第 7 章：統計與追蹤 -->
+    <!-- ============================================================ -->
+    <section class="chapter" id="ch7">
+      <div class="chapter-head">
+        <div class="chapter-num">7</div>
+        <div>
+          <h2>統計與追蹤</h2>
+          <p class="sub">看見自己的節奏，也養成習慣</p>
+        </div>
+      </div>
+
+      <ul>
+        <li><b>今日重點 3 件事</b>＋<b>今日完成率</b>：先圈出當天最重要的三件，再看完成比例。</li>
+        <li><b>每週目標</b>：側邊欄記下本週重點，<b>週回顧</b>會統計本週完成率、和上週比較（↑／↓／→）、各分類完成情況、下週已排行程。</li>
+        <li><b>習慣追蹤</b>：把「每天喝水」這類習慣打卡，會累積<b>連續天數</b>（連續越久越有動力）。</li>
+        <li><b>近 7 天完成長條圖</b>：側邊欄「完成率」下方，一眼看出哪天特別忙或偷懶。</li>
+        <li><b>😀 心情追蹤</b>：每天記 1～5 分心情，月檢視格子右下角顯示心情色點。</li>
+        <li><b>🎯 OKR 目標</b>：設定目標與底下的關鍵結果，填入目標值與目前值，系統自動算出整體達成率。</li>
+        <li><b>📈 進階統計儀表板</b>：近 30 天分類工時、近 8 週完成率趨勢、逾期清單、時段分布、番茄鐘專注時數、心情分布，全在一頁。</li>
+      </ul>
+
+      <figure>
+        <svg class="illus" viewBox="0 0 660 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cap7">
+          <!-- 長條圖：近7天 -->
+          <text x="40" y="36" font-size="14" font-weight="800" fill="var(--text)">近 7 天完成數</text>
+          <line x1="40" y1="200" x2="330" y2="200" stroke="var(--line)" stroke-width="2"/>
+          <g fill="var(--primary)">
+            <rect x="46" y="150" width="30" height="50" rx="5"/>
+            <rect x="86" y="120" width="30" height="80" rx="5"/>
+            <rect x="126" y="168" width="30" height="32" rx="5"/>
+            <rect x="166" y="96" width="30" height="104" rx="5"/>
+            <rect x="206" y="140" width="30" height="60" rx="5"/>
+            <rect x="246" y="112" width="30" height="88" rx="5"/>
+            <rect x="286" y="176" width="30" height="24" rx="5"/>
+          </g>
+          <g font-size="11" fill="var(--muted)" text-anchor="middle">
+            <text x="61" y="216">一</text><text x="101" y="216">二</text><text x="141" y="216">三</text><text x="181" y="216">四</text><text x="221" y="216">五</text><text x="261" y="216">六</text><text x="301" y="216">日</text>
+          </g>
+
+          <!-- 完成率環 -->
+          <g transform="translate(470 120)">
+            <circle r="66" fill="none" stroke="var(--line)" stroke-width="16"/>
+            <circle r="66" fill="none" stroke="var(--sport)" stroke-width="16" stroke-linecap="round"
+                    stroke-dasharray="414.7" stroke-dashoffset="83" transform="rotate(-90)"/>
+            <text x="0" y="0" font-size="30" font-weight="800" fill="var(--text)" text-anchor="middle">80%</text>
+            <text x="0" y="24" font-size="12.5" fill="var(--muted)" text-anchor="middle">今日完成率</text>
+          </g>
+
+          <!-- 習慣連續火焰格子 -->
+          <text x="40" y="262" font-size="14" font-weight="800" fill="var(--text)">習慣：每天喝水</text>
+          <g>
+            <!-- 10 格，前 7 打勾（實色），最後帶火焰 -->
+            <g fill="var(--sport)">
+              <rect x="40" y="278" width="28" height="28" rx="6"/>
+              <rect x="76" y="278" width="28" height="28" rx="6"/>
+              <rect x="112" y="278" width="28" height="28" rx="6"/>
+              <rect x="148" y="278" width="28" height="28" rx="6"/>
+              <rect x="184" y="278" width="28" height="28" rx="6"/>
+              <rect x="220" y="278" width="28" height="28" rx="6"/>
+              <rect x="256" y="278" width="28" height="28" rx="6"/>
+            </g>
+            <g fill="none" stroke="var(--line)" stroke-width="2">
+              <rect x="292" y="278" width="28" height="28" rx="6"/>
+              <rect x="328" y="278" width="28" height="28" rx="6"/>
+            </g>
+            <!-- 火焰（自繪，非 emoji） -->
+            <g transform="translate(384 268)">
+              <path d="M14 4 C6 16 24 20 16 34 C34 30 30 8 22 0 C24 10 18 12 14 4 Z" fill="var(--home)"/>
+              <path d="M16 14 C11 21 20 24 16 32 C25 29 22 17 18 12 Z" fill="var(--important)"/>
+            </g>
+            <text x="420" y="298" font-size="15" font-weight="800" fill="var(--home)">連續 21 天</text>
+          </g>
+
+          <!-- OKR 進度 -->
+          <text x="40" y="350" font-size="14" font-weight="800" fill="var(--text)">🎯 OKR：完成產品改版</text>
+          <rect x="40" y="362" width="470" height="22" rx="11" fill="var(--chip)"/>
+          <rect x="40" y="362" width="306" height="22" rx="11" fill="var(--primary)"/>
+          <text x="524" y="379" font-size="15" font-weight="800" fill="var(--primary)">65%</text>
+          <text x="40" y="406" font-size="11.5" fill="var(--muted)">＝底下各關鍵結果（目前值 / 目標值）的平均達成率</text>
+        </svg>
+        <figcaption id="cap7">追蹤面板一次看四樣：<b>近 7 天長條圖</b>看忙碌起伏、<b>完成率圓環</b>看今日達成、<b>習慣格子＋連續天數</b>維持動力、<b>OKR 進度條</b>則把大目標拆成關鍵結果自動算平均達成率。</figcaption>
+      </figure>
+
+      <div class="example">
+        <span class="ex-tag">實際例子</span>
+        <p>想養成每天運動的習慣、又想追一個季度大目標：</p>
+        <div class="flow">
+          <span class="step">習慣追蹤新增「運動 30 分」</span>
+          <span class="arrow">→</span>
+          <span class="step">每天完成打卡，看連續天數往上疊</span>
+          <span class="arrow">→</span>
+          <span class="step">OKR 設「跑完半馬」＋關鍵結果「月跑量 80km」</span>
+          <span class="arrow">→</span>
+          <span class="step">填入目前跑量，進度自動更新</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 第 8 章：資料與雲端 -->
+    <!-- ============================================================ -->
+    <section class="chapter" id="ch8">
+      <div class="chapter-head">
+        <div class="chapter-num">8</div>
+        <div>
+          <h2>資料與雲端</h2>
+          <p class="sub">備份、匯出、多裝置同步——以及一個一定要知道的例外</p>
+        </div>
+      </div>
+
+      <p>資料平常存在這台裝置的瀏覽器，建議定期備份：</p>
+      <ul>
+        <li><b>完整 JSON 備份／還原</b>：唯一能<b>完整</b>還原全部資料的方式。匯出時可<b>設密碼加密</b>（AES-GCM，檔名 <span class="k">.enc.json</span>），還原時自動偵測並要求密碼。</li>
+        <li><b>匯出 Excel（CSV）</b>：適合另存檢視、給別人看；<b>不</b>適合拿來還原。</li>
+        <li><b>匯出 PDF／列印</b>：列印目前檢視，自動隱藏工具列與按鈕，白底黑字排版。</li>
+        <li><b>匯出／匯入 .ics</b>：和 Outlook、Google 日曆等交換行程（重複行程轉成 RRULE），與 JSON 備份是各自獨立的功能。</li>
+      </ul>
+
+      <h3>雲端同步（選用）</h3>
+      <p>預設<b>完全關閉</b>，此時 App 跟純本機版一模一樣、不發任何網路請求。設定好 <span class="k">config.js</span> 後，可用 Google 帳號登入，手動或自動把資料同步到你自己的 Supabase 專案，供多台裝置共用（<b>逐筆合併、後寫入者覆蓋</b>）。還能開啟「雲端備份版本」保留最新 10 份快照，誤覆蓋時可救回。另有 Google 日曆<b>唯讀匯入</b>可把外部行程顯示進來（詳見 <span class="k">CLOUD_SETUP.md</span> / <span class="k">CLOUD_GCAL_SETUP.md</span>）。</p>
+
+      <h3>家庭共享（選用，需先登入雲端）</h3>
+      <p>想跟家人共用同一批行程時，在「☁️ 雲端同步」視窗建立<b>共享群組</b>，按「📋 複製邀請碼」把代碼傳給家人；家人在自己的裝置上按「輸入邀請碼加入」即可。加入後<b>不會</b>整包資料互通——只有你在新增／編輯行程時<b>逐筆勾選「共享」</b>的那些行程才會出現在群組成員的畫面上，其餘仍然完全私人。隨時可以退出群組。</p>
+      <div class="example">
+        <b>例子：</b>你想讓另一半看到「週六 10:00 帶小孩打疫苗」，但不想讓他看到你的工作行程。
+        作法：先建立群組並把邀請碼給他 → 編輯這筆行程時勾「共享」→ 其他工作行程<b>不要</b>勾，就只會共享這一筆。
+      </div>
+
+      <h3>⚠️ 一定要知道：附件只留在本機</h3>
+      <p>行程可加<b>📎 附件</b>（照片或檔案，單檔 ≤5MB、每筆 ≤10 個）。但附件本體只存在<b>本機瀏覽器的 IndexedDB</b>，<b>不會</b>跟著 JSON 備份、也<b>不會</b>透過雲端同步轉移到其他裝置。換手機、還原備份時，附件都不會過去，重要檔案請另外自行保存。</p>
+
+      <figure>
+        <svg class="illus" viewBox="0 0 660 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cap8">
+          <!-- 雲（中上） -->
+          <g transform="translate(330 70)">
+            <path d="M-60 20 a34 34 0 0 1 22 -64 a40 40 0 0 1 74 8 a30 30 0 0 1 6 56 Z" fill="var(--primary)" opacity="0.9"/>
+            <text x="3" y="6" font-size="14" font-weight="800" fill="#fff" text-anchor="middle">雲端</text>
+          </g>
+          <!-- 電腦（左） -->
+          <g transform="translate(70 250)">
+            <rect x="0" y="0" width="150" height="96" rx="10" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+            <rect x="12" y="12" width="126" height="60" rx="4" fill="var(--chip)"/>
+            <rect x="55" y="96" width="40" height="10" fill="var(--line)"/>
+            <rect x="35" y="106" width="80" height="8" rx="4" fill="var(--line)"/>
+            <text x="75" y="130" font-size="13" font-weight="700" fill="var(--text)" text-anchor="middle">電腦</text>
+          </g>
+          <!-- 手機（右） -->
+          <g transform="translate(520 240)">
+            <rect x="0" y="0" width="70" height="120" rx="14" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="2"/>
+            <rect x="8" y="12" width="54" height="88" rx="4" fill="var(--chip)"/>
+            <circle cx="35" cy="110" r="5" fill="var(--line)"/>
+            <text x="35" y="146" font-size="13" font-weight="700" fill="var(--text)" text-anchor="middle">手機</text>
+          </g>
+          <!-- 雙向箭頭：電腦<->雲 -->
+          <g stroke="var(--sport)" stroke-width="3" fill="none">
+            <path d="M150 250 Q210 150 288 96" marker-end="url(#ar)"/>
+            <path d="M300 110 Q220 190 150 270" marker-end="url(#ar)"/>
+          </g>
+          <!-- 雙向箭頭：手機<->雲 -->
+          <g stroke="var(--sport)" stroke-width="3" fill="none">
+            <path d="M540 240 Q470 150 372 96" marker-end="url(#ar)"/>
+            <path d="M360 110 Q450 180 540 258" marker-end="url(#ar)"/>
+          </g>
+          <text x="330" y="200" font-size="13" font-weight="800" fill="var(--sport)" text-anchor="middle">逐筆合併同步</text>
+
+          <!-- 附件被擋 -->
+          <g transform="translate(96 366)">
+            <!-- 迴紋針 -->
+            <path d="M4 20 v-12 a8 8 0 0 1 16 0 v14 a4 4 0 0 1 -8 0 v-12" fill="none" stroke="var(--home)" stroke-width="3" stroke-linecap="round"/>
+            <text x="30" y="14" font-size="12.5" font-weight="700" fill="var(--text)">📎 附件</text>
+          </g>
+          <!-- 從電腦往雲的附件箭頭被打叉 -->
+          <path d="M150 360 Q240 300 300 150" stroke="var(--important)" stroke-width="2.6" stroke-dasharray="6 6" fill="none"/>
+          <g transform="translate(250 250)" stroke="var(--important)" stroke-width="4" stroke-linecap="round">
+            <line x1="-11" y1="-11" x2="11" y2="11"/><line x1="11" y1="-11" x2="-11" y2="11"/>
+          </g>
+          <text x="250" y="290" font-size="12.5" font-weight="800" fill="var(--important)" text-anchor="middle">附件不同步</text>
+          <text x="250" y="308" font-size="11.5" fill="var(--muted)" text-anchor="middle">只存本機 IndexedDB</text>
+
+          <defs>
+            <marker id="ar" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto">
+              <path d="M0 0 L9 4.5 L0 9 z" fill="var(--sport)"/>
+            </marker>
+          </defs>
+        </svg>
+        <figcaption id="cap8">雲端同步時，<b>電腦與手機各自和雲端逐筆合併</b>（綠色雙向箭頭）。但<b>📎 附件是唯一的例外</b>——紅色打叉那條代表附件只留在本機、不會上雲也不進備份，換裝置就不會跟著走。</figcaption>
+      </figure>
+
+      <div class="example">
+        <span class="ex-tag">實際例子</span>
+        <p>要換新手機、想把行程搬過去：</p>
+        <div class="flow">
+          <span class="step">舊機「備份」匯出（可設密碼）</span>
+          <span class="arrow">→</span>
+          <span class="step">新機「還原」匯入該檔</span>
+          <span class="arrow">→</span>
+          <span class="step">行程全到齊</span>
+          <span class="arrow">→</span>
+          <span class="step">但附件要另外自己複製（不在備份裡）</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 第 9 章：手機與 PWA -->
+    <!-- ============================================================ -->
+    <section class="chapter" id="ch9">
+      <div class="chapter-head">
+        <div class="chapter-num">9</div>
+        <div>
+          <h2>手機與 PWA</h2>
+          <p class="sub">手機上更順手，還能裝成一個真正的 App</p>
+        </div>
+      </div>
+
+      <p>螢幕寬度 760px 以下時，版面會自動為手機重排：</p>
+      <ul>
+        <li><b>底部導航列</b>：日／週／月／列表／今天五顆，單手切換最快。</li>
+        <li><b>收合面板</b>：側邊欄（今日重點、完成率、每週目標、習慣、自訂分類、快速範本…）、搜尋篩選、每日備忘錄都收成可展開的面板。</li>
+        <li><b>右下浮動＋</b>：一顆圓形按鈕直接快速新增行程。</li>
+        <li>其餘工具收進工具列的 <span class="k">⋯ 更多</span>；標題也會顯示成「手機行程表」。</li>
+      </ul>
+
+      <h3>滑動手勢</h3>
+      <ul>
+        <li><b>空白處左右滑</b>：切到上一頁／下一頁（依目前檢視是換月、換週或換天）。</li>
+        <li><b>行程卡左滑</b>：把它<b>完成</b>（會播提示音並震動；若有未完成的前置任務會擋下來提醒）。</li>
+        <li><b>行程卡右滑</b>：把它<b>順延到下一個工作日</b>（重複行程請改用編輯）。</li>
+        <li><b>月格長按</b>：在日期格長按約半秒，直接開新增視窗並帶入那天。</li>
+      </ul>
+
+      <h3>裝成 App（PWA）</h3>
+      <p>透過本機伺服器或正式站（<span class="k">https://calendar88.pages.dev/</span>）開啟後，Android 用 Chrome 選「加入主畫面／安裝」，iPhone 用 Safari 的「分享 → 加入主畫面」，就能像 App 一樣從主畫面開啟、<b>離線也能用</b>。此外還有<b>掛牆看板模式</b>（全螢幕大時鐘＋今日行程，適合平板當家庭佈告欄）與<b>分享圖卡</b>（把當天行程畫成圖片分享到 LINE）。</p>
+      <p class="tip">注意：PWA 安裝與離線需透過 http(s) 開啟，直接雙擊 index.html 的 file:// 模式無法安裝，但一般行程功能全部照用。</p>
+
+      <figure>
+        <svg class="illus" viewBox="0 0 660 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cap9">
+          <!-- 手機外框 -->
+          <rect x="238" y="30" width="184" height="400" rx="30" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="3"/>
+          <rect x="252" y="58" width="156" height="344" rx="8" fill="var(--bg)"/>
+          <rect x="300" y="42" width="60" height="8" rx="4" fill="var(--line)"/>
+          <!-- 螢幕內：一張行程卡 -->
+          <rect x="266" y="78" width="128" height="60" rx="10" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="1.6"/>
+          <rect x="266" y="78" width="7" height="60" rx="3.5" fill="var(--work)"/>
+          <circle cx="288" cy="100" r="8" fill="none" stroke="var(--primary)" stroke-width="2.4"/>
+          <text x="304" y="98" font-size="11" font-weight="700" fill="var(--text)">開會</text>
+          <text x="304" y="116" font-size="9" fill="var(--muted)">14:00</text>
+          <rect x="266" y="150" width="128" height="44" rx="10" fill="var(--chip)"/>
+          <rect x="266" y="206" width="128" height="44" rx="10" fill="var(--chip)"/>
+
+          <!-- 底部導航列 -->
+          <rect x="252" y="360" width="156" height="42" rx="8" fill="var(--surface-strong)" stroke="var(--line)" stroke-width="1.4"/>
+          <g fill="var(--muted)" font-size="8.5" text-anchor="middle" font-weight="700">
+            <rect x="262" y="368" width="16" height="16" rx="3" fill="var(--primary)"/><text x="270" y="398" fill="var(--primary)">日</text>
+            <rect x="292" y="368" width="16" height="16" rx="3" fill="none" stroke="var(--muted)" stroke-width="1.6"/><text x="300" y="398">週</text>
+            <rect x="322" y="368" width="16" height="16" rx="3" fill="none" stroke="var(--muted)" stroke-width="1.6"/><text x="330" y="398">月</text>
+            <g stroke="var(--muted)" stroke-width="1.6"><line x1="352" y1="370" x2="366" y2="370"/><line x1="352" y1="376" x2="366" y2="376"/><line x1="352" y1="382" x2="366" y2="382"/></g><text x="359" y="398">列表</text>
+            <circle cx="389" cy="376" r="7" fill="none" stroke="var(--muted)" stroke-width="1.6"/><circle cx="389" cy="376" r="2" fill="var(--muted)"/><text x="389" y="398">今天</text>
+          </g>
+
+          <!-- 左滑完成箭頭 -->
+          <g transform="translate(150 108)">
+            <path d="M80 0 H16" stroke="var(--sport)" stroke-width="4" fill="none" marker-end="url(#al)"/>
+            <text x="48" y="-12" font-size="12.5" font-weight="800" fill="var(--sport)" text-anchor="middle">左滑</text>
+            <text x="48" y="24" font-size="12" font-weight="700" fill="var(--sport)" text-anchor="middle">完成 ✓</text>
+          </g>
+          <!-- 右滑順延箭頭 -->
+          <g transform="translate(430 108)">
+            <path d="M0 0 H64" stroke="var(--home)" stroke-width="4" fill="none" marker-end="url(#ar2)"/>
+            <text x="40" y="-12" font-size="12.5" font-weight="800" fill="var(--home)" text-anchor="middle">右滑</text>
+            <text x="40" y="24" font-size="12" font-weight="700" fill="var(--home)" text-anchor="middle">順延 ▶</text>
+          </g>
+
+          <!-- 長按提示 -->
+          <g transform="translate(360 290)">
+            <circle cx="0" cy="0" r="15" fill="none" stroke="var(--primary)" stroke-width="3"/>
+            <circle cx="0" cy="0" r="5" fill="var(--primary)"/>
+            <path d="M20 20 l26 26" stroke="var(--primary)" stroke-width="3" stroke-linecap="round"/>
+            <text x="52" y="44" font-size="12" font-weight="700" fill="var(--text)">長按日格快速新增</text>
+          </g>
+
+          <!-- 加到主畫面 -->
+          <text x="330" y="450" font-size="12.5" font-weight="700" fill="var(--muted)" text-anchor="middle">加到主畫面 · 離線可用 · 掛牆看板模式</text>
+
+          <defs>
+            <marker id="al" markerWidth="9" markerHeight="9" refX="3" refY="4.5" orient="auto"><path d="M9 0 L0 4.5 L9 9 z" fill="var(--sport)"/></marker>
+            <marker id="ar2" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="var(--home)"/></marker>
+          </defs>
+        </svg>
+        <figcaption id="cap9">手機版重點：底部是<b>日／週／月／列表／今天</b>五顆導航；行程卡<b>左滑完成、右滑順延</b>，日期格<b>長按快速新增</b>。裝成 PWA 後可離線使用，甚至開掛牆看板模式當家庭佈告欄。</figcaption>
+      </figure>
+
+      <div class="example">
+        <span class="ex-tag">實際例子</span>
+        <p>通勤路上快速清當天待辦：</p>
+        <div class="flow">
+          <span class="step">單手滑到「日」檢視</span>
+          <span class="arrow">→</span>
+          <span class="step">做完的行程卡往左一滑＝完成</span>
+          <span class="arrow">→</span>
+          <span class="step">今天做不完的往右一滑＝順延到明天上班日</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer class="guide-footer">
+  <a class="back-btn" href="./index.html">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    回行事曆
+  </a>
+  <p class="ver">桌面行程表 · 使用教學　|　本頁為離線單檔說明，資料一律存在你自己的裝置。</p>
+</footer>
+
+</body>
+</html>

@@ -1,5 +1,14 @@
 # Recent Changes
 
+## 2026-08-09 新增使用教學：首訪歡迎卡片＋完整教學頁 guide.html
+- **歡迎卡片**（`#welcomeDialog`）：首次進入自動彈出，六大分類簡易教學（新增行程／切換檢視／重複行程／提醒通知／統計追蹤／備份同步），每類一張自繪 inline SVG（不用系統 emoji 當圖示，NOTES 14）。底部「不再顯示」勾選 → 寫 `desktop-schedule-welcome-v1='1'`；不勾就關則下次仍跳。裝置本機旗標，**不進備份、不進雲端**
+- 隨時可重開：⋯更多 › 設定與維護 › 「📖 使用教學」
+- **`guide.html`**（新檔，71KB）：九章完整教學（基本操作／六種檢視／重複行程／分類標籤優先度日曆本／提醒與專注／進階工具／統計與追蹤／資料與雲端／手機與 PWA），每章＝說明＋一張獨有 inline SVG＋figcaption＋實際範例。自我包含零外連、`file://` 可開、沿用 styles.css 變數並讀 theme key 跟隨深淺色、375px 無橫向溢出（寬表格包 `.table-wrap` 自捲）
+- `service-worker.js`：`guide.html` 加進 APP_SHELL（離線可查），`CACHE_NAME` v46→v47
+- 新增三個頂層函式 `maybeShowWelcome`／`openWelcomeDialog`／`closeWelcomeDialog`，撞名掃描 315 個頂層函式 0 衝突
+- **子代理回報有誤、已由主代理修正**：guide.html 原稿漏掉「家庭共享」整節（子代理只 grep `app-0*.js` 沒 grep `sync.js`，誤判該功能不存在）。已補上邀請碼流程與「行程需逐筆勾共享」的說明＋範例
+- **剩什麼**：`file://` 實測被預覽面板擋住（http→file 導航瀏覽器禁止），改以「零外連＋僅相對路徑」的結構證據佐證；有機會請在本機雙擊 `index.html` 實際確認一次
+
 ## 2026-08-08 手機版版面重排（桌機零變動）
 - 起因：使用者回報手機版面亂、且「⋯更多」與頂部工具列有重複選項。查出根因——`app-02-init.js` 註解宣稱手機會用 CSS 把 `.toolbar-actions` 整組隱藏，**實際那條規則不存在**；真正在管的是 `styles.css` 手機 media query 內的 id 隱藏清單，而第五波新增的 `#okrBtn`/`#calendarsBtn`/`#printViewBtn` 漏加，導致頂部與更多視窗各有一份
 - 頂部工具列 394px→**235px**：只留 日期導覽／清單·時間軸／🗑清空當日／🌙／☁️雲端同步／今日待辦／⋯更多（使用者指定保留到「今日待辦」）；主 `.view-switch` 手機隱藏，改由底部導航列負責，底部沒有的「年／甘特」在更多視窗補入口（`data-view-proxy`，因 `.view-btn` 只有 `data-view` 沒有 id）

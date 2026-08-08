@@ -332,6 +332,17 @@ function bindEvents() {
   });
   els.kioskCloseBtn?.addEventListener('click', closeKioskMode);
 
+  // 首次歡迎教學卡片：右上關閉鈕與「開始使用」都走 closeWelcomeDialog()（勾了「不再顯示」才寫旗標）；
+  // 「詳細教學」導向同目錄 guide.html（相對路徑，file:// 下也可用，該頁由另一支負責）；
+  // 「⋯ 更多 › 設定與維護 › 使用教學」直接開卡片——它是直接動作、不是 data-proxy，所以自己綁。
+  els.closeWelcomeBtn?.addEventListener('click', closeWelcomeDialog);
+  els.welcomeStartBtn?.addEventListener('click', closeWelcomeDialog);
+  els.welcomeGuideBtn?.addEventListener('click', () => { window.location.href = './guide.html'; });
+  els.welcomeReopenBtn?.addEventListener('click', () => {
+    els.moreToolsDialog?.close();
+    openWelcomeDialog();
+  });
+
   // 統計儀表板：手機版走 #moreToolsDialog 的 data-proxy="dashboardBtn"（沿用既有
   // proxy click 迴圈，不需要額外綁定）。逾期清單點擊比照 data-countdown-edit 的
   // 委派寫法，但用 data-dashboard-edit 這組新 dataset key 避免跟既有委派衝突。
@@ -516,6 +527,23 @@ const COMMAND_PALETTE_ACTIONS = [
 
 let commandPaletteItems = [];
 let commandPaletteActiveIndex = -1;
+
+// 首次歡迎教學卡片的開關。openWelcomeDialog() 供「⋯ 更多 › 使用教學」重開；closeWelcomeDialog()
+// 供右上關閉鈕與「開始使用」：勾了「不再顯示」就寫入 WELCOME_KEY='1'（try/catch 保護，隱私模式
+// 寫入失敗也不影響其他功能），沒勾就只關閉、下次仍會自動跳。裝置本機 UI 狀態，不進備份／雲端同步。
+function openWelcomeDialog() {
+  els.welcomeDialog?.showModal();
+}
+function closeWelcomeDialog() {
+  if (els.welcomeDontShowAgain?.checked) {
+    try {
+      localStorage.setItem(WELCOME_KEY, '1');
+    } catch (_) {
+      /* 隱私模式等寫入失敗：靜默忽略，不影響其他功能 */
+    }
+  }
+  els.welcomeDialog?.close();
+}
 
 function openCommandPalette() {
   if (!els.commandPalette) return;

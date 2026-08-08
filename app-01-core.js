@@ -35,6 +35,10 @@ let dynamicHolidays = {}; // init() 時從 localStorage 載入進記憶體，供
 const SNOOZE_KEY = 'desktop-schedule-snooze-v1';
 const SNOOZE_STALE_MS = 24 * 60 * 60 * 1000; // 到期超過 24 小時的殘留視為過期，清掉不補發
 
+// 首次進入的歡迎教學卡片「不再顯示」旗標（值 '1' 代表已看過／不再顯示）。純裝置本機 UI 狀態，
+// 刻意不納入 buildBackupPayload()/applyBackupObject()、不進雲端同步（比照 HOLIDAYS_KEY 的處理）。
+const WELCOME_KEY = 'desktop-schedule-welcome-v1';
+
 // 台灣國定假日對照表（2025–2027年，含補假／彈性放假）。資料來源：行政院人事行政總處公告辦公日曆表。
 const TAIWAN_HOLIDAYS = {
   '2025-01-01': '元旦',
@@ -407,6 +411,12 @@ const els = {
   moreToolsBtn: $('moreToolsBtn'),
   moreToolsDialog: $('moreToolsDialog'),
   closeMoreToolsBtn: $('closeMoreToolsBtn'),
+  welcomeDialog: $('welcomeDialog'),
+  closeWelcomeBtn: $('closeWelcomeBtn'),
+  welcomeStartBtn: $('welcomeStartBtn'),
+  welcomeGuideBtn: $('welcomeGuideBtn'),
+  welcomeDontShowAgain: $('welcomeDontShowAgain'),
+  welcomeReopenBtn: $('welcomeReopenBtn'),
   moreToolsWeeklyReviewBtn: $('moreToolsWeeklyReviewBtn'),
   kioskModeBtn: $('kioskModeBtn'),
   kioskOverlay: $('kioskOverlay'),
