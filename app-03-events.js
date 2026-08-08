@@ -240,6 +240,31 @@ function bindEvents() {
     });
   });
 
+  // 檢視 proxy（年／甘特）：.view-btn 沒有 id、只有 data-view，所以另走一條，
+  // 行為與上面的 data-proxy 一致（關 dialog → 對原按鈕 .click()，切檢視邏輯零改動）。
+  document.querySelectorAll('#moreToolsDialog [data-view-proxy]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.viewProxy;
+      els.moreToolsDialog?.close();
+      document.querySelector(`.view-btn:not(.day-mode-btn)[data-view="${view}"]`)?.click();
+    });
+  });
+
+  // 「更多」分組收合：只在手機有意義（桌機用 CSS 把 .more-tools-group-title 隱藏、
+  // 項目恆常展開，所以這裡即使綁了也點不到）。一次只展開一組，避免又變成長清單。
+  document.querySelectorAll('#moreToolsDialog .more-tools-group-title').forEach((title) => {
+    title.addEventListener('click', () => {
+      const group = title.parentElement;
+      const willOpen = !group.classList.contains('open');
+      document.querySelectorAll('#moreToolsDialog .more-tools-group').forEach((other) => {
+        other.classList.remove('open');
+        other.querySelector('.more-tools-group-title')?.setAttribute('aria-expanded', 'false');
+      });
+      group.classList.toggle('open', willOpen);
+      title.setAttribute('aria-expanded', String(willOpen));
+    });
+  });
+
   document.querySelectorAll('.view-btn:not(.day-mode-btn)').forEach((btn) => {
     btn.addEventListener('click', () => {
       currentView = btn.dataset.view;

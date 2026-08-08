@@ -1424,6 +1424,13 @@ body.dark .conflict-warning {
   border: 1px solid var(--border);
 }
 
+/* 「更多」工具視窗的分組。桌機刻意「不」顯示組標題、且項目全部展開，
+   讓桌機（工具列溢出時才會開這個 dialog）看到的外觀與分組前的平舖清單
+   完全一致——分組純粹是為手機服務的，桌機版面零變動。
+   .more-tools-group 自己也是 column flex＋同樣 gap，多包一層不會讓間距跑掉。 */
+.more-tools-group { display: flex; flex-direction: column; gap: 10px; }
+.more-tools-group-title { display: none; }
+
 /* 桌面版工具列動態溢出收合（app.js setupToolbarOverflow()）用的 proxy 群組：
    跟 .more-tools-body 其餘固定項目視覺一致（同樣的直向排列＋間距），
    只是獨立管理避免跟手機固定的 proxy 互相覆蓋。 */
@@ -1613,9 +1620,64 @@ body.widget-mode .task-card { font-size: 14px; }
   #dataCheckBtn,
   #batchAddBtn,
   #deferBtn,
+  /* 以下三顆是第五波新增的工具鈕，當時漏了加進本清單，導致它們同時出現在
+     手機頂部工具列「以及」⋯更多視窗裡（同一個功能兩個入口）。補上去。 */
+  #okrBtn,
+  #calendarsBtn,
+  #printViewBtn,
   #shareCardBtn {
     display: none !important;
   }
+
+  /* 手機檢視切換交給底部導航列（日/週/月/列表/今天），頂部這條就不再重複佔一整行。
+     底部導航沒有的「年／甘特」已在 ⋯更多 →「檢視與模式」補上入口。
+     只隱藏主檢視切換，日檢視的「清單／時間軸」（#dayModeSwitch）要留著。 */
+  .toolbar-actions > .view-switch:not(#dayModeSwitch) { display: none !important; }
+
+  /* ⋯更多：手機改成分組下拉，預設全收合，點組標題才展開該組（一次一組）。 */
+  .more-tools-group {
+    gap: 8px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 4px;
+    background: var(--surface);
+  }
+  .more-tools-group-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 14px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left;
+  }
+  .more-tools-group-title::after {
+    content: '›';
+    font-size: 18px;
+    color: var(--muted);
+    transition: transform .18s ease;
+  }
+  .more-tools-group.open > .more-tools-group-title::after { transform: rotate(90deg); }
+  .more-tools-group:not(.open) > .more-tools-item { display: none; }
+
+  /* 行事曆下方的側欄小面板（今日重點／倒數日／完成率／每週目標／習慣追蹤／自訂分類／
+     快速範本）原本一格一行、七行收合標題就吃掉半個螢幕。改成兩欄，展開中的那格
+     才跨整行，高度直接砍半，捲動距離大幅縮短。 */
+  .sidebar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-content: start;
+  }
+  .sidebar > .primary-btn,
+  .sidebar > .panel:not(.collapsed) { grid-column: 1 / -1; }
+  .sidebar > .panel.collapsed { margin: 0; }
+  .sidebar > .panel.collapsed h2 { font-size: 14px; }
 
   /* Dialog 手機版改成貼齊底部彈出，上圓角下直角，內容過長可捲動。 */
   dialog.task-dialog {

@@ -778,29 +778,56 @@
       <button type="button" id="closeMoreToolsBtn" class="icon-btn" aria-label="關閉">✕</button>
     </div>
 
+    <!-- 分五組。手機（≤760px）每組是可收合的下拉；桌機把 .more-tools-group-title 隱藏、
+         項目全部展開，視覺與分組前的平舖清單完全一致（桌機只有工具列溢出時才會開這個 dialog）。
+         點任一項仍是 proxy 行為：關掉本 dialog → 對原按鈕 .click() → 原本的卡片視窗照常跳出。 -->
     <div class="more-tools-body">
-      <button type="button" class="more-tools-item" id="moreToolsWeeklyReviewBtn">📊 本週回顧</button>
-      <button type="button" class="more-tools-item" data-proxy="dashboardBtn">📈 統計</button>
-      <button type="button" class="more-tools-item" data-proxy="okrBtn">🎯 OKR</button>
-      <button type="button" class="more-tools-item" data-proxy="commandPaletteBtn">🔍 命令面板</button>
-      <button type="button" class="more-tools-item" data-proxy="dataCheckBtn">🩺 資料檢查</button>
-      <button type="button" class="more-tools-item" data-proxy="enableNotificationsBtn">🔔 開啟通知</button>
-      <button type="button" class="more-tools-item" data-proxy="backupBtn">備份</button>
-      <button type="button" class="more-tools-item" data-proxy="restoreBtn">還原</button>
-      <button type="button" class="more-tools-item" data-proxy="settingsBtn">文字設定</button>
-      <button type="button" class="more-tools-item" data-proxy="pomodoroBtn">🍅 番茄鐘</button>
-      <button type="button" class="more-tools-item" data-proxy="widgetModeBtn">小工具模式</button>
-      <button type="button" class="more-tools-item" data-proxy="calendarsBtn">📚 日曆本</button>
-      <button type="button" class="more-tools-item" data-proxy="cleanupBtn">清理舊行程</button>
-      <button type="button" class="more-tools-item" data-proxy="exportCsvBtn">匯出 Excel</button>
-      <button type="button" class="more-tools-item" data-proxy="printBtn">匯出 PDF</button>
-      <button type="button" class="more-tools-item" data-proxy="printViewBtn">🖨 列印目前檢視</button>
-      <button type="button" class="more-tools-item" data-proxy="exportIcsBtn">匯出 .ics</button>
-      <button type="button" class="more-tools-item" data-proxy="importIcsBtn">匯入 .ics</button>
-      <button type="button" class="more-tools-item" data-proxy="batchAddBtn">📋 批量新增</button>
-      <button type="button" class="more-tools-item" data-proxy="deferBtn">⏭ 未完成順延</button>
-      <button type="button" class="more-tools-item" data-proxy="shareCardBtn">🖼 分享圖卡</button>
-      <button type="button" class="more-tools-item" id="kioskModeBtn">🖥 看板模式</button>
+      <div class="more-tools-group">
+        <button type="button" class="more-tools-group-title" aria-expanded="false">檢視與模式</button>
+        <!-- 年／甘特：手機頂部的檢視切換列已隱藏（改由底部導航負責日/週/月/列表），
+             這兩個檢視底部導航沒有，所以在這裡補入口。用 data-view-proxy 而非 data-proxy，
+             因為 .view-btn 沒有 id，只有 data-view。 -->
+        <button type="button" class="more-tools-item" data-view-proxy="year">📅 年檢視</button>
+        <button type="button" class="more-tools-item" data-view-proxy="gantt">📊 甘特圖</button>
+        <button type="button" class="more-tools-item" data-proxy="printViewBtn">🖨 列印目前檢視</button>
+        <button type="button" class="more-tools-item" id="kioskModeBtn">🖥 看板模式</button>
+        <button type="button" class="more-tools-item" data-proxy="widgetModeBtn">小工具模式</button>
+      </div>
+
+      <div class="more-tools-group">
+        <button type="button" class="more-tools-group-title" aria-expanded="false">分析與追蹤</button>
+        <button type="button" class="more-tools-item" id="moreToolsWeeklyReviewBtn">📊 本週回顧</button>
+        <button type="button" class="more-tools-item" data-proxy="dashboardBtn">📈 統計</button>
+        <button type="button" class="more-tools-item" data-proxy="okrBtn">🎯 OKR</button>
+        <button type="button" class="more-tools-item" data-proxy="pomodoroBtn">🍅 番茄鐘</button>
+      </div>
+
+      <div class="more-tools-group">
+        <button type="button" class="more-tools-group-title" aria-expanded="false">行程工具</button>
+        <button type="button" class="more-tools-item" data-proxy="commandPaletteBtn">🔍 命令面板</button>
+        <button type="button" class="more-tools-item" data-proxy="batchAddBtn">📋 批量新增</button>
+        <button type="button" class="more-tools-item" data-proxy="deferBtn">⏭ 未完成順延</button>
+        <button type="button" class="more-tools-item" data-proxy="shareCardBtn">🖼 分享圖卡</button>
+        <button type="button" class="more-tools-item" data-proxy="calendarsBtn">📚 日曆本</button>
+        <button type="button" class="more-tools-item" data-proxy="cleanupBtn">清理舊行程</button>
+      </div>
+
+      <div class="more-tools-group">
+        <button type="button" class="more-tools-group-title" aria-expanded="false">匯出入與備份</button>
+        <button type="button" class="more-tools-item" data-proxy="backupBtn">備份</button>
+        <button type="button" class="more-tools-item" data-proxy="restoreBtn">還原</button>
+        <button type="button" class="more-tools-item" data-proxy="exportCsvBtn">匯出 Excel</button>
+        <button type="button" class="more-tools-item" data-proxy="printBtn">匯出 PDF</button>
+        <button type="button" class="more-tools-item" data-proxy="exportIcsBtn">匯出 .ics</button>
+        <button type="button" class="more-tools-item" data-proxy="importIcsBtn">匯入 .ics</button>
+      </div>
+
+      <div class="more-tools-group">
+        <button type="button" class="more-tools-group-title" aria-expanded="false">設定與維護</button>
+        <button type="button" class="more-tools-item" data-proxy="settingsBtn">文字設定</button>
+        <button type="button" class="more-tools-item" data-proxy="enableNotificationsBtn">🔔 開啟通知</button>
+        <button type="button" class="more-tools-item" data-proxy="dataCheckBtn">🩺 資料檢查</button>
+      </div>
     </div>
   </dialog>
 
