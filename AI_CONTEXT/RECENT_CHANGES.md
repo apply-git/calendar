@@ -1,5 +1,11 @@
 # Recent Changes
 
+## 2026-08-09 教學頁加可拖曳浮動返回鈕
+- `guide.html` 新增 `#floatBack`：`position:fixed` 右下角，捲到任何位置都在。**可自由拖曳**（Pointer Events 一套涵蓋滑鼠與觸控），位移 <6px 判定為點擊 → 回行事曆，超過才算拖曳，不會誤觸
+- 位置存 `desktop-schedule-guide-backpos`，重載後回到原位；每次套用與 `resize` 都 clamp 進可視範圍，轉向不會把按鈕丟到畫面外。手機縮成 46×46 圓鈕只留箭頭，桌機是藥丸形帶文字
+- 解決的問題：教學頁是整頁導航，iOS standalone PWA 沒有網址列也沒有返回手勢，原本只靠頁首/頁尾兩顆按鈕，捲到中間就按不到。原本那兩顆保留不動
+- `CACHE_NAME` v49→v50；踩坑寫入 NOTES 第 20 條（`touch-action:none` 是手機能拖的關鍵；`right/bottom` 與 JS 的 `left/top` 要用 class 隔開；`scroll-behavior:smooth` 會讓 `scrollTo` 後立刻讀 `scrollY` 拿到 0 而使捲動測試變空測）
+
 ## 2026-08-09 教學頁改雙軌（電腦版／手機版）＋每張圖加紅色標註
 - `guide.html` 進入先出**平台選擇頁**（💻電腦版／📱手機版兩張大卡），選定才顯示該軌；選擇記在 `desktop-schedule-guide-platform`，頂部有切換器與「↺ 重新選擇」，目錄（`data-track` 兩組 `<ol>`）與頁首/分頁標題跟著切
 - 兩軌各九章，共 18 張擬真介面圖：**電腦版套瀏覽器視窗外框**（含網址列）、**手機版套手機外框**（狀態列/home indicator），皆照實測真實 DOM 版面畫（桌機六組下拉選單、手機雙欄小卡＋底部導航等）

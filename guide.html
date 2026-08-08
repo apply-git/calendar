@@ -121,6 +121,46 @@
   }
   .back-btn svg { width: 18px; height: 18px; }
 
+  /* 可拖曳的浮動返回鈕。預設右下角；使用者拖過之後改用 JS 設的 left/top（見檔尾 script），
+     那時會加上 .is-moved 讓 right/bottom 失效，避免兩組定位互相打架。
+     touch-action:none 是拖曳能動的關鍵——不設的話瀏覽器會把手指移動判成捲頁，
+     pointermove 收不到。 */
+  #floatBack {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 900;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 11px 15px;
+    border: 0;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .28);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #floatBack.is-moved { right: auto; bottom: auto; }
+  #floatBack svg { width: 17px; height: 17px; flex: 0 0 auto; }
+  #floatBack.dragging { cursor: grabbing; opacity: .9; transform: scale(1.04); }
+  #floatBack:focus-visible { outline: 3px solid var(--anno); outline-offset: 3px; }
+  /* 手機縮成圓形只留箭頭，省空間、也比較不擋內容。 */
+  @media (max-width: 760px) {
+    #floatBack { padding: 13px; gap: 0; }
+    #floatBack span { display: none; }
+    #floatBack svg { width: 20px; height: 20px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #floatBack.dragging { transform: none; }
+  }
+
   /* ---------- 平台選擇畫面 ---------- */
   .platform-picker {
     min-height: calc(100vh - 150px);
@@ -2483,6 +2523,14 @@
   <p class="ver">桌面行程表 · 使用教學　|　本頁為離線單檔說明，資料一律存在你自己的裝置。</p>
 </footer>
 
+<!-- 可拖曳的浮動返回鈕：整頁導航進來的教學頁，在 iOS standalone PWA 下既沒有網址列
+     也沒有返回手勢，只靠頁首/頁尾兩顆按鈕，捲到中間就按不到。這顆固定在畫面上，
+     可以自己拖到不擋內容的位置，位置會被記住。 -->
+<button type="button" id="floatBack" aria-label="回行事曆（可拖曳移動位置）" title="回行事曆（可拖曳）">
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <span>回行事曆</span>
+</button>
+
 <script>
   /* ========== 平台選擇 / 切換邏輯 ==========
      - 選擇記在 localStorage['desktop-schedule-guide-platform']（'desktop' | 'mobile'）
@@ -2563,6 +2611,101 @@
     var saved = readPlatform();
     if (saved) applyPlatform(saved);
     else showPicker();
+  })();
+
+  /* ========== 可拖曳的浮動返回鈕 ==========
+     - 用 Pointer Events，滑鼠與觸控共用一套（不必分別綁 mouse* / touch*）
+     - 「拖曳」與「點擊」用位移門檻區分：移動未超過 DRAG_MIN_PX 才算點擊 → 回行事曆
+     - 位置記在 localStorage['desktop-schedule-guide-backpos']（{x,y}），
+       讀寫包 try/catch；隱私模式存不了也只是不記位置，不影響按鈕能用
+     - 每次套用位置都會 clamp 進可視範圍，視窗縮小/轉向不會把按鈕丟到畫面外 */
+  (function () {
+    var btn = document.getElementById('floatBack');
+    if (!btn) return;
+    var POS_KEY = 'desktop-schedule-guide-backpos';
+    var DRAG_MIN_PX = 6;   // 小於這個位移視為點擊，不算拖曳
+    var EDGE = 8;          // 貼邊時保留的最小邊距
+    var dragging = false, moved = false, startX = 0, startY = 0, baseX = 0, baseY = 0;
+
+    function clamp(x, y) {
+      var w = btn.offsetWidth, h = btn.offsetHeight;
+      return {
+        x: Math.min(Math.max(x, EDGE), Math.max(EDGE, window.innerWidth - w - EDGE)),
+        y: Math.min(Math.max(y, EDGE), Math.max(EDGE, window.innerHeight - h - EDGE))
+      };
+    }
+    function place(x, y) {
+      var p = clamp(x, y);
+      btn.classList.add('is-moved');
+      btn.style.left = p.x + 'px';
+      btn.style.top = p.y + 'px';
+      return p;
+    }
+    function savePos(p) {
+      try { localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch (e) {}
+    }
+    function restorePos() {
+      try {
+        var raw = localStorage.getItem(POS_KEY);
+        if (!raw) return;
+        var p = JSON.parse(raw);
+        if (p && isFinite(p.x) && isFinite(p.y)) place(p.x, p.y);
+      } catch (e) {}
+    }
+
+    btn.addEventListener('pointerdown', function (e) {
+      if (e.button != null && e.button !== 0) return; // 只認主鍵/單指
+      var r = btn.getBoundingClientRect();
+      dragging = true; moved = false;
+      startX = e.clientX; startY = e.clientY;
+      baseX = r.left; baseY = r.top;
+      btn.setPointerCapture(e.pointerId);
+      btn.classList.add('dragging');
+    });
+
+    btn.addEventListener('pointermove', function (e) {
+      if (!dragging) return;
+      var dx = e.clientX - startX, dy = e.clientY - startY;
+      if (!moved && Math.abs(dx) + Math.abs(dy) < DRAG_MIN_PX) return;
+      moved = true;
+      place(baseX + dx, baseY + dy);
+    });
+
+    function endDrag(e) {
+      if (!dragging) return;
+      dragging = false;
+      btn.classList.remove('dragging');
+      try { btn.releasePointerCapture(e.pointerId); } catch (err) {}
+      if (moved) {
+        var r = btn.getBoundingClientRect();
+        savePos({ x: r.left, y: r.top });
+      } else {
+        window.location.href = './index.html'; // 沒移動＝當成點擊
+      }
+    }
+    btn.addEventListener('pointerup', endDrag);
+    btn.addEventListener('pointercancel', function (e) {
+      dragging = false;
+      btn.classList.remove('dragging');
+      try { btn.releasePointerCapture(e.pointerId); } catch (err) {}
+    });
+
+    // 鍵盤可用：Enter / Space 直接回行事曆（拖曳是滑鼠/觸控的加值，不是唯一途徑）
+    btn.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        window.location.href = './index.html';
+      }
+    });
+
+    // 視窗尺寸變了（轉向、縮放）重新 clamp，避免按鈕跑到看不見的地方
+    window.addEventListener('resize', function () {
+      if (!btn.classList.contains('is-moved')) return;
+      var r = btn.getBoundingClientRect();
+      place(r.left, r.top);
+    });
+
+    restorePos();
   })();
 </script>
 
